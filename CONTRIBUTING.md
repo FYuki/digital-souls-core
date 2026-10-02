@@ -13,12 +13,25 @@ AGENTSは規約を重複させず、この文書へ案内します。
 
 ## 変更とレビュー
 
-最新の`main`から別worktreeとfeature branchを作り、push前にremoteと
+最新の`main`から`epic/*`を作り、そのepicから別worktreeと作業branchを作ります。push前にremoteと
 リポジトリの識別情報を確認します。コミットは範囲を絞り、レビュー可能な単位にします。
-`main`宛てのDraft PRにIssueを紐付け、ユーザーレビューに出してください。
-今回の初期整備ではmergeは承認されていません。別途の決定なしにリポジトリの
+作業branchはfeature/fix/docs/infra/character等の目的別名とし、対応するepic宛てのDraft PRに
+Issueを紐付けます。作業branchからmainへの直接PRは作りません。
+作業PR→epicは最終headのCIグリーン、epic→mainは最終headのCIグリーンと実際のCodeRabbit
+レビュー指摘への対応が必要です。botの概要・review disabled通知はレビュー完了ではありません。
+blocking指摘が未解決ならマージしません。ユーザーから当該作業のマージ許可がある場合のみ
+これらを満たしてマージし、mainの正確なcommitとpost-merge CIも確認します。
+独立reviewはCodeRabbitの代用ではありません。一般の作業に無条件のマージ権限を与える規約では
+ありません。別途の決定なしにリポジトリの
 セキュリティ設定、branch protection、ruleset、GitHub Appを変更しません。
 この規約から新たな承認権限を推定しないでください。
+
+3層方針は[公開digital-soulsの規約](https://github.com/FYuki/digital-souls/blob/7a11b2d9883b8bc2f6fcc53c6187d78e445d4b3c/docs/repository-policy.md)
+を参照し、Coreのユーザー指示へ合わせています。音声・PoC固有規則は移植しません。
+CodeRabbitは[設定](.coderabbit.yaml)で日本語/assertiveとrepo規約参照を指定します。
+小規模public repoではmanual reviewが必要な場合があります。main宛てPRをレビュー可能にして
+`@coderabbitai full review`を一度依頼し、実際のreview内容・対象head・適用設定を確認します。
+rate limitなら通知されたretry/reset時刻を待ち、連投しません。epicの自動review範囲を増やしません。
 
 ## アーキテクチャとプライバシー
 
@@ -47,7 +60,7 @@ git diff --check
 ```
 
 `Bootstrap checks / docs-tooling`はpathフィルターを設けず、すべてのPRと
-mainへのpushで実行します。追跡対象Markdownのローカル参照先ファイル、テキストの
+mainおよびepicへのpushで実行します。追跡対象Markdownのローカル参照先ファイル、テキストの
 空白・改行、JSON構文、検証ツール自体の回帰テストを確認します。
 アンカーの存在や外部URLは検証しません。製品の正しさを保証するものでも、
 包括的な秘密情報スキャナーでもありません。ステージした内容の機密情報を確認してください。
@@ -66,7 +79,23 @@ CIの権限はcontentsの読み取りのみです。公式ActionsをSHAで固定
 製品コードを受け入れる前に、言語・toolchainをADRで合意し、開発依存の正確なバージョン、
 コミットされたlockfile、lockを変更しないインストール手順を追加します。
 lint、format-check、静的型検査、UT、IT1、パッケージのbuild・install確認を行う
-実際のコマンドを整備してください。これらは現在**未導入（NOT IMPLEMENTED）**です。
+実際のコマンドを整備します。[推論API契約](docs/api.md)と[ADR 0001](docs/adr/0001-character-inference-api.md)に
+初期Python実装の境界を記載しています。固定したuv 0.8.22で以下を実行します。
+
+```sh
+uv sync --frozen
+uv run --no-sync ruff check src tests
+uv run --no-sync ruff format --check src tests
+uv run --no-sync mypy
+uv run --no-sync pytest -m ut -q
+uv run --no-sync pytest -m it1 -q
+uv build --no-build-isolation
+```
+
+wheelの独立環境へのlocked installとimport確認は[API CI](.github/workflows/api.yml)に定義します。
+`API checks / api-quality`も全PRとmain/epicへのpushで実行します。UT/IT1はsocketを禁止し、
+pytest pluginでskip/xfail/xpass/0件を失敗にします。依存取得にはネットワークが必要ですが
+テスト実行に実LLM・APIキー・GPUは不要です。
 空の成功ジョブ、テスト0件でのPASS、dummy testを作らないでください。
 
 UTとIT1は外部通信・実LLMを使わない決定的なテストとします。
