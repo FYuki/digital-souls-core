@@ -40,7 +40,7 @@ a documentation-tool runtime, not a product-language choice. The checker uses
 only built-in modules; there are no development packages to lock today.
 
 ```sh
-node --test tools/check-docs.test.mjs
+node --test --test-reporter=./tools/required-tests-reporter.mjs tools/check-docs.test.mjs tools/required-tests-reporter.test.mjs
 node tools/check-docs.mjs
 git diff --check
 ```
@@ -51,6 +51,10 @@ existence or remote URLs), text whitespace/newlines, JSON syntax and the
 checker's real regression tests. It does not establish product correctness or
 provide a complete secret scanner. Review staged content for confidential data.
 Sample manifests are checked for included-file SHA-256/size and local paths.
+The required-test reporter rejects skipped, TODO, cancelled and failing tests,
+empty suites/files, and missing per-file summaries. Node's synthetic empty-file
+pass does not count as a registered test. Reporter fixture tests run on the pinned
+Node version; revalidate event-summary behavior when updating Node.
 CI uses read-only contents permission, pinned official Actions, no secrets,
 no `pull_request_target` and no cache. Update pinned tools in reviewed changes.
 

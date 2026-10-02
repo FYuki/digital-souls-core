@@ -20,7 +20,7 @@ jobs:
         with:
           node-version-file: .node-version
       - name: Test documentation checker
-        run: node --test tools/check-docs.test.mjs
+        run: node --test --test-reporter=./tools/required-tests-reporter.mjs tools/check-docs.test.mjs tools/required-tests-reporter.test.mjs
       - name: Check tracked documentation and config
         run: node tools/check-docs.mjs
       - name: Check patch whitespace
