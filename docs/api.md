@@ -59,7 +59,9 @@ HTTP 200を開始するので、それ以前の失敗は通常のHTTPエラー�
 `event: error`＋`data: {"error": ...}`を送り、`[DONE]`を送らず終了します。
 OpenAI Python SDKで途中失敗が例外となる契約テストがあります。すべての互換クライアントの
 動作保証ではなく、独自clientはerror event・異常EOFを成功として扱わないでください。
-切断・取消では上流streamをcloseします。再試行・別モデルfallbackは実装しません。
+初回chunk待機中も含め、切断・取消では上流streamをcloseします。
+応答開始前に検出した切断は内部的に499/client_disconnectedとして扱います。
+再試行・別モデルfallbackは実装しません。
 
 エラーbodyは`{"error":{"type":"core_error","code":"...","message":"..."}}`です。
 不正入力/未対応は400、送信policy拒否は403、unknown characterは404、provider制限は429、

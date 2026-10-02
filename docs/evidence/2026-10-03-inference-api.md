@@ -10,8 +10,8 @@
 ## ローカル検証
 
 初回37 testsから拒否・policy・token正規化・HTTP fixture・AnyIO取消scopeを追加し、
-45 tests（skipなし）がPASSしました。ruff check/format、mypyもPASSです。
-製品コード14ファイルが型検査対象です。文書requiredテスト23件、文書リンクと素材hash、
+初回chunk前後のASGI切断を含む47 tests（skipなし）がPASSしました。ruff check/format、mypyもPASSです。
+Pythonコード15ファイルが型検査対象です。文書requiredテスト23件、文書リンクと素材hash、
 git diff --checkがPASS。CodeRabbit YAMLは取得した公式schemaで検証済みです。
 最終revisionとGitHub CI結果はPRにhead SHAを添えて記録します。
 

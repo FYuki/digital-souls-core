@@ -1,14 +1,18 @@
 """A deliberately bounded HTTP API. Only the outbound SDK owns provider transport."""
 
+import asyncio
 import json
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator, Coroutine
 from contextlib import aclosing
 from pathlib import Path
+from typing import Any
 
+import anyio
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
+from starlette.types import Receive, Scope, Send
 
 from .application import CoreError, Inference
 from .character import load_characters
@@ -18,6 +22,41 @@ from .provider import LiteLLMProvider
 
 def error_body(error: CoreError) -> dict[str, dict[str, str]]:
     return {"error": {"type": "core_error", "code": error.code, "message": error.message}}
+
+
+class ManagedStream(StreamingResponse):
+    """Own prefetched upstream even if the client leaves before the first send."""
+
+    upstream: AsyncGenerator[dict[str, Any]]
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            with anyio.CancelScope(shield=True):
+                await self.upstream.aclose()
+
+
+async def until_disconnect[T](operation: Coroutine[Any, Any, T], request: Request) -> T:
+    async def disconnected() -> None:
+        # FastAPI has already consumed the JSON body before invoking the route.
+        while True:
+            event = await request.receive()
+            if event["type"] == "http.disconnect":
+                return
+
+    work = asyncio.create_task(operation)
+    watcher = asyncio.create_task(disconnected())
+    try:
+        done, _ = await asyncio.wait((work, watcher), return_when=asyncio.FIRST_COMPLETED)
+        if work in done:
+            return work.result()
+        raise CoreError(499, "client_disconnected", "Client disconnected")
+    finally:
+        for task in (work, watcher):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(work, watcher, return_exceptions=True)
 
 
 def create_app(inference: Inference | None = None) -> FastAPI:
@@ -84,19 +123,25 @@ def create_app(inference: Inference | None = None) -> FastAPI:
                     )
                     yield "event: error\ndata: " + json.dumps(error_body(public_error)) + "\n\n"
 
-        return StreamingResponse(
+        response = ManagedStream(
             events(),
             media_type="text/event-stream",
             headers={**prepared.headers, "Cache-Control": "no-cache"},
         )
+        response.upstream = upstream
+        return response
 
     @app.post("/v1/character/completions", response_model=None)
-    async def character_completion(body: CharacterCompletion) -> JSONResponse | StreamingResponse:
-        return await run(body.character_id, body, alias=False)
+    async def character_completion(
+        body: CharacterCompletion, request: Request
+    ) -> JSONResponse | StreamingResponse:
+        return await until_disconnect(run(body.character_id, body, alias=False), request)
 
     @app.post("/v1/chat/completions", response_model=None)
-    async def alias_completion(body: AliasCompletion) -> JSONResponse | StreamingResponse:
-        return await run(body.model, body, alias=True)
+    async def alias_completion(
+        body: AliasCompletion, request: Request
+    ) -> JSONResponse | StreamingResponse:
+        return await until_disconnect(run(body.model, body, alias=True), request)
 
     @app.get("/v1/models")
     async def models() -> dict[str, object]:
