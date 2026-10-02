@@ -3,8 +3,9 @@
 変更前に[CONTRIBUTING.md](CONTRIBUTING.md)を読んでください。
 開発規約の正本はCONTRIBUTINGで、このファイルはエージェント向けの入口です。
 
-- 隔離したworktreeとfeature branchで作業し、`main`宛てのDraft PRを
-  ユーザーレビューに出してください。今回の作業ではmergeやauto-mergeを行いません。
+- 隔離したworktreeと作業branchで、対応する`epic/*`宛てのDraft PRを出してください。
+  `epic/*`から`main`へのPRには実際のCodeRabbitレビューとCIが必要です。
+  詳細とマージ権限の条件はCONTRIBUTINGを参照してください。
 - 依頼された範囲を守ってください。製品要件や言語選定には議論が必要です。
   未整備の品質ゲートを埋めるために実装を作らないでください。
 - 私的ログ、認証情報、無関係なリポジトリの内容を転記しないでください。

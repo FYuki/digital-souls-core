@@ -3,7 +3,7 @@ name: Bootstrap checks
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'epic/**']
 
 permissions:
   contents: read
