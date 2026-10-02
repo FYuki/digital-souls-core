@@ -23,7 +23,7 @@ pytestmark = pytest.mark.it1
 
 
 def test_external_client_fixture_round_trip() -> None:
-    http = TestClient(create_fixture_app())
+    http = TestClient(create_fixture_app(), base_url="http://127.0.0.1")
     messages: list[dict[str, Any]] = [{"role": "user", "content": "run fixture"}]
     body = {
         "character_id": "miori",
@@ -54,7 +54,7 @@ def test_external_client_fixture_round_trip() -> None:
 @pytest.mark.parametrize("field", ["max_tokens", "max_completion_tokens"])
 def test_token_limit_normalization(field: str) -> None:
     fake = FakeProvider()
-    http = TestClient(create_app(Inference((character(),), fake)))
+    http = TestClient(create_app(Inference((character(),), fake)), base_url="http://127.0.0.1")
     body: dict[str, Any] = {
         "model": "miori-alias",
         "messages": [{"role": "user", "content": "hi"}],
@@ -73,7 +73,9 @@ def test_context_failure_does_not_call_provider_or_echo_private_data() -> None:
             raise RuntimeError("SYNTHETIC_PRIVATE_DATA")
 
     fake = FakeProvider()
-    http = TestClient(create_app(Inference((character(),), fake, BrokenContext())))
+    http = TestClient(
+        create_app(Inference((character(),), fake, BrokenContext())), base_url="http://127.0.0.1"
+    )
     response = http.post(
         "/v1/chat/completions",
         json={"model": "miori-alias", "messages": [{"role": "user", "content": "hi"}]},
@@ -96,7 +98,10 @@ def test_denied_profile_does_not_retrieve_context() -> None:
             }
         ),
     )
-    http = TestClient(create_app(Inference((denied,), FakeProvider(), ForbiddenContext())))
+    http = TestClient(
+        create_app(Inference((denied,), FakeProvider(), ForbiddenContext())),
+        base_url="http://127.0.0.1",
+    )
     response = http.post(
         "/v1/chat/completions",
         json={"model": "miori-alias", "messages": [{"role": "user", "content": "hi"}]},
@@ -123,7 +128,9 @@ def test_invalid_policy_is_not_coerced_and_invalid_configuration_fails_startup(
 
 def test_stateless_http_character_separation() -> None:
     fake = FakeProvider()
-    http = TestClient(create_app(Inference((character(), character("other")), fake)))
+    http = TestClient(
+        create_app(Inference((character(), character("other")), fake)), base_url="http://127.0.0.1"
+    )
     for alias in ("miori-alias", "other-alias", "miori-alias"):
         assert (
             http.post(

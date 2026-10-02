@@ -3,6 +3,8 @@ language: ja-JP
 reviews:
   profile: assertive
   poem: false
+  # Exact default exclusion without ! makes lock files reviewable without narrowing scope.
+  path_filters: ['**/*.lock']
   path_instructions:
     - path: '**/*'
       instructions: >-

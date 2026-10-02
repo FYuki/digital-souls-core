@@ -13,7 +13,10 @@ pytestmark = pytest.mark.it1
 
 
 def client(provider: FakeProvider) -> TestClient:
-    return TestClient(create_app(Inference((character(), character("other")), provider)))
+    return TestClient(
+        create_app(Inference((character(), character("other")), provider)),
+        base_url="http://127.0.0.1",
+    )
 
 
 def request_body(**extra: Any) -> dict[str, Any]:
@@ -162,9 +165,9 @@ def test_default_config_is_offline_and_has_no_implicit_characters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("CORE_CHARACTER_CONFIG", raising=False)
-    http = TestClient(create_app())
+    http = TestClient(create_app(), base_url="http://127.0.0.1")
     assert http.get("/v1/models").json()["data"] == []
     monkeypatch.setenv("CORE_CHARACTER_CONFIG", str(ROOT / "examples/characters.json"))
-    http = TestClient(create_app())
+    http = TestClient(create_app(), base_url="http://127.0.0.1")
     response = http.post("/v1/chat/completions", json=request_body(model="miori"))
     assert response.status_code == 403

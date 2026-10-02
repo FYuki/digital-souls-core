@@ -136,8 +136,8 @@ async def test_anyio_disconnect_scope_allows_async_close(monkeypatch: pytest.Mon
 
 def test_openai_client_normal_usage_and_stream_error_is_not_success() -> None:
     fake = FakeProvider()
-    server = TestClient(create_app(Inference((character(),), fake)))
-    with OpenAI(api_key="synthetic", base_url="http://testserver/v1", http_client=server) as client:
+    server = TestClient(create_app(Inference((character(),), fake)), base_url="http://127.0.0.1")
+    with OpenAI(api_key="synthetic", base_url="http://127.0.0.1/v1", http_client=server) as client:
         response = client.chat.completions.create(
             model="miori-alias", messages=[{"role": "user", "content": "hi"}]
         )
