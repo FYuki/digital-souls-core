@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { checkText, checkRepository } from './check-docs.mjs';
+import { checkText, checkRepository, checkManifest } from './check-docs.mjs';
+import { createHash } from 'node:crypto';
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'core-docs-test-'));
@@ -13,6 +14,25 @@ function fixture(t) {
   return root;
 }
 
+test('manifest detects tampering of exact asset bytes', t => {
+  const root = fixture(t);
+  writeFileSync(join(root, 'asset.bin'), 'example');
+  const manifest = { files: [{ status: 'included', path: 'asset.bin', bytes: 7,
+    sha256: createHash('sha256').update('example').digest('hex') }] };
+  assert.deepEqual(checkManifest(root, manifest), []);
+  writeFileSync(join(root, 'asset.bin'), 'changed');
+  assert.match(checkManifest(root, manifest)[0], /mismatch/);
+});
+test('manifest rejects missing files and escaping paths', t => {
+  const root = fixture(t);
+  assert.match(checkManifest(root, { files: [{ status: 'included', path: 'missing' }] })[0], /Missing asset/);
+  assert.match(checkManifest(root, { files: [{ status: 'included', path: '../outside' }] })[0], /escapes/);
+});
+test('held assets must not claim a local path', t => {
+  const root = fixture(t);
+  assert.deepEqual(checkManifest(root, { files: [{ status: 'held' }] }), []);
+  assert.match(checkManifest(root, { files: [{ status: 'held', path: 'a.wav' }] })[0], /must not/);
+});
 test('accepts real local targets and ignores external links and anchors', t => {
   const root = fixture(t);
   writeFileSync(join(root, 'target.md'), '# Target\n');

@@ -10,3 +10,6 @@ Start with [CONTRIBUTING](CONTRIBUTING.md) for development and validation, and
 
 There is no product implementation yet. Product requirements, implementation
 language, and runtime architecture remain open for discussion.
+
+[光織 / Miori](characters/miori/README.md) is included as a sample character;
+see its separate asset terms and manifest for held/omitted items.

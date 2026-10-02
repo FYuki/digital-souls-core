@@ -1,0 +1,61 @@
+{
+  "sourceRepository": "https://github.com/FYuki/digital-souls",
+  "sourceRepositoryId": 1305324121,
+  "sourceCommit": "7a11b2d9883b8bc2f6fcc53c6187d78e445d4b3c",
+  "character": "光織 / Miori",
+  "characterVersion": "1.2.0",
+  "reviewedOn": "2026-10-02",
+  "distributionBasis": "User explicitly authorized publication of Miori as a sample in this repository. No new general reuse license is granted.",
+  "files": [
+    {
+      "sourcePath": "characters/miori/assets/standing/default.png",
+      "sha256": "b27a3d5e0404836ea999b93bbb5752eb2f0559ff2c3f350af74dce3359802ba3",
+      "bytes": 1771710,
+      "status": "included",
+      "path": "assets/standing/default.png"
+    },
+    {
+      "sourcePath": "characters/miori/assets/voice/miori-b3-4221.json",
+      "sha256": "17d3e032a4cf59de8ad96a69a976a7bdaaa98079100f3f16e025941dfe339a0e",
+      "bytes": 3661,
+      "status": "held-pending-distribution-terms"
+    },
+    {
+      "sourcePath": "characters/miori/assets/voice/miori-b3-4221.wav",
+      "sha256": "f001f7df5415e74b955a8e15f9c2955cefcbc19b3e2282150fc67f0a9dcc2b79",
+      "bytes": 1355564,
+      "status": "held-pending-distribution-terms"
+    },
+    {
+      "sourcePath": "characters/miori/memory-policy.md",
+      "sha256": "291f93bbd381ef27a24435e26e66dd896222162d5162d2d36a6208aaef94272c",
+      "bytes": 650,
+      "status": "omitted-not-needed-for-minimal-sample"
+    },
+    {
+      "sourcePath": "characters/miori/miori.card.json",
+      "sha256": "faa31050be4cf7142dec3952ab179922e35793063c35c330cf2f2b4ce794c444",
+      "bytes": 12097,
+      "status": "included",
+      "path": "miori.card.json"
+    },
+    {
+      "sourcePath": "characters/miori/personality.md",
+      "sha256": "6d875c0d52f47793368005f396e157af498fffc6b68953753c41bcb0a303a2e8",
+      "bytes": 2139,
+      "status": "omitted-not-needed-for-minimal-sample"
+    },
+    {
+      "sourcePath": "characters/miori/voice.md",
+      "sha256": "0082a8db3a7c11b89661ef10e1e2160686b873b853690d218746f8f2139d2203",
+      "bytes": 7694,
+      "status": "held-pending-distribution-terms"
+    },
+    {
+      "sourcePath": "characters/miori/world.md",
+      "sha256": "b1882c0f5a89c480423bb6ed0d152108f63194156f0ec3bd63c3a6081939b48c",
+      "bytes": 3634,
+      "status": "omitted-not-needed-for-minimal-sample"
+    }
+  ]
+}

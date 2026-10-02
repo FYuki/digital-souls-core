@@ -50,6 +50,7 @@ without path filters. It checks tracked Markdown local file targets (not anchor
 existence or remote URLs), text whitespace/newlines, JSON syntax and the
 checker's real regression tests. It does not establish product correctness or
 provide a complete secret scanner. Review staged content for confidential data.
+Sample manifests are checked for included-file SHA-256/size and local paths.
 CI uses read-only contents permission, pinned official Actions, no secrets,
 no `pull_request_target` and no cache. Update pinned tools in reviewed changes.
 

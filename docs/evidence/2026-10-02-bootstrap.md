@@ -22,3 +22,23 @@ Product lint, formatting, types, UT, IT1 and packaging: NOT IMPLEMENTED.
 Real-environment IT2/ST: NOT RUN. No providers or GPU were used. The documentation
 checker's regression tests are tooling tests only, not Core product tests.
 Branch protections, rulesets and GitHub Apps were not changed.
+
+## Executed checks and sample asset review
+
+- `node --test tools/check-docs.test.mjs`: PASS, 11 tests, 0 failures/skips.
+- `node tools/check-docs.mjs`: PASS, text/JSON/local links and asset hashes.
+- `git diff --cached --check`: PASS before commit.
+- Staged text reviewed; one-off scan of tracked text for PEM private-key headers,
+  GitHub/OpenAI/AWS access-key patterns and quoted key/password/secret assignments:
+  zero hits. This is a limited pattern check, not an exhaustive security audit.
+- Card is public fictional persona/lore and sample dialogue, not a private chat
+  export. Included card and PNG match their source SHA-256 and size.
+- PNG visually inspected; PNG chunks are IHDR, caBX, IDAT and IEND. C2PA metadata
+  describes OpenAI generated media; provenance metadata was preserved unchanged.
+- [Miori manifest](../../characters/miori/manifest.json) inventories eight source
+  files. Two included; voice-related files held pending distribution terms;
+  three companion documents omitted from the minimal sample.
+
+The public PoC revision is pinned in the asset manifest. No private-repository
+content was transferred. Audio distribution terms remain unresolved; no WAV or
+voice metadata is included. See [asset terms](../../characters/miori/TERMS.md).
