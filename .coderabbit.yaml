@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: ja-JP
+reviews:
+  profile: assertive
+  poem: false
+  path_instructions:
+    - path: '**/*'
+      instructions: >-
+        CONTRIBUTING.md、AGENTS.md、関連するdocs/adrとdocs/api.mdを読み、
+        差分を適用される規則・契約に照合してください。違反には該当規則を示してください。
+        Coreは人格文脈付きLLM Providerであり、tool実行ループや私的記憶の永続化は対象外です。
+  auto_review:
+    ignore_title_keywords: ['WIP', 'DO NOT MERGE']
+    ignore_usernames: ['dependabot', 'github-actions', 'renovate']
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns: ['CONTRIBUTING.md', 'AGENTS.md', 'docs/adr/*.md', 'docs/api.md']
+chat:
+  art: false

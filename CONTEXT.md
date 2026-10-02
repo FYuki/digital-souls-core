@@ -9,7 +9,8 @@
 - プロバイダーのadapterを交換できるLLM port。
 
 音声・STT・TTS、LiveKit、常駐エージェント基盤、scheduler、worker、UIは
-現在のCoreの対象外です。今回の初期整備では業務実装を追加しません。
-contract、永続化の意味、プロバイダー、実装言語、受入シナリオは実装前に合意します。
+現在のCoreの対象外です。最初の実装は人格文脈付きLLM Providerの
+[推論API](docs/api.md)です。外部Agentのtool実行ループを持たず、通常チャットUIからも呼べます。
+記憶の永続化と自動技能学習は初期実装の対象外で、差し替え境界だけを用意します。
 
 開発規約はこの文書に重複させず、[CONTRIBUTING](CONTRIBUTING.md)で管理します。

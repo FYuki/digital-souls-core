@@ -26,4 +26,5 @@ revision / 日付 / 環境:
 - [ ] 未合意の製品要件を確定扱いにしていない
 - [ ] 残るリスクと不足する検証範囲を記載した
 
-ユーザーレビュー用のDraft PRです。mergeには別途の判断が必要です。
+作業PRはepic宛て、epic完了PRはmain宛てです。対象head、CI結果、実CodeRabbit reviewと
+指摘対応状況を記載し、CONTRIBUTINGの条件とユーザーの許可範囲を満たしてからマージします。

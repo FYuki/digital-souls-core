@@ -1,0 +1,41 @@
+# ADR 0001: キャラクター文脈付き推論API
+
+Status: Proposed
+
+日付: 2026-10-03
+
+## 背景と選択肢
+
+最初の受入れは、公開Mioriカードをsystemへ反映し、通常会話と外部Agentのtool call往復を
+キャラクターが保持するモデル設定で推論できることです。製品言語は初期repoで未選定でした。
+ユーザーはPython/FastAPI/LiteLLMを第一候補として実装を了承しています。
+Nodeは文書検証用に既存採用されていますが、製品言語の選定ではありません。
+
+独自の各社HTTP/SSE adapterは保守範囲が広く、Agent frameworkはtool実行ループを持たないCoreに
+不要です。LiteLLM SDKのcompletion adapterを採用し、Agentは独立した外部clientに置きます。
+Responses先行は現時点で必須client/modelが特定されていないため保留します。
+
+## 決定案
+
+Python 3.12.3、FastAPI、Pydanticによる厳密な入力contractとLiteLLM SDKで小さい構成を作ります。
+依存は[pyproject](../../pyproject.toml)と[uv.lock](../../uv.lock)で固定します。
+HTTP/SDKから独立したapplicationのProvider portを、通常入口とalias入口で共用します。
+schema/applicationはSDKやHTTPへ依存しません。実行中のCharacter/Profileはimmutable snapshotです。
+明示的な送信policyとparameter allowlistがない能力は拒否し、fallbackとsilent dropを禁止します。
+
+人物の技能や記憶は`ContextSource`の境界だけを用意し、初期版は空です。callerのtoolsは目的に
+応じて外部Agentが渡し、LLMが生成したtool callをそのまま返します。Coreで実行しません。
+認証scopeはサーバー由来の型を境界に渡し、初期HTTPは信頼された単独利用者のlocalhost専用です。
+multi-tenantや私的記憶の公開配信分離を実装済みとは称しません。
+
+## 影響と制約
+
+対応範囲・エラー・stream・Lore・tokenとbyte budgetの区別は[API契約](../api.md)に記載します。
+SDKの将来変更から外向きcontractを守るため、socket禁止のUT/IT1と実SDKのmock transportを用います。
+実モデルのpersona品質、全provider/model能力はこのテストでは確認できません。
+SDK依存は大きいため固定版の更新時もこの契約テストとsecurity reviewが必要です。
+
+参考: [LiteLLM入力](https://docs.litellm.ai/docs/completion/input)、
+[stream](https://docs.litellm.ai/docs/completion/stream)、
+[function calling](https://docs.litellm.ai/docs/completion/function_call)。
+関連Issue・PR・正確な検証revisionは[証跡](../evidence/2026-10-03-inference-api.md)で管理します。

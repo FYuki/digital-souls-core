@@ -8,8 +8,10 @@
 [Issue](https://github.com/FYuki/digital-souls-core/issues)、検証結果は
 [日付付き証跡](docs/evidence/2026-10-02-bootstrap.md)で管理します。
 
-製品の実装はまだありません。製品要件、実装言語、実行時のアーキテクチャは
-今後の議論で決めます。
+最初の[キャラクター推論API](docs/api.md)をPython/FastAPI/LiteLLMで実装しています。
+通常チャットと外部Agentのtool call往復に対応する小範囲のChat Completions APIです。
+localhostの単独利用者向けで、公開サービス用の認証・記憶永続化・tool実行は未実装です。
+サンプルは外部送信を拒否し、fakeで無課金検証できます。
 
 [光織 / Miori](characters/miori/README.md)をサンプルキャラクターとして格納しています。
 素材固有の利用条件と、保留・省略した項目のmanifestを確認してください。
