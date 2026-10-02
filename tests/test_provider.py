@@ -74,7 +74,7 @@ async def test_sdk_errors_are_sanitized(
     assert info.value.status == status and info.value.code == code
     assert "SYNTHETIC_SECRET" not in str(info.value)
     with pytest.raises(CoreError):
-        await anext(provider.stream(character().config.profile, {"stream": True}))
+        await anext(provider.stream(character(native=True).config.profile, {"stream": True}))
 
 
 async def test_cancellation_closes_sdk_stream(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -97,7 +97,7 @@ async def test_cancellation_closes_sdk_stream(monkeypatch: pytest.MonkeyPatch) -
         return Stream()
 
     monkeypatch.setattr(litellm, "acompletion", call)
-    iterator = LiteLLMProvider().stream(character().config.profile, {"stream": True})
+    iterator = LiteLLMProvider().stream(character(native=True).config.profile, {"stream": True})
     task = asyncio.create_task(anext(iterator))
     await entered.wait()
     task.cancel()
@@ -128,7 +128,9 @@ async def test_anyio_disconnect_scope_allows_async_close(monkeypatch: pytest.Mon
     monkeypatch.setattr(litellm, "acompletion", call)
     with anyio.CancelScope() as scope:
         scope.cancel()
-        await anext(LiteLLMProvider().stream(character().config.profile, {"stream": True}))
+        await anext(
+            LiteLLMProvider().stream(character(native=True).config.profile, {"stream": True})
+        )
     assert closed
 
 

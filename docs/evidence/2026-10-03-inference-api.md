@@ -70,3 +70,10 @@ PR #5の初期head `d356df29f52d2b720da569edc85492b5dae42add` に対し、次の
 
 これらは実LLM通信や課金なしのIT1です。provider全般の取消互換性を保証しません。
 最新headのテスト・CI結果と親reviewの対応状況は修正PRに記録します。
+
+再reviewで`openai/` prefix内にもResponses自動bridgeがあることを確認しました。
+SDKと同じ`responses_api_bridge_check`を通信前に使い、ローカルmetadataが`mode=chat`で
+モデル名を変更しない場合だけ許可します。`gpt-5-codex`、`o3-pro`、`codex-mini-latest`、
+明示`responses/`と未知modeの拒否をpinned SDKの判定結果と比較しています。
+正常経路のfixtureは既知Chatモデル`gpt-4o-mini-2024-07-18`を使い、実SDKが
+`/v1/chat/completions`へ要求することとcloseをMockTransportで確認します。実LLMは呼びません。

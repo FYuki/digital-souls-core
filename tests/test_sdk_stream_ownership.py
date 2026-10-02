@@ -54,6 +54,7 @@ async def test_real_litellm_openai_sdk_owns_and_closes_http_response(
     responses: list[httpx.Response] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/chat/completions"
         response = httpx.Response(200, headers={"content-type": "text/event-stream"}, stream=wire)
         responses.append(response)
         return response
@@ -70,7 +71,7 @@ async def test_real_litellm_openai_sdk_owns_and_closes_http_response(
 
         monkeypatch.setattr(litellm, "acompletion", call)
         stream = LiteLLMProvider().stream(
-            character().config.profile,
+            character(native=True).config.profile,
             {"messages": [{"role": "user", "content": "synthetic"}], "stream": True},
         )
         first = await anext(stream)
@@ -143,7 +144,7 @@ async def test_real_sdk_read_timeout_before_and_after_first_chunk_is_safe(
             return await original(**kwargs, client=sdk)
 
         monkeypatch.setattr(litellm, "acompletion", call)
-        app = create_app(Inference((character(),), LiteLLMProvider()))
+        app = create_app(Inference((character(native=True),), LiteLLMProvider()))
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://local"
         ) as client:
@@ -191,3 +192,53 @@ def test_pinned_midstream_wrapper_classifies_nested_error_without_exposing_text(
     mapped = provider_error(wrapped)
     assert mapped.code == code and mapped.status == status
     assert "SYNTHETIC" not in mapped.message
+
+
+@pytest.mark.parametrize(
+    "name", ["gpt-5-codex", "o3-pro", "codex-mini-latest", "responses/gpt-4o-mini"]
+)
+async def test_pinned_responses_routes_are_denied_before_sdk_acquisition(
+    monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    from litellm.main import responses_api_bridge_check
+
+    info, _ = responses_api_bridge_check(model=name, custom_llm_provider="openai")
+    assert info["mode"] == "responses"
+
+    async def forbidden(**kwargs: Any) -> Any:
+        pytest.fail("Responses bridge must not acquire an upstream stream")
+
+    monkeypatch.setattr(litellm, "acompletion", forbidden)
+    profile = character(native=True).config.profile.model_copy(update={"model": f"openai/{name}"})
+    with pytest.raises(CoreError) as error:
+        await anext(LiteLLMProvider().stream(profile, {"stream": True}))
+    assert error.value.status == 400 and error.value.code == "unsupported_stream_provider"
+
+
+async def test_unknown_route_is_denied_before_sdk_acquisition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def forbidden(**kwargs: Any) -> Any:
+        pytest.fail("Unknown route must fail closed")
+
+    monkeypatch.setattr(litellm, "acompletion", forbidden)
+    with pytest.raises(CoreError) as error:
+        await anext(LiteLLMProvider().stream(character().config.profile, {"stream": True}))
+    assert error.value.code == "unsupported_stream_provider"
+
+
+@pytest.mark.parametrize("key", ["gpt-4o-mini-2024-07-18", "openai/gpt-4o-mini-2024-07-18"])
+async def test_sdk_alias_cannot_redirect_verified_native_route(
+    monkeypatch: pytest.MonkeyPatch, key: str
+) -> None:
+    monkeypatch.setattr(litellm, "model_alias_map", {key: "openai/gpt-5-codex"})
+
+    async def forbidden(**kwargs: Any) -> Any:
+        pytest.fail("SDK alias must not change the verified route")
+
+    monkeypatch.setattr(litellm, "acompletion", forbidden)
+    with pytest.raises(CoreError) as error:
+        await anext(
+            LiteLLMProvider().stream(character(native=True).config.profile, {"stream": True})
+        )
+    assert error.value.code == "unsupported_stream_provider"

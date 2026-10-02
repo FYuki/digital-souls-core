@@ -16,11 +16,41 @@ from .character import Profile
 os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
 
 import litellm as litellm  # noqa: E402
+from litellm.main import responses_api_bridge_check  # noqa: E402
 
 litellm.suppress_debug_info = True
 litellm.set_verbose = False
 litellm.turn_off_message_logging = True
 litellm.telemetry = False
+
+
+def require_native_chat_stream(model: str) -> None:
+    """Use the pinned SDK's local routing probe, denying unknown/Responses modes.
+
+    Route metadata is not proof of model capabilities or authorization to use it.
+    """
+    provider, _, name = model.partition("/")
+    aliases = litellm.model_alias_map or {}
+    if model in aliases or name in aliases:
+        raise CoreError(
+            400,
+            "unsupported_stream_provider",
+            "SDK model aliases cannot override the verified route",
+        )
+    if provider != "openai" or name.startswith("responses/"):
+        raise CoreError(
+            400, "unsupported_stream_provider", "Streaming requires native OpenAI Chat Completions"
+        )
+    try:
+        info, resolved = responses_api_bridge_check(model=name, custom_llm_provider="openai")
+    except Exception:
+        raise CoreError(
+            400, "unsupported_stream_provider", "Streaming route is not verified"
+        ) from None
+    if info.get("mode") != "chat" or resolved != name:
+        raise CoreError(
+            400, "unsupported_stream_provider", "Streaming route is not native Chat Completions"
+        )
 
 
 def provider_error(error: Exception) -> CoreError:
@@ -54,12 +84,10 @@ class LiteLLMProvider:
     async def _call(profile: Profile, payload: dict[str, Any]) -> Any:
         if not profile.external_send_allowed:
             raise CoreError(403, "external_send_denied", "Character export policy denies inference")
-        if payload.get("stream") and not profile.model.startswith("openai/"):
+        if payload.get("stream"):
             # Pinned LiteLLM adapters do not share a response ownership contract.
             # Only the native OpenAI SDK stream lifecycle is verified here.
-            raise CoreError(
-                400, "unsupported_stream_provider", "Streaming requires the verified openai adapter"
-            )
+            require_native_chat_stream(profile.model)
         return await litellm.acompletion(
             model=profile.model,
             **payload,
