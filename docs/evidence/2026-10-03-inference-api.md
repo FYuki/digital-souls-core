@@ -52,3 +52,21 @@ SDK整合のためLiteLLM 1.77.7とOpenAI 1.109.1を明示固定しました。
 無制約の依存解決でOpenAI 3系列のHTTP型との不整合を検出したためです。
 Starlette/AnyIOとLiteLLMの非推奨API警告は既知で、テストskipではありません。
 これは依存の包括的なsecurity auditを実施したという意味ではありません。
+
+## 親側独立reviewへの対応
+
+PR #5の初期head `d356df29f52d2b720da569edc85492b5dae42add` に対し、次の2件を確認しました。
+
+1. LiteLLM 1.77.7のAnthropic `ModelResponseIterator`はclose/acloseを持たず、
+   `streaming_response`の行iteratorだけを閉じてもHTTPX Responseは閉じません。
+   pinned SDK実オブジェクトとTracking AsyncByteStreamで再現しました。
+   SDK内部のResponse所有関係を無理に追跡する実装を増やさず、ネイティブ`openai/`以外の
+   streamはSDK呼び出し前に400/unsupported_stream_providerで拒否するよう制限しました。
+   OpenAIについては実LiteLLM wrapper＋OpenAI SDK＋HTTPX MockTransportで、正常終了・
+   consumer close・反復中の取消のすべてでResponseとwireがcloseされることを検証しています。
+2. SDK反復中のHTTPX timeoutと`MidStreamFallbackError.original_exception`を型で分類するよう修正。
+   初回chunk前のHTTP504、chunk後のSSE provider_timeout、秘密の例外文字列を返さないこと、
+   wrapped rate-limit/未知errorも安全なコードへ分類することを検証しています。
+
+これらは実LLM通信や課金なしのIT1です。provider全般の取消互換性を保証しません。
+最新headのテスト・CI結果と親reviewの対応状況は修正PRに記録します。

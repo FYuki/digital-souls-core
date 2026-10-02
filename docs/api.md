@@ -54,6 +54,12 @@ n、seed、logprobs、その他未記載fieldは未対応です。unknown field�
 
 ## streaming・取消・エラー
 
+実providerへのstreamは初期版では`openai/`のネイティブOpenAI adapterだけに制限します。
+LiteLLM 1.77.7のAnthropic等にはHTTP Responseのclose所有権を公開しないiteratorがあるため、
+allowlistにstreamがあっても他providerは送信前に400/unsupported_stream_providerで拒否します。
+OpenRouter等のOpenAI互換サービスもこの保証範囲には含めません。非streamの他providerは管理者の
+能力確認が必要で、実モデル検証済みとは称しません。汎用Provider port自体は差し替え可能です。
+
 SSEの`data: {chunk}`と正常終了時の`data: [DONE]`を返します。最初のchunkを待ってから
 HTTP 200を開始するので、それ以前の失敗は通常のHTTPエラーです。途中失敗は
 `event: error`＋`data: {"error": ...}`を送り、`[DONE]`を送らず終了します。

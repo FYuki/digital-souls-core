@@ -6,6 +6,8 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 import anyio
+import httpx
+import openai
 
 from .application import CoreError
 from .character import Profile
@@ -22,12 +24,28 @@ litellm.telemetry = False
 
 
 def provider_error(error: Exception) -> CoreError:
-    if isinstance(error, litellm.UnsupportedParamsError):
-        return CoreError(400, "unsupported_parameter", "Provider rejected an unsupported parameter")
-    if isinstance(error, litellm.Timeout):
-        return CoreError(504, "provider_timeout", "Provider timed out")
-    if isinstance(error, litellm.RateLimitError):
-        return CoreError(429, "provider_rate_limit", "Provider rate limit reached")
+    # Streaming can expose HTTPX directly or wrap the cause in MidStreamFallbackError.
+    # Classify types only: never inspect/return messages, URLs, headers or generated text.
+    pending: list[BaseException] = [error]
+    visited: set[int] = set()
+    while pending and len(visited) < 8:
+        current = pending.pop()
+        if id(current) in visited:
+            continue
+        visited.add(id(current))
+        if isinstance(current, litellm.UnsupportedParamsError):
+            return CoreError(
+                400, "unsupported_parameter", "Provider rejected an unsupported parameter"
+            )
+        if isinstance(
+            current, (litellm.Timeout, httpx.TimeoutException, openai.APITimeoutError, TimeoutError)
+        ):
+            return CoreError(504, "provider_timeout", "Provider timed out")
+        if isinstance(current, (litellm.RateLimitError, openai.RateLimitError)):
+            return CoreError(429, "provider_rate_limit", "Provider rate limit reached")
+        for cause in (getattr(current, "original_exception", None), current.__cause__):
+            if isinstance(cause, BaseException):
+                pending.append(cause)
     return CoreError(502, "provider_error", "Provider request failed")
 
 
@@ -36,6 +54,12 @@ class LiteLLMProvider:
     async def _call(profile: Profile, payload: dict[str, Any]) -> Any:
         if not profile.external_send_allowed:
             raise CoreError(403, "external_send_denied", "Character export policy denies inference")
+        if payload.get("stream") and not profile.model.startswith("openai/"):
+            # Pinned LiteLLM adapters do not share a response ownership contract.
+            # Only the native OpenAI SDK stream lifecycle is verified here.
+            raise CoreError(
+                400, "unsupported_stream_provider", "Streaming requires the verified openai adapter"
+            )
         return await litellm.acompletion(
             model=profile.model,
             **payload,
