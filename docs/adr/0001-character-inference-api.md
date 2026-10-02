@@ -34,6 +34,12 @@ multi-tenantや私的記憶の公開配信分離を実装済みとは称しま�
 SDKの将来変更から外向きcontractを守るため、socket禁止のUT/IT1と実SDKのmock transportを用います。
 実モデルのpersona品質、全provider/model能力はこのテストでは確認できません。
 SDK依存は大きいため固定版の更新時もこの契約テストとsecurity reviewが必要です。
+親reviewでLiteLLM 1.77.7のAnthropic stream iteratorがHTTP Responseのclose所有権を
+公開しないことを確認したため、実streamは所有closeをmock transportで実証したネイティブ
+OpenAI adapterに限定します。他providerの独自SSEや内部iteratorへの場当たり的なclose実装は
+追加せず、送信前に未対応エラーとします。`openai/`内にもResponses自動変換があるため、
+pinned SDKと同じローカルroute probeで`mode=chat`のnative経路だけを許可し、既知Responses・
+明示Responses・未知modeを拒否します。SDK変更後もadapterごとの実証が必要です。
 
 参考: [LiteLLM入力](https://docs.litellm.ai/docs/completion/input)、
 [stream](https://docs.litellm.ai/docs/completion/stream)、

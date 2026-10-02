@@ -54,6 +54,17 @@ n、seed、logprobs、その他未記載fieldは未対応です。unknown field�
 
 ## streaming・取消・エラー
 
+実providerへのstreamは初期版では、pinned SDKがローカルmetadataで`mode=chat`と解決する
+`openai/`のネイティブChat Completions経路だけに制限します。prefixだけでは許可しません。
+SDK自身と同じResponses bridge判定を送信前に行い、`openai/gpt-5-codex`、`openai/o3-pro`、
+`openai/codex-mini-latest`などの既知Responsesモデル、`openai/responses/...`、未知modeを拒否します。
+このmetadataは経路判定専用で、モデル能力・利用資格や実モデル検証の証明ではありません。
+SDKのglobal model aliasによる経路変更も拒否します。APIの登録済みcharacter aliasとは別のものです。
+LiteLLM 1.77.7のAnthropic等にはHTTP Responseのclose所有権を公開しないiteratorがあるため、
+allowlistにstreamがあっても他providerは送信前に400/unsupported_stream_providerで拒否します。
+OpenRouter等のOpenAI互換サービスもこの保証範囲には含めません。非streamの他providerは管理者の
+能力確認が必要で、実モデル検証済みとは称しません。汎用Provider port自体は差し替え可能です。
+
 SSEの`data: {chunk}`と正常終了時の`data: [DONE]`を返します。最初のchunkを待ってから
 HTTP 200を開始するので、それ以前の失敗は通常のHTTPエラーです。途中失敗は
 `event: error`＋`data: {"error": ...}`を送り、`[DONE]`を送らず終了します。

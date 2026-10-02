@@ -27,11 +27,11 @@ TOOL = {
 }
 
 
-def character(name: str = "miori") -> Character:
+def character(name: str = "miori", *, native: bool = False) -> Character:
     sample = load_characters(ROOT / "examples/characters.json")[0]
     profile = Profile(
         profile_id=f"{name}-profile",
-        model=f"openai/{name}-test-model",
+        model="openai/gpt-4o-mini-2024-07-18" if native else f"openai/{name}-test-model",
         allowed_parameters=PARAMETERS,
         external_send_allowed=True,
     )
