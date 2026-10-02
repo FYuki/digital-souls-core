@@ -13,7 +13,10 @@
 初回chunk前後のASGI切断を含む47 tests（skipなし）がPASSしました。ruff check/format、mypyもPASSです。
 Pythonコード15ファイルが型検査対象です。文書requiredテスト23件、文書リンクと素材hash、
 git diff --checkがPASS。CodeRabbit YAMLは取得した公式schemaで検証済みです。
-最終revisionとGitHub CI結果はPRにhead SHAを添えて記録します。
+この47件の対象revisionは`e5a9254df0c3b65abfe41b40c55c349c9bab0993`です。
+同じSHAの[API CI](https://github.com/FYuki/digital-souls-core/actions/runs/37045484700)と
+[文書CI](https://github.com/FYuki/digital-souls-core/actions/runs/37045484756)でも成功を確認しました。
+後続の99件は別revisionの結果であり、[追加修正の証跡](2026-10-03-review-followup.md)を参照してください。
 
 ```sh
 uv sync --frozen
