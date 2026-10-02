@@ -1,29 +1,29 @@
-## Problem and change
+## 課題と変更内容
 
-Issue:
-Scope and user-visible behavior:
-ADR (if needed; state review status):
+関連Issue:
+変更範囲と利用者から見た振る舞い:
+ADR（必要な場合。レビュー状態も記載）:
 
-## Validation
+## 検証
 
-Revision / date / environment:
-Evidence (commands, results and logs):
+revision / 日付 / 環境:
+証跡（コマンド・結果・ログ）:
 
-| Gate | PASS / FAIL / SKIP / NOT RUN / NOT IMPLEMENTED | Evidence or reason |
+| 検証項目 | PASS / FAIL / SKIP / NOT RUN / NOT IMPLEMENTED | 証跡または理由 |
 | --- | --- | --- |
-| Docs/tooling | | |
-| Product lint / format / types | | |
-| Product UT / IT1 | | |
-| Packaging | | |
-| Real-environment IT2 / ST | | |
+| 文書・検証ツール | | |
+| 製品のlint / format / 型検査 | | |
+| 製品のUT / IT1 | | |
+| パッケージング | | |
+| 実環境のIT2 / ST | | |
 
-Required failures, skips and unexecuted tests are not passes.
+必須テストの失敗・skip・未実行はPASSではありません。
 
-## Review
+## レビュー
 
-- [ ] Checked scope, privacy boundaries and staged content for secrets/private data
-- [ ] Asset provenance and distribution terms preserved where applicable
-- [ ] Product requirements left open where not agreed
-- [ ] Remaining risks and missing coverage described
+- [ ] 作業範囲・プライバシー境界・ステージした内容の秘密情報や私的データを確認した
+- [ ] 該当する素材の出典と配布条件を保持した
+- [ ] 未合意の製品要件を確定扱いにしていない
+- [ ] 残るリスクと不足する検証範囲を記載した
 
-Draft PR for user review; merging requires a separate decision.
+ユーザーレビュー用のDraft PRです。mergeには別途の判断が必要です。

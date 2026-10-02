@@ -1,43 +1,44 @@
-# Development policy
+# 開発規約
 
-## Sources of truth
+## 文書の正本と言語
 
-README is the entrance; CONTEXT contains product background only. This document
-owns development rules. AGENTS points agents here without duplicating policy.
-Record architectural decisions and rationale in numbered ADRs; keep proposals
-marked Proposed until reviewed. Issues own scope, acceptance criteria and
-progress. Dated evidence records exact revisions, commands, environments,
-results and limitations. Link these records from the PR; do not treat chat or
-a progress note as an approved specification.
+READMEを入口とし、CONTEXTには製品背景だけを置きます。開発規約の正本はこの文書です。
+AGENTSは規約を重複させず、この文書へ案内します。
+人間向けの文書とPR本文は日本語で書いてください。証跡・ログは英語でも構いません。
+識別子、コマンド、schemaフィールド、出典原文は必要に応じて元の表記を維持します。
 
-## Changes and review
+アーキテクチャの決定と理由は番号付きADRに記録し、レビュー前の提案はProposedとします。
+作業範囲・受入条件・進捗はIssue、正確なrevision・コマンド・環境・結果・制約は
+日付付き証跡で管理し、PRからリンクします。会話や進捗メモを承認済み仕様として扱いません。
 
-Use a separate worktree and feature branch from current `main`. Check the remote
-and repository identity before pushing. Keep commits scoped and reviewable.
-Create a draft PR targeting `main`, link its Issue and request user review.
-No merge is authorized by this bootstrap. Do not change repository security
-settings, protections, rulesets or GitHub Apps without a separate decision.
-Never infer new approval privileges from these rules.
+## 変更とレビュー
 
-## Architecture and privacy
+最新の`main`から別worktreeとfeature branchを作り、push前にremoteと
+リポジトリの識別情報を確認します。コミットは範囲を絞り、レビュー可能な単位にします。
+`main`宛てのDraft PRにIssueを紐付け、ユーザーレビューに出してください。
+今回の初期整備ではmergeは承認されていません。別途の決定なしにリポジトリの
+セキュリティ設定、branch protection、ruleset、GitHub Appを変更しません。
+この規約から新たな承認権限を推定しないでください。
 
-Schema/contracts and domain behavior must not depend on provider SDKs, network
-clients or storage adapters. Adapters implement ports and may depend inward.
-Define and test contract compatibility before changing serialized data.
-Keep provider selection and credentials outside domain behavior.
+## アーキテクチャとプライバシー
 
-Privacy decisions must fail closed: deny storage, retrieval or transmission
-when policy is missing, invalid or undecidable. Apply policy at each boundary;
-a prompt is not an enforcement mechanism. Never put credentials or secrets in
-prompts, fixtures, logs or commits. Use synthetic test data. Test denial paths,
-memory correction/deletion and adapter boundaries when those features exist.
+schema・contracts・domainの振る舞いは、プロバイダーSDK、通信クライアント、
+ストレージadapterに依存させません。adapterはportを実装し、内側へ依存できます。
+シリアライズするデータを変更する前にcontractの互換性を定義・検証してください。
+プロバイダー選択と認証情報はdomainの振る舞いの外側で扱います。
 
-## Reproducible bootstrap
+プライバシー判断はfail-closedとします。ポリシーが欠落・不正・判定不能の場合は
+保存・検索・送信を拒否してください。各境界でポリシーを適用します。
+プロンプトは強制機構ではありません。認証情報や秘密をプロンプト、fixture、ログ、
+コミットに含めないでください。テストには合成データを使います。
+該当機能を実装したら、拒否経路、記憶の訂正・削除、adapterの境界を検証します。
 
-Install Node **24.19.0**, matching `.node-version`; no package installation,
-LLM credentials, network calls or GPU are required for validation. Node is only
-a documentation-tool runtime, not a product-language choice. The checker uses
-only built-in modules; there are no development packages to lock today.
+## 再現可能な初期検証
+
+`.node-version`と一致するNode **24.19.0**を用意してください。
+検証にパッケージのインストール、LLM認証情報、外部通信、GPUは不要です。
+Nodeは文書検証ツールの実行環境であり、製品の実装言語を選定したものではありません。
+検証ツールは組み込みモジュールのみを使うため、現在はlock対象の開発パッケージはありません。
 
 ```sh
 node --test --test-reporter=./tools/required-tests-reporter.mjs tools/check-docs.test.mjs tools/required-tests-reporter.test.mjs
@@ -45,41 +46,43 @@ node tools/check-docs.mjs
 git diff --check
 ```
 
-`Bootstrap checks / docs-tooling` runs on every pull request and main push,
-without path filters. It checks tracked Markdown local file targets (not anchor
-existence or remote URLs), text whitespace/newlines, JSON syntax and the
-checker's real regression tests. It does not establish product correctness or
-provide a complete secret scanner. Review staged content for confidential data.
-Sample manifests are checked for included-file SHA-256/size and local paths.
-The required-test reporter rejects skipped, TODO, cancelled and failing tests,
-empty suites/files, and missing per-file summaries. Node's synthetic empty-file
-pass does not count as a registered test. Reporter fixture tests run on the pinned
-Node version; revalidate event-summary behavior when updating Node.
-CI uses read-only contents permission, pinned official Actions, no secrets,
-no `pull_request_target` and no cache. Update pinned tools in reviewed changes.
+`Bootstrap checks / docs-tooling`はpathフィルターを設けず、すべてのPRと
+mainへのpushで実行します。追跡対象Markdownのローカル参照先ファイル、テキストの
+空白・改行、JSON構文、検証ツール自体の回帰テストを確認します。
+アンカーの存在や外部URLは検証しません。製品の正しさを保証するものでも、
+包括的な秘密情報スキャナーでもありません。ステージした内容の機密情報を確認してください。
+サンプルmanifestでは、格納したファイルのSHA-256・サイズ・ローカルパスを検証します。
 
-## Product gates to add with the first implementation
+必須テスト用reporterは、skip・TODO・cancelled・失敗、空suite・空ファイル、
+ファイル単位のsummary欠落を拒否します。Nodeが空ファイルに付ける見かけのPASSは
+登録されたテストとして数えません。固定したNodeでreporterのfixtureテストを実行し、
+Node更新時にはイベントとsummaryの挙動を再検証してください。
 
-Before accepting product code, agree the language/toolchain in an ADR and add
-exact development dependency versions with a committed lockfile and frozen
-installation. Add actual commands for lint, format-check, static types, UT,
-IT1 and package build/install smoke tests. These gates are **NOT IMPLEMENTED**
-today; do not create empty-success jobs, zero-test passes or dummy tests.
+CIの権限はcontentsの読み取りのみです。公式ActionsをSHAで固定し、secrets、
+`pull_request_target`、キャッシュは使いません。固定ツールの更新はレビューを経て行います。
 
-UT and IT1 must be deterministic, with no external communication or real LLM.
-UT covers units; IT1 covers in-process integration using fakes/local fixtures.
-IT2 and ST run only in explicitly authorized real environments. Record provider,
-environment, revision, date, sanitized inputs/results and relevant cost/limits
-as evidence; do not call them passed on a mocked run. Default setup stays usable
-without a real LLM or GPU.
+## 最初の製品実装とともに追加する品質ゲート
 
-Required test failure, skips or NOT RUN results must never become PASS. Explain
-the missing coverage and do not claim readiness until required gates pass.
-When runners are added, make zero discovered required tests fail. Keep a stable
-required-check name and avoid path/conditional rules that leave it pending.
+製品コードを受け入れる前に、言語・toolchainをADRで合意し、開発依存の正確なバージョン、
+コミットされたlockfile、lockを変更しないインストール手順を追加します。
+lint、format-check、静的型検査、UT、IT1、パッケージのbuild・install確認を行う
+実際のコマンドを整備してください。これらは現在**未導入（NOT IMPLEMENTED）**です。
+空の成功ジョブ、テスト0件でのPASS、dummy testを作らないでください。
 
-## Repository settings for the owner to consider
+UTとIT1は外部通信・実LLMを使わない決定的なテストとします。
+UTは単体、IT1はfakeやローカルfixtureを使うプロセス内の結合を検証します。
+IT2とSTは明示的に承認された実環境でのみ実行してください。
+プロバイダー、環境、revision、日付、機密情報を除いた入力・結果、関連する費用・制約を
+証跡として残し、mockでの実行を実環境の合格として扱いません。
+通常のセットアップは実LLMやGPUなしで使える状態を維持します。
 
-After reviewing the workflow, consider requiring `docs-tooling`, PR review and
-blocking direct main pushes. Review bypass permissions and fork behavior before
-enabling protections. These settings have not been changed by this work.
+必須テストの失敗・skip・NOT RUNをPASSにしてはいけません。
+不足する検証範囲を説明し、必須ゲートが通るまでは準備完了としないでください。
+runnerを追加する際は、必須テストの検出が0件なら失敗にします。
+required checkの名前を安定させ、path条件や実行条件でpendingのまま残さないでください。
+
+## 所有者が判断するリポジトリ設定
+
+workflowをレビューした後、`docs-tooling`の必須化、PRレビューの必須化、
+mainへの直接pushの禁止を検討してください。保護を有効にする前に、
+bypass権限とforkでの挙動を確認します。今回、これらの設定は変更していません。

@@ -1,26 +1,26 @@
-# 光織 / Miori — sample character
+# 光織 / Miori — サンプルキャラクター
 
-This sample contains the original Character Card v3, version 1.2.0, and its
-standing illustration. It is data, not an approved Core schema or runtime API.
+元のCharacter Card v3（キャラクターバージョン1.2.0）と立ち絵を格納しています。
+サンプルデータであり、承認済みのCore schemaやruntime APIではありません。
 
-- [Character card](miori.card.json)
-- [Illustration](assets/standing/default.png)
-- [Source inventory and SHA-256 manifest](manifest.json)
-- [Asset terms](TERMS.md)
+- [キャラクターカード](miori.card.json)
+- [立ち絵](assets/standing/default.png)
+- [出典一覧とSHA-256のmanifest](manifest.json)
+- [素材の利用条件](TERMS.md)
 
-Source: public `FYuki/digital-souls`, revision
-`7a11b2d9883b8bc2f6fcc53c6187d78e445d4b3c`, `characters/miori/`.
-Included files are byte-for-byte copies. The card name/version were checked
-and the illustration visually inspected on 2026-10-02.
+出典は公開リポジトリ`FYuki/digital-souls`のrevision
+`7a11b2d9883b8bc2f6fcc53c6187d78e445d4b3c`、`characters/miori/`です。
+格納ファイルはバイト単位で元データと一致します。2026-10-02にカードの名前・
+バージョンを確認し、立ち絵を目視確認しました。
 
-The card's inert `digital_souls.tts_config` refers to `miori-b3-4221`.
-It is preserved for fidelity; this repository does not resolve or execute it.
-The sample is not runnable. No speech implementation is implied.
+カード内の`digital_souls.tts_config`は`miori-b3-4221`を参照しています。
+元データを維持するために残していますが、このリポジトリでは解決・実行しません。
+このサンプルは実行可能なものではなく、音声実装の追加を意味しません。
 
-Voice WAV and metadata are held pending confirmation of third-party distribution
-terms. Source metadata describes synthetic voice design without reference audio;
-this alone does not settle distribution terms. Operational voice instructions
-are also omitted. Personality, world and memory-policy companion documents are
-unnecessary for this minimal sample; the card contains the public persona/lore.
-All eight source files have hashes and explicit inclusion/omission status.
-No private logs, other characters or local service settings are copied.
+音声WAVとメタデータは、第三者の配布条件を確認するまで保留しています。
+出典のメタデータには参照音声を使わない合成音声の設計と記載されていますが、
+それだけでは配布条件は確定しません。音声の運用手順も格納していません。
+性格・世界観・記憶ポリシーの補助文書は最小サンプルには不要として省略しました。
+公開の性格・設定はカードに含まれています。
+出典の全8ファイルについてhashと格納・省略・保留の状態を記録しています。
+私的ログ、別キャラクター、ローカルサービス設定は転記していません。

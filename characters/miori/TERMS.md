@@ -1,14 +1,17 @@
-# Sample asset terms
+# サンプル素材の利用条件
 
-The owner explicitly authorized publishing 光織 / Miori as a sample in this public
-Core repository on 2026-10-02. The card and illustration come from the owner's
-public source repository; [manifest](manifest.json) records unchanged hashes.
+所有者は2026-10-02に、この公開Coreリポジトリへ光織 / Mioriを
+サンプルとして公開することを明示的に許可しました。
+カードと立ち絵の出典は所有者の公開リポジトリです。
+[manifest](manifest.json)に、元データと一致するhashを記録しています。
 
-No general asset reuse license was found in the inspected source root or Miori
-directory. This transfer grants no new MIT, Apache, Creative Commons or other
-broad license. Preserve existing attribution (`creator: digital-souls`). Contact
-the rights holder for reuse beyond this authorized repository publication.
-A future code license must distinguish these assets and not relicense them.
+確認した出典のルートとMioriディレクトリでは、素材の一般的な再利用ライセンスは
+見つかりませんでした。今回の移管は、新たなMIT、Apache、Creative Commons、
+その他の広範なライセンスを付与するものではありません。
+既存の帰属表示（`creator: digital-souls`）を保持してください。
+今回許可されたリポジトリでの公開を超える再利用は、権利者に確認してください。
+将来コードにライセンスを付ける場合も、これらの素材を区別し、
+素材のライセンスを変更してはいけません。
 
-Audio is not redistributed while third-party distribution terms are unconfirmed.
-No model weights or third-party software are included.
+第三者の配布条件が未確認の間、音声は再配布しません。
+モデルの重みや第三者ソフトウェアは含めていません。

@@ -1,12 +1,12 @@
-# Repository instructions
+# リポジトリ内の作業指示
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing this repository. It is
-the canonical development policy; this file is the entry point for agents.
+変更前に[CONTRIBUTING.md](CONTRIBUTING.md)を読んでください。
+開発規約の正本はCONTRIBUTINGで、このファイルはエージェント向けの入口です。
 
-- Work in an isolated worktree and feature branch. Submit a draft PR to `main`
-  for user review. Do not merge or enable auto-merge in this task.
-- Keep changes within the requested scope. Product requirements and language
-  selection need discussion; do not invent implementations to fill empty gates.
-- Never copy private logs, credentials, or unrelated repository content.
-- Report FAIL, SKIP and NOT RUN explicitly. None means PASS.
-- These instructions grant no additional approval or external-service authority.
+- 隔離したworktreeとfeature branchで作業し、`main`宛てのDraft PRを
+  ユーザーレビューに出してください。今回の作業ではmergeやauto-mergeを行いません。
+- 依頼された範囲を守ってください。製品要件や言語選定には議論が必要です。
+  未整備の品質ゲートを埋めるために実装を作らないでください。
+- 私的ログ、認証情報、無関係なリポジトリの内容を転記しないでください。
+- FAIL・SKIP・NOT RUNを明示してください。いずれもPASSではありません。
+- この指示は追加の承認権限や外部サービスの実行権限を付与しません。

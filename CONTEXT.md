@@ -1,16 +1,15 @@
-# Product context
+# 製品の背景
 
-This repository is intended to explore a small, provider-independent Core.
-The following boundary is a starting point for discussion, not an approved API:
+このリポジトリでは、小さく、プロバイダーに依存しないCoreを検討します。
+次の範囲は議論の出発点であり、承認済みAPIではありません。
 
-- Character definitions and the context needed for an interaction.
-- Privacy decisions and policies for storage, retrieval and external transmission.
-- Memory extraction, acceptance, correction and deletion.
-- An LLM port that allows provider adapters to be replaced.
+- キャラクター定義と、対話に必要なコンテキスト。
+- プライバシー判断と、保存・検索・外部送信のポリシー。
+- 記憶の抽出・採用・訂正・削除。
+- プロバイダーのadapterを交換できるLLM port。
 
-Speech/STT/TTS, LiveKit, resident agent infrastructure, schedulers, workers and
-user interfaces are outside the current Core scope. No business implementation
-is introduced by the bootstrap. Contracts, persistence semantics, providers,
-implementation language and acceptance scenarios must be agreed before coding.
+音声・STT・TTS、LiveKit、常駐エージェント基盤、scheduler、worker、UIは
+現在のCoreの対象外です。今回の初期整備では業務実装を追加しません。
+contract、永続化の意味、プロバイダー、実装言語、受入シナリオは実装前に合意します。
 
-Development policy belongs in [CONTRIBUTING](CONTRIBUTING.md), not this document.
+開発規約はこの文書に重複させず、[CONTRIBUTING](CONTRIBUTING.md)で管理します。
