@@ -5,6 +5,15 @@ Coreは人格文脈付きLLM Providerです。単独のチャットUI、配信�
 この版は**信頼された単一利用者のlocalhost専用**です。認証・tenant隔離・公開配信向けの
 アクセス制御は未実装であり、インターネットや共有LANへ公開しないでください。
 
+アプリはHostを`127.0.0.1`、`localhost`、`[::1]`と有効なportに制限し、重複・曖昧なHostを
+body解析前に400/invalid_hostで拒否します。Originがある場合はscheme/hostname/portが
+Hostと同一の場合だけ許可し、別origin・`null`・重複Originは403/origin_deniedです。
+CLI等のOriginなし要求は許可します。別portのブラウザーUIや外部originを許可するCORS設定は
+提供しません。same-originのローカルUIか非ブラウザーclientを利用してください。
+これらはDNS rebindingやcross-origin要求への防御であり、認証ではありません。
+別のローカルプロセスによる要求を識別・認可するものではなく、複数利用者・公開運用は依然未対応です。
+実provider有効化前には信頼された単一利用者の端末であることと既存の利用資格を確認してください。
+
 ## 入り口
 
 | メソッド・path | 用途 |

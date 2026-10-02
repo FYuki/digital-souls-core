@@ -54,6 +54,7 @@ def require_native_chat_stream(model: str) -> None:
 
 
 def provider_error(error: Exception) -> CoreError:
+    """Classify bounded exception chains without returning provider text or secrets."""
     # Streaming can expose HTTPX directly or wrap the cause in MidStreamFallbackError.
     # Classify types only: never inspect/return messages, URLs, headers or generated text.
     pending: list[BaseException] = [error]
@@ -99,6 +100,7 @@ class LiteLLMProvider:
         )
 
     async def complete(self, profile: Profile, payload: dict[str, Any]) -> dict[str, Any]:
+        """Make one SDK call using the fixed profile, preserving normalized completion fields."""
         try:
             result = await self._call(profile, payload)
             return dict(result.model_dump(exclude_none=True))
@@ -110,6 +112,10 @@ class LiteLLMProvider:
     async def stream(
         self, profile: Profile, payload: dict[str, Any]
     ) -> AsyncGenerator[dict[str, Any]]:
+        """Yield SDK deltas and own transport cleanup on EOF, errors, and cancellation.
+
+        Only verified native Chat Completions routes may acquire a stream.
+        """
         upstream = None
         try:
             upstream = await self._call(profile, payload)

@@ -65,7 +65,7 @@ async def test_http_disconnect_closes_upstream_before_and_after_first_chunk(
         "raw_path": b"/v1/chat/completions",
         "query_string": b"",
         "root_path": "",
-        "headers": [(b"content-type", b"application/json")],
+        "headers": [(b"content-type", b"application/json"), (b"host", b"127.0.0.1:8000")],
         "server": ("127.0.0.1", 8000),
         "client": ("127.0.0.1", 1234),
     }

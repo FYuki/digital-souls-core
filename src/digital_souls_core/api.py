@@ -17,6 +17,7 @@ from starlette.types import Receive, Scope, Send
 from .application import CoreError, Inference
 from .character import load_characters
 from .contracts import AliasCompletion, CharacterCompletion, CompletionInput
+from .local_http import LocalHTTPBoundary
 from .provider import LiteLLMProvider
 
 
@@ -38,6 +39,8 @@ class ManagedStream(StreamingResponse):
 
 
 async def until_disconnect[T](operation: Coroutine[Any, Any, T], request: Request) -> T:
+    """Cancel request-owned work on disconnect without leaving a detached task."""
+
     async def disconnected() -> None:
         # FastAPI has already consumed the JSON body before invoking the route.
         while True:
@@ -60,12 +63,18 @@ async def until_disconnect[T](operation: Coroutine[Any, Any, T], request: Reques
 
 
 def create_app(inference: Inference | None = None) -> FastAPI:
+    """Load the operator registry once or inject a service for offline integration.
+
+    No characters are registered implicitly. Host/Origin checks supplement the
+    loopback-only, single-user deployment contract; they do not provide identity.
+    """
     if inference is None:
         config_path = os.environ.get("CORE_CHARACTER_CONFIG")
         characters = load_characters(Path(config_path)) if config_path else ()
         inference = Inference(characters, LiteLLMProvider())
     service = inference
     app = FastAPI(title="Digital Souls Core", version="0.1.0")
+    app.add_middleware(LocalHTTPBoundary)
 
     @app.exception_handler(CoreError)
     async def core_error_handler(request: Request, error: CoreError) -> JSONResponse:
@@ -135,16 +144,19 @@ def create_app(inference: Inference | None = None) -> FastAPI:
     async def character_completion(
         body: CharacterCompletion, request: Request
     ) -> JSONResponse | StreamingResponse:
+        """Infer as a registered character; credentials and endpoint stay server-owned."""
         return await until_disconnect(run(body.character_id, body, alias=False), request)
 
     @app.post("/v1/chat/completions", response_model=None)
     async def alias_completion(
         body: AliasCompletion, request: Request
     ) -> JSONResponse | StreamingResponse:
+        """Resolve a character alias through the same inference path as the explicit API."""
         return await until_disconnect(run(body.model, body, alias=True), request)
 
     @app.get("/v1/models")
     async def models() -> dict[str, object]:
+        """List character aliases, not physical model capabilities or credentials."""
         return {
             "object": "list",
             "data": [
@@ -160,6 +172,7 @@ def create_app(inference: Inference | None = None) -> FastAPI:
 
     @app.get("/v1/characters/{character_id}")
     async def character_metadata(character_id: str) -> dict[str, object]:
+        """Expose pinned identity/profile metadata with unknown physical limits as null."""
         character = service.characters.get(character_id)
         if character is None:
             raise CoreError(404, "character_not_found", "Unknown character")

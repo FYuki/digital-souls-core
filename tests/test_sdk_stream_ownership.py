@@ -146,7 +146,7 @@ async def test_real_sdk_read_timeout_before_and_after_first_chunk_is_safe(
         monkeypatch.setattr(litellm, "acompletion", call)
         app = create_app(Inference((character(native=True),), LiteLLMProvider()))
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://local"
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
         ) as client:
             result = await client.post(
                 "/v1/chat/completions",

@@ -41,6 +41,8 @@ class Prepared:
 
 
 class Inference:
+    """Stateless character selection and context assembly shared by HTTP entry points."""
+
     def __init__(
         self,
         characters: tuple[Character, ...],
@@ -58,6 +60,11 @@ class Inference:
         self.scope = AccessScope()
 
     async def prepare(self, selector: str, request: CompletionInput, *, alias: bool) -> Prepared:
+        """Pin the character, authorize export/capabilities, and bound injected context.
+
+        Context lookup receives server-trusted scope only after export is allowed.
+        A fresh payload keeps concurrent characters and caller histories isolated.
+        """
         character = (self.aliases if alias else self.characters).get(selector)
         if character is None:
             raise CoreError(404, "character_not_found", "Unknown character or model alias")
