@@ -46,7 +46,9 @@ lockを包括的な脆弱性監査の代わりとして扱ってはいません�
 ## ローカル検証
 
 Ubuntu / Python 3.12.3 / uv 0.8.22 / Node 24.19.0、2026-10-02 UTCに実行。
-対象は`fix/local-http-boundary`の当文書と同じcommitです。
+対象revisionは`5dc71119b935f9234f988f1fa95ae62faf285ca3`です。
+同じSHAの[API CI](https://github.com/FYuki/digital-souls-core/actions/runs/37050863193)と
+[文書CI](https://github.com/FYuki/digital-souls-core/actions/runs/37050863218)でも成功を確認しました。
 
 - `uv lock --check`、`uv sync --frozen`: PASS、lock変更なし。
 - `uv run --no-sync ruff check src tests`、`ruff format --check src tests`、`mypy`: PASS。
