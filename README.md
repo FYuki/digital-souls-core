@@ -2,5 +2,11 @@
 
 Public workspace for defining a minimal, provider-independent Core.
 
-Development rules and CI are being prepared for review. Product requirements,
-implementation language, and runtime architecture remain open for discussion.
+Start with [CONTRIBUTING](CONTRIBUTING.md) for development and validation, and
+[CONTEXT](CONTEXT.md) for the provisional product boundary. Agent entry point:
+[AGENTS](AGENTS.md). Decisions live in [ADRs](docs/adr/README.md), progress in
+[Issues](https://github.com/FYuki/digital-souls-core/issues), and validation in
+[dated evidence](docs/evidence/2026-10-02-bootstrap.md).
+
+There is no product implementation yet. Product requirements, implementation
+language, and runtime architecture remain open for discussion.
