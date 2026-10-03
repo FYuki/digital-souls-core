@@ -10,7 +10,8 @@
 
 最初の[キャラクター推論API](docs/api.md)をPython/FastAPI/LiteLLMで実装しています。
 通常チャットと外部Agentのtool call往復に対応する小範囲のChat Completions APIです。
-localhostの単独利用者向けで、公開サービス用の認証・記憶永続化・tool実行は未実装です。
+localhostの単独利用者向けで、公開サービス用の認証・tool実行は未実装です。
+記憶永続化は明示的なopt-inで利用でき、既定では接続しません。
 サンプルは外部送信を拒否し、fakeで無課金検証できます。
 
 ローカルGemma 4を使う場合は[llama.cppの起動・切替・rollback](docs/llamacpp-operations.md)を参照してください。
@@ -22,7 +23,8 @@ localhostの単独利用者向けで、公開サービス用の認証・記憶�
 ## 明示的な会話履歴（第1段階）
 
 既存APIはstatelessのままです。保存・復元・一覧・削除の専用経路と、既定拒否の保存policy境界を
-[会話履歴API](docs/history-api.md)に記載しています。分類器と記憶抽出・検索は未実装です。
+[会話履歴API](docs/history-api.md)に記載しています。ローカル分類器と明示的な記憶抽出・参照検索は実装済みです。
+意味検索は未実装で、実モデルの分類・抽出品質は未検証です。
 
 機微情報の明示的な検査・保存と送信の許可境界は[privacyガイド](docs/privacy.md)を参照してください。
 

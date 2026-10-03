@@ -13,6 +13,13 @@ from .privacy_classifier import LocalClassifier
 from .privacy_scan import scan
 
 
+class MemoryQueryUnavailable(CoreError):
+    """Query authorization refused/unavailable before any memory storage lookup."""
+
+    def __init__(self) -> None:
+        super().__init__(403, "memory_query_unavailable", "Memory query not authorized")
+
+
 class MemoryService:
     def __init__(
         self, store: MemoryStore, policy: PrivacyPolicy, extractor: LocalExtractor
@@ -110,8 +117,7 @@ class MemoryService:
         policy, stamp, versions = self.policy, self.policy.stamp, self._versions()
         if not authorized():
             raise CoreError(403, "memory_denied", "Memory caller authorization changed")
-        if not await policy.authorize(binding, "memory", query):
-            raise CoreError(403, "memory_denied", "Memory query denied")
+        query_allowed = await policy.authorize(binding, "memory", query)
         if (
             not authorized()
             or policy is not self.policy
@@ -119,6 +125,8 @@ class MemoryService:
             or versions != self._versions()
         ):
             raise CoreError(403, "memory_denied", "Memory policy changed")
+        if not query_allowed:
+            raise MemoryQueryUnavailable()
         result = self.store.search(binding, query, limit)
         if not await policy.authorize(binding, "memory", [m.text for m in result]):
             raise CoreError(403, "memory_denied", "Memory result denied")
@@ -179,11 +187,16 @@ class MemoryContext:
             self.service.policy.stamp,
             self.service._versions(),
         )
-        memories = (
-            await self.service.search(binding, user_text[:256], limit=4, authorized=authorized)
-            if user_text
-            else ()
-        )
+        memories: tuple[Memory, ...] = ()
+        if user_text and policy.permits(binding, "memory"):
+            try:
+                memories = await self.service.search(
+                    binding, user_text[:256], limit=4, authorized=authorized
+                )
+            except MemoryQueryUnavailable:
+                # Only pre-lookup query refusal is optional. Changed policy,
+                # invalid provenance, storage/result errors and cancellation propagate.
+                pass
         # Keep immutable memory/source objects in the closure after serialization.
         text = (
             json.dumps(
@@ -216,9 +229,14 @@ class MemoryContext:
                 and self.service.policy is policy
                 and policy.stamp == stamp
                 and self.service._versions() == versions
-                and policy.permits(binding, "memory")
-                and policy.permits(binding, "local")
-                and self.service.store.valid(binding, memories)
+                and (
+                    not memories
+                    or (
+                        policy.permits(binding, "memory")
+                        and policy.permits(binding, "local")
+                        and self.service.store.valid(binding, memories)
+                    )
+                )
             )
 
         return GuardedContext(text, valid, policy)

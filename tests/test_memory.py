@@ -805,3 +805,138 @@ async def test_late_failed_attempt_cannot_retire_or_commit_explicit_retry(tmp_pa
     service.store.fail(BINDING, fresh)
     assert service.store.results(BINDING, fresh.job_id)
     assert service.store.results(BINDING, old.job_id) == ()
+
+
+@pytest.mark.parametrize("private", [False, True])
+@pytest.mark.parametrize("denial", ["permission", "sensitive", "unavailable"])
+async def test_optional_memory_denial_allows_local_history_without_lookup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, private: bool, denial: str
+) -> None:
+    service, conversation, _ = setup(tmp_path)
+    cid = conversation.create("synthetic").conversation_id
+    revision = 0
+    if private:
+        conversation.controls(
+            "synthetic", cid, ConversationControls(expected_revision=0, private_mode=True)
+        )
+        revision = 1
+    if denial == "permission":
+        service.policy.configure({BINDING: frozenset({"history", "local"})})
+    classifier = service.policy.classifier
+    assert classifier is not None
+    calls = 0
+
+    async def deny(value: object, version: str) -> bool:
+        nonlocal calls
+        calls += 1
+        if denial == "unavailable":
+            raise TimeoutError("synthetic classifier unavailable")
+        return False
+
+    def no_lookup(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("Denied memory must not access storage")
+
+    monkeypatch.setattr(classifier, "safe", deny)
+    for method in ("sources", "search", "valid"):
+        monkeypatch.setattr(service.store, method, no_lookup)
+    await conversation.complete(
+        "synthetic",
+        cid,
+        turn(
+            expected_revision=revision, messages=[{"role": "user", "content": "Synthetic health"}]
+        ),
+    )
+    assert calls == (0 if denial == "permission" else 1)
+    assert isinstance(conversation.inference.provider, FakeProvider)
+    payload = conversation.inference.provider.calls[-1][1]
+    assert "retrieved_memory_data" not in json.dumps(payload)
+    assert conversation.read("synthetic", cid).messages[0].content == "Synthetic health"
+
+
+@pytest.mark.parametrize("change", ["policy", "scope", "version", "classifier_aba"])
+async def test_denied_query_with_mutation_is_not_optional(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    service, conversation, _ = setup(tmp_path)
+    classifier = service.policy.classifier
+    assert isinstance(classifier, LocalClassifier)
+
+    async def deny(value: object, version: str) -> bool:
+        if change == "policy":
+            service.policy.configure({})
+        elif change == "scope":
+            conversation.inference.scope = AccessScope(client="other")
+        elif change == "version":
+            classifier.model_digest = "synthetic-new-version"
+        else:
+            service.policy.classifier = None
+            service.policy.classifier = classifier
+        return False
+
+    monkeypatch.setattr(classifier, "safe", deny)
+    cid = conversation.create("synthetic").conversation_id
+    with pytest.raises(CoreError) as caught:
+        await conversation.inference.prepare(
+            "synthetic",
+            CompletionInput(messages=[Message(role="user", content="tea")]),
+            alias=False,
+            conversation_id=cid,
+        )
+    assert caught.value.code != "memory_query_unavailable"
+    assert isinstance(conversation.inference.provider, FakeProvider)
+    assert conversation.inference.provider.calls == []
+
+
+@pytest.mark.parametrize("failure", ["storage", "result_denial", "source_invalid"])
+async def test_memory_errors_after_lookup_never_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    service, conversation, _ = setup(tmp_path)
+    ref = await source(conversation)
+    await service.extract(BINDING, (ref,))
+    classifier = service.policy.classifier
+    assert classifier is not None
+    original = classifier.safe
+
+    async def classify(value: object, version: str) -> bool:
+        if isinstance(value, list):
+            if failure == "result_denial":
+                return False
+            if failure == "source_invalid":
+                conversation.delete("synthetic", ref.conversation_id)
+        return await original(value, version)
+
+    def broken(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("synthetic storage error")
+
+    monkeypatch.setattr(classifier, "safe", classify)
+    if failure == "storage":
+        monkeypatch.setattr(service.store, "search", broken)
+    with pytest.raises(RuntimeError if failure == "storage" else CoreError):
+        await conversation.inference.prepare(
+            "synthetic",
+            CompletionInput(messages=[Message(role="user", content="tea")]),
+            alias=False,
+            conversation_id=ref.conversation_id,
+        )
+
+
+@pytest.mark.parametrize("change", ["scope", "policy", "classifier"])
+async def test_empty_memory_context_retains_dispatch_guard(tmp_path: Path, change: str) -> None:
+    service, conversation, _ = setup(tmp_path)
+    service.policy.configure({BINDING: frozenset({"history", "local"})})
+    cid = conversation.create("synthetic").conversation_id
+    prepared = await conversation.inference.prepare(
+        "synthetic",
+        CompletionInput(messages=[Message(role="user", content="tea")]),
+        alias=False,
+        conversation_id=cid,
+    )
+    if change == "scope":
+        conversation.inference.scope = AccessScope(client="other")
+    elif change == "policy":
+        service.policy.configure({})
+    else:
+        service.policy.classifier = service.policy.classifier
+    with pytest.raises(CoreError):
+        conversation.inference.check(prepared)
