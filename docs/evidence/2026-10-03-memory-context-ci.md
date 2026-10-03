@@ -20,3 +20,9 @@ CIには当時生成されたUUIDが記録されていないため、その実�
 新規回帰は`tests/test_memory_context_refs.py`。local/external×会話ID/記憶ID×電話/Luhnの8条件と、共有source関係1件を追加。旧frameのmemory_idを見ていた既存テストのtrigger/assertionは、新frameまたはretrieved_memory_data識別へ更新した。削除guardの拒否assertionは維持する。
 
 主な検証コマンド: `uv run --no-sync pytest tests/test_memory_context_refs.py tests/test_memory.py -q`。必須のruff/mypy/UT/IT1/docs/build/installと、対象経路の独立プロセス反復結果・最終SHA・CIは作業PRに記録する。環境はWSL Ubuntu、Python 3.12.3、uv 0.8.22、Node 24.19.0。合成データのみでGPU・稼働runtime・私的履歴を操作しない。
+
+## 検証結果
+
+コード対象SHA: `9e790bfb225b0aa21fa34a77262305118ab8b4b1`。UT 30、IT1 577、文書ツール23件成功。ruff check/format、mypy 46 files、lock整合・frozen sync、sdist/wheel build、hash付き依存導入・別venv wheel isolated import成功。
+
+元の失敗テスト1件と新規回帰9件を、ファイル順序を交互に逆転して10個の独立pytestプロセスで反復し、各10件（計100件）成功。コマンドは`pytest tests/test_memory_context_refs.py tests/test_memory.py::test_context_opt_in_stateless_compatibility_and_dispatch_guard -q`とその引数逆順。seedや全体の実行順序に依存しないUUID固定の回帰であり、確率的な成功だけを根拠にしていない。CI失敗runは再実行していない。
