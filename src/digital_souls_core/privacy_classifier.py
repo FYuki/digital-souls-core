@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from .application import Provider
 from .character import Profile, local_destination_identity
 from .privacy_scan import POLICY_VERSION, scan
+from .structured_output import response_format, structured_provenance
 
 CLASSIFIER_VERSION = "core-semantic-v1"
 PROMPT_VERSION = "core-semantic-prompt-v1"
@@ -76,6 +77,7 @@ class LocalClassifier:
         """Return only fixed deployment versions, never inputs or model responses."""
         return {
             **local_destination_identity(self._profile),
+            **structured_provenance(Assessment, "privacy_assessment"),
             "classifier_version": CLASSIFIER_VERSION,
             "prompt_version": PROMPT_VERSION,
             "policy_version": POLICY_VERSION,
@@ -90,6 +92,7 @@ class LocalClassifier:
             return False
         try:
             payload = {
+                "response_format": response_format(Assessment, "privacy_assessment"),
                 "messages": [
                     {
                         "role": "system",

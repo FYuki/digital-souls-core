@@ -11,7 +11,7 @@ from digital_souls_core.contracts import CompletionInput, Message
 from digital_souls_core.conversations import Conversations
 from digital_souls_core.history import Binding, SourceReference
 from digital_souls_core.privacy import Permission, PrivacyPolicy
-from digital_souls_core.privacy_classifier import LocalClassifier
+from digital_souls_core.privacy_classifier import Assessment, LocalClassifier
 from digital_souls_core.privacy_scan import POLICY_VERSION, scan
 from digital_souls_core.sqlite_history import SQLiteHistory
 
@@ -404,6 +404,8 @@ async def test_classifier_existing_sdk_transport(monkeypatch: pytest.MonkeyPatch
     classifier = LocalClassifier(LiteLLMProvider(), local_profile(), model_digest="synthetic")
     assert await classifier.safe("Synthetic safe preference", POLICY_VERSION)
     assert len(sent) == 1 and len(closed) == 1
+    assert sent[0]["response_format"]["type"] == "json_schema"
+    assert sent[0]["response_format"]["json_schema"]["schema"] == Assessment.model_json_schema()
     assert "SYNTHETIC_CLOUD_SECRET" not in json.dumps(sent)
 
 
@@ -473,6 +475,9 @@ def test_classifier_requires_operator_capabilities(field: str, value: object) ->
 def test_classifier_provenance_is_content_free() -> None:
     classifier = LocalClassifier(FakeProvider(), local_profile(), model_digest="synthetic")
     assert set(classifier.provenance) == {
+        "structured_output_contract",
+        "response_schema_sha256",
+        "provider_sdk",
         "destination_version",
         "transport",
         "profile_id",
