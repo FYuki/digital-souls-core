@@ -11,7 +11,7 @@ from digital_souls_core.api import create_app
 from digital_souls_core.application import CoreError, Inference
 from digital_souls_core.provider import LiteLLMProvider, litellm, provider_error
 
-from .support import character, chunk
+from .support import TOOL, character, chunk
 
 pytestmark = pytest.mark.it1
 
@@ -44,7 +44,15 @@ class TrackedBytes(httpx.AsyncByteStream):
 async def test_real_litellm_openai_sdk_owns_and_closes_http_response(
     monkeypatch: pytest.MonkeyPatch, mode: str
 ) -> None:
-    values = [chunk({"role": "assistant", "content": "first"})]
+    values = [
+        chunk(
+            {
+                "role": "assistant",
+                "content": "first",
+                "reasoning_content": "SYNTHETIC_PRIVATE_REASONING",
+            }
+        )
+    ]
     events = [("data: " + json.dumps(value) + "\n\n").encode() for value in values]
     if mode == "eof":
         events.extend(
@@ -55,6 +63,7 @@ async def test_real_litellm_openai_sdk_owns_and_closes_http_response(
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v1/chat/completions"
+        assert json.loads(request.content)["tools"] == [TOOL]
         response = httpx.Response(200, headers={"content-type": "text/event-stream"}, stream=wire)
         responses.append(response)
         return response
@@ -72,10 +81,16 @@ async def test_real_litellm_openai_sdk_owns_and_closes_http_response(
         monkeypatch.setattr(litellm, "acompletion", call)
         stream = LiteLLMProvider().stream(
             character(native=True).config.profile,
-            {"messages": [{"role": "user", "content": "synthetic"}], "stream": True},
+            {
+                "messages": [{"role": "user", "content": "synthetic"}],
+                "stream": True,
+                "tools": [TOOL],
+            },
         )
         first = await anext(stream)
         assert first["choices"][0]["delta"]["content"] == "first"
+        assert "SYNTHETIC_PRIVATE_REASONING" not in json.dumps(first)
+        assert "reasoning_content" not in first["choices"][0]["delta"]
         assert wrappers[0].completion_stream.response is responses[0]
         assert not responses[0].is_closed
         if mode == "eof":
@@ -110,7 +125,9 @@ async def test_pinned_anthropic_iterator_does_not_own_http_response_close() -> N
     assert wire.closed
 
 
-@pytest.mark.parametrize("provider", ["anthropic", "bedrock", "openrouter", "ollama"])
+@pytest.mark.parametrize(
+    "provider", ["anthropic", "bedrock", "openrouter", "ollama", "ollama_chat"]
+)
 async def test_unverified_stream_adapter_rejected_before_any_sdk_call(
     monkeypatch: pytest.MonkeyPatch, provider: str
 ) -> None:

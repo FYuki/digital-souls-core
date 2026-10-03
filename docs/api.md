@@ -49,7 +49,10 @@ inference profile、provider/modelは別の識別子です。返却JSONの`model
   旧`max_tokens`も同じ内部`max_completion_tokens`へ正規化します。両方指定は400です。
   上限はCoreの入力上限でありモデル能力ではありません。reasoningモデルでは非表示の推論tokenを
   含む場合があり、出力文字数の保証ではありません。providerへの変換はLiteLLMに任せます。
-- 通常のchoices/message/tool_calls/finish_reason/usage、およびstreamのdeltaをそのまま返します。
+- 通常のchoices/finish_reason/usageと、messageまたはstreamのdeltaの対応fieldを返します。
+  message/deltaはrole/content/tool_calls/tool_call_idに限定し、SDKのreasoning_contentや
+  thinking等の拡張fieldは公開・保存しません。思考だけで終わった通常応答のcontentは空文字です。
+  返却assistant messageは加工せず、必要なtool結果を続けて次のmessagesへ再送できます。
   streamのusageはproviderが送った場合のみ保持します。Coreでtoken数を捏造しません。
 
 各parameterは管理者がprofileの`allowed_parameters`で確認済みとしたものだけを許可します。
@@ -61,15 +64,34 @@ Responses、multimodal、audio、developer role、JSON mode、stream_options、p
 n、seed、logprobs、その他未記載fieldは未対応です。unknown fieldは400、unknown endpointは404。
 完全なOpenAI互換ではありません。必須クライアントがResponses専用なら別途実装が必要です。
 
+## Ollama固有の対応範囲
+
+管理者が`ollama_chat/<model>`を設定した場合、非streamのnative Chat APIを利用します。
+旧`ollama/<model>`は400/unsupported_provider_routeです。native toolsのIDと引数・結果の
+関連を保持しますが、SDKは引数をJSON文字列とobject間で変換するため、空白等のバイト一致は
+保証しません。`tool_choice`はSDKが削除してしまうため、auto/none/required/名前指定すべてを
+400/unsupported_parameterで送信前に拒否します。黙ったJSON形式fallbackは利用しません。
+
+固定profileの`ollama_think`だけがbooleanまたはnullを受け付けます。false/trueは上流の
+`think`へ渡し、省略/nullはモデル既定値です。他providerでは未指定だけを許可し、
+明示的なnullを含む設定は起動時エラーです。
+callerの`think`、`ollama_think`、`reasoning_effort`は未対応fieldとして400です。
+thinkingのみで出力上限に達した場合も、空contentと`finish_reason=length`を保持します。
+管理者はモデルの実能力を確認してtools等を許可してください。Ollama streamingは未対応です。
+設計理由は[ADR 0002](adr/0002-ollama-native-chat.md)を参照してください。
+
 ## streaming・取消・エラー
 
 実providerへのstreamは初期版では、pinned SDKがローカルmetadataで`mode=chat`と解決する
 `openai/`のネイティブChat Completions経路だけに制限します。prefixだけでは許可しません。
-SDK自身と同じResponses bridge判定を送信前に行い、`openai/gpt-5-codex`、`openai/o3-pro`、
+SDK自身と同じResponses bridge判定に実要求のtools・reasoning・api_base等を渡して送信前に判定し、
+`openai/gpt-5-codex`、`openai/o3-pro`、
 `openai/codex-mini-latest`などの既知Responsesモデル、`openai/responses/...`、未知modeを拒否します。
 このmetadataは経路判定専用で、モデル能力・利用資格や実モデル検証の証明ではありません。
+function toolsによってResponsesへ切り替わるGPT-5.4以降等も要求単位で拒否します。
+endpoint解決はSDKと同じ管理者の設定順を使い、callerによるendpoint・reasoning指定は許可しません。
 SDKのglobal model aliasによる経路変更も拒否します。APIの登録済みcharacter aliasとは別のものです。
-LiteLLM 1.77.7のAnthropic等にはHTTP Responseのclose所有権を公開しないiteratorがあるため、
+LiteLLM 1.103.2のAnthropic等にはHTTP Responseのclose所有権を公開しないiteratorがあるため、
 allowlistにstreamがあっても他providerは送信前に400/unsupported_stream_providerで拒否します。
 OpenRouter等のOpenAI互換サービスもこの保証範囲には含めません。非streamの他providerは管理者の
 能力確認が必要で、実モデル検証済みとは称しません。汎用Provider port自体は差し替え可能です。
@@ -121,4 +143,5 @@ CORE_CHARACTER_CONFIG=examples/characters.json uv run --no-sync uvicorn digital_
 ```
 
 環境変数なしならキャラクター0件で起動します。無課金のfake/SDK mock検証は`uv run --no-sync pytest`。
-fakeの定型返答は人格品質や実モデル動作の証明ではありません。実モデル試験は未実施です。
+fakeの定型返答は人格品質や実モデル動作の証明ではありません。
+限定した実モデル試験の範囲は[検証証跡](evidence/2026-10-03-ollama-native-chat.md)を参照してください。
