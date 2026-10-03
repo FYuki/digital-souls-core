@@ -126,3 +126,17 @@ batchの他のjobを進めた後、集約エラーを返す。現在の出典を
 
 最終推論では、記憶本文を人格system文から分離し、出典付きの歴史的userデータとしてframeする。
 systemには命令として扱わない固定方針を置く。プロンプトは強制機構ではなく、実モデルの完全防御は未検証。
+
+
+## 処理先変更による承認失効
+
+管理されたloopback内のendpoint/profile変更も、保存済み再構築承認の失効対象とする。
+classifier/extractor双方のprovenanceへ秘密を含まないtransport/profile ID/正規化endpointを追加する。
+既存versions JSONを拡張し、旧jobへ現在値を補完するmigrationは行わない。識別不足は不一致として
+classifier/extractorへの送信前に拒否し、明示抽出で現在の許可を取り直す。同一identityでの再起動・URL表記差は継続できる。
+SQLite schema versionと既存migrationのtransaction境界は変更しない。
+
+
+consume/rebaseはrunの設定比較前にsource適格性の確認で本文を読むため、
+再構築全体での本文取得前拒否は保証しない。既存の適格性・transaction境界を維持するため、
+この修正ではmetadata専用の取得経路を追加せず、保証をモデル送信前の拒否に限定する。

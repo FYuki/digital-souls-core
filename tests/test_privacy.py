@@ -473,6 +473,10 @@ def test_classifier_requires_operator_capabilities(field: str, value: object) ->
 def test_classifier_provenance_is_content_free() -> None:
     classifier = LocalClassifier(FakeProvider(), local_profile(), model_digest="synthetic")
     assert set(classifier.provenance) == {
+        "destination_version",
+        "transport",
+        "profile_id",
+        "endpoint",
         "classifier_version",
         "prompt_version",
         "policy_version",

@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from .application import Provider
-from .character import Profile
+from .character import Profile, local_destination_identity
 from .privacy_scan import POLICY_VERSION, scan
 
 CLASSIFIER_VERSION = "core-semantic-v1"
@@ -75,6 +75,7 @@ class LocalClassifier:
     def provenance(self) -> dict[str, str]:
         """Return only fixed deployment versions, never inputs or model responses."""
         return {
+            **local_destination_identity(self._profile),
             "classifier_version": CLASSIFIER_VERSION,
             "prompt_version": PROMPT_VERSION,
             "policy_version": POLICY_VERSION,
