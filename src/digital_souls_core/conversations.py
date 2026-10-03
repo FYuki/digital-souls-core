@@ -13,6 +13,7 @@ from .application import CoreError, Inference
 from .character import CharacterConfig, Profile
 from .contracts import CompletionInput, Message
 from .history import Binding, HistoryPolicy, HistoryStore, Operation, Receipt, Snapshot, TurnInput
+from .privacy import PrivacyPolicy
 
 MAX_BYTES = 1024 * 1024
 
@@ -45,6 +46,8 @@ class Conversations:
     def __init__(
         self, inference: Inference, store: HistoryStore, policy: HistoryPolicy | None = None
     ) -> None:
+        if isinstance(policy, PrivacyPolicy) and inference.privacy is not policy:
+            raise ValueError("history and inference must share the same privacy policy")
         self.inference = inference
         self.store = store
         self.policy = policy
@@ -62,6 +65,10 @@ class Conversations:
         try:
             allowed = (
                 self.policy is not None
+                and (
+                    not isinstance(self.policy, PrivacyPolicy)
+                    or self.inference.privacy is self.policy
+                )
                 and self.policy.allows(
                     operation, binding, tuple(m.model_copy(deep=True) for m in messages)
                 )
