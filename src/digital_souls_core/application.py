@@ -1,11 +1,18 @@
 """One inference path shared by both HTTP entry points."""
 
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Protocol
 
-from .character import AccessScope, Character, ContextSource, EmptyContext, Profile
+from .character import (
+    AccessScope,
+    Character,
+    ContextSource,
+    EmptyContext,
+    GuardedContextSource,
+    Profile,
+)
 from .contracts import CompletionInput
 from .history import Binding
 from .privacy import PrivacyPolicy, destination
@@ -31,6 +38,7 @@ class Provider(Protocol):
 class Prepared:
     character: Character
     payload: dict[str, Any]
+    valid: Callable[[], bool] = lambda: True
 
     @property
     def headers(self) -> dict[str, str]:
@@ -52,6 +60,7 @@ class Inference:
         context: ContextSource | None = None,
         *,
         privacy: PrivacyPolicy | None = None,
+        memory_context: GuardedContextSource | None = None,
     ) -> None:
         by_id = {char.config.character_id: char for char in characters}
         aliases = {char.config.alias: char for char in characters}
@@ -63,8 +72,16 @@ class Inference:
         self.context = context or EmptyContext()
         self.scope = AccessScope()
         self.privacy = privacy
+        self.memory_context = memory_context
 
-    async def prepare(self, selector: str, request: CompletionInput, *, alias: bool) -> Prepared:
+    async def prepare(
+        self,
+        selector: str,
+        request: CompletionInput,
+        *,
+        alias: bool,
+        conversation_id: str | None = None,
+    ) -> Prepared:
         """Pin the character, authorize export/capabilities, and bound injected context.
 
         Context lookup receives server-trusted scope only after export is allowed.
@@ -97,13 +114,36 @@ class Inference:
         user_text = next(
             (msg.content or "" for msg in reversed(request.messages) if msg.role == "user"), ""
         )
+        stamp = privacy.stamp if privacy is not None else None
         extra = await self.context.context(character, binding.scope, user_text)
+        memory_context = self.memory_context
+
+        def authorized() -> bool:
+            return (
+                self.privacy is privacy
+                and self.scope == binding.scope
+                and (privacy is None or privacy.stamp == stamp)
+                and self.memory_context is memory_context
+            )
+
+        if not authorized():
+            raise CoreError(403, "privacy_denied", "Context policy changed")
+        guarded = None
+        if conversation_id is not None and memory_context is not None:
+            if privacy is None or memory_context.policy is not privacy:
+                raise CoreError(403, "privacy_denied", "Memory and inference policy differ")
+            guarded = await memory_context.context(
+                character, binding.scope, user_text, authorized=authorized
+            )
+            if guarded.policy is not privacy:
+                raise CoreError(403, "privacy_denied", "Memory and inference policy differ")
         prompt = "\n\n".join(
             part
             for part in (
                 character.system_prompt,
                 *(item.content for item in character.lore if item.matches(user_text)),
                 extra,
+                guarded.text if guarded is not None else "",
             )
             if part
         )
@@ -117,4 +157,20 @@ class Inference:
             raise CoreError(403, "privacy_denied", "Privacy policy denies inference")
         if privacy is not self.privacy:
             raise CoreError(403, "privacy_denied", "Privacy policy changed during inference")
-        return Prepared(character, payload)
+
+        def valid() -> bool:
+            return (
+                self.scope == binding.scope
+                and self.privacy is privacy
+                and (privacy is None or privacy.stamp == stamp)
+                and (guarded is None or (self.memory_context is memory_context and guarded.valid()))
+            )
+
+        prepared = Prepared(character, payload, valid)
+        self.check(prepared)
+        return prepared
+
+    @staticmethod
+    def check(prepared: Prepared) -> None:
+        if not prepared.valid():
+            raise CoreError(403, "context_revoked", "Context authorization changed")

@@ -16,7 +16,7 @@ Status: Proposed
 
 この表は[ADR 0005](0005-privacy-boundaries.md)の自然言語保存拒否に関する仮案に優先します。
 secret/機微検査・外部送信許可は別です。操作によって秘密値の保存・送信を許可しません。
-長期記憶の抽出・採用・検索本体は未実装なので、「対象」は必要なsource条件を表します。
+controls単体の「対象」は必要なsource条件を表します。Stage3の抽出・検索は[記憶API](../memory.md)を参照してください。
 
 ## 決定案
 
@@ -28,7 +28,7 @@ completionの`memory_excluded_indices`で今回の入力配列内の発話を選
 
 threadの`private_mode`と`archived`はPATCHで変更し、期待revisionによる排他を用います。
 private中に保存したturnは解除後も自動で対象へ戻しません。現在privateのthreadは全sourceを利用不可とします。
-これは実装上の保守的なsource gateであり、既存の派生memoryを物理削除する実装ではありません。
+controls単体ではsource gateまででした。Stage3では同一DBの派生本文削除と永続epochを追加します。
 archiveは通常一覧から隠すだけで、直接復元・source eligibility・削除は引き続き可能です。
 
 sourceはtrusted Bindingと、conversation ID・turn revision・message indexで識別します。
@@ -52,7 +52,8 @@ control変更もconversation revisionを進め、進行中の旧revision推論�
 - メモリ削除を同期callbackだけで伝える方式は停止中の通知を失うため、永続通知にします。
 - 生成応答の厳密な依存解析は未実装なので、過去の除外内容を参照し得るassistant/toolを保守的に除外します。
   除外を含む会話で生成された安全な独立応答も対象外になり得ます。
-- 過去発話への後付け訂正・除外変更、通知の自動consumer、memory/index実削除はこの実装に含めません。
+- controls単体には後付け訂正・除外変更、consumer、memory実削除を含めませんでした。
+  Stage3の追加範囲と未実装範囲は[記憶API](../memory.md)で区別します。
 
 ## Stage3の確定した製品動作（2026-10-03）
 
@@ -64,12 +65,12 @@ control変更もconversation revisionを進め、進行中の旧revision推論�
    残る適格sourceだけから再構成します。成功して再審査を通るまで検索/コンテキストへ出しません。
    根拠が残らなければ削除状態を維持します。private化もsource対象外化として同じ規則を適用します。
 
-上記はまだ実装済みではありません。現行private切替はoutboxを生成せず、解除後のsource gateだけでは
+controls実装時点では上記は未実装でした。その時点のprivate切替はoutboxを生成せず、source gateだけでは
 旧memoryの復活を防げません。現行`SourceDeletion`は履歴が消えたことを表すため、履歴を残すprivate化の
 通知に流用しません。Stage3で撤回通知・永続的な撤回世代・memory状態を追加する必要があります。
 既存source参照は維持し、削除通知の既存契約も壊さずに拡張します。
 fixture consumerの成功は実memory削除の証明ではありません。
-詳細な実装提案・ゲートは[ADR 0007](0007-memory-provenance-and-revocation.md)に分離します。
+Stage3で上記の撤回通知・epochを追加します。詳細な設計・ゲートは[ADR 0007](0007-memory-provenance-and-revocation.md)に分離します。
 
 ## 参照
 

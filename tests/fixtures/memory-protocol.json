@@ -1,0 +1,32 @@
+[
+  {
+    "id": "explicit-preference",
+    "text": "For this synthetic case, I prefer mint tea.",
+    "kind": "semantic"
+  },
+  {
+    "id": "reported-episode",
+    "text": "For this synthetic case, I planted mint on 2026-01-02.",
+    "kind": "episode"
+  },
+  {
+    "id": "question",
+    "text": "For this synthetic case, should I plant mint?",
+    "kind": null
+  },
+  {
+    "id": "quoted-suggestion",
+    "text": "In this synthetic example an assistant suggested planting mint.",
+    "kind": null
+  },
+  {
+    "id": "uncertain",
+    "text": "For this synthetic case, I might prefer mint, but I am unsure.",
+    "kind": null
+  },
+  {
+    "id": "conflict",
+    "text": "For this synthetic case, I both prefer and do not prefer mint.",
+    "kind": null
+  }
+]

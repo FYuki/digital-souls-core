@@ -29,6 +29,11 @@ class PrivacyPolicy:
         self._grants: dict[Binding, frozenset[Permission]] = {}
         self._generation = 0
 
+    @property
+    def stamp(self) -> tuple[int, int]:
+        """Content-free consent/classifier generation for adjacent no-await guards."""
+        return self._generation, id(self.classifier)
+
     def configure(self, grants: Mapping[Binding, frozenset[Permission]]) -> None:
         """Atomically replace trusted consent; outstanding decisions become stale."""
         if any(

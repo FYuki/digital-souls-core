@@ -46,13 +46,13 @@ localとexternalの両permissionが必要です。分類器は同じProvider por
 | memory | 決定論的検査＋ローカル意味分類（source除外は別途必須） | 将来の記憶形成を拒否 |
 
 意味分類のsafe判定だけで候補の根拠・型・有用性・保存先が承認されたことにはなりません。
-記憶抽出本体、repository、queue、検索は未実装です。
+Stage3の最小抽出・保存・参照検索は[記憶API説明](memory.md)を参照してください。実モデル品質は未検証です。
 
 [ADR 0006](adr/0006-conversation-memory-controls.md)のユーザー操作仕様を優先します。
 「記録しないで（指定発話）」は履歴を残し、UI/Agentが`memory_excluded_indices`で指定した発話を
 memory対象外にします。自然語だけから期間や操作を推定しません。thread private/archiveは明示PATCHです。
 履歴を残さない操作は会話削除で、派生memory削除の通知を同時に作ります。
-ただしStage3 memory本体と実通知consumerは未実装です。
+Stage3では同じDBの派生本文を同時に消去し、明示batch consumerが残存sourceだけの再構成jobを扱います。
 secret検出時は引き続きturnを拒否します。stateless応答の事後マスク機能もありません。
 
 保存の許可と外部送信の許可は独立しています。health等の同一会話内履歴は

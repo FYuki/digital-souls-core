@@ -102,3 +102,16 @@ source参照・epoch・memory IDを本文と共に内部で保持する接続口
 
 全て合成データから始めます。実classifier品質・実抽出品質の評価は別途明示された実環境作業で行い、
 未検証を成功と扱いません。private input importの許可は引き続きありません。
+
+
+## Stage3最小実装の具体化（2026-10-03）
+
+初期実装はSQLite v3、同一transactionでの本文消去、内容なし撤回outbox、明示batch consumerとします。
+抽出器のstrict出力は型とsource indexに限定し、本文は選ばれたuser発話全体をCoreが保存します。
+自由要約より表現力を抑えますが、生成文による根拠外の事実/日時や否定脱落を保存しないためです。
+episodeはuser reportの分類ラベルであり、正規化時間schemaは未実装です。実抽出品質は未検証です。
+モデルmetadataにもscanner/長さ検査を適用し、秘密をprovenance経由で永続化しません。
+語句部分一致検索とhard limitを選び、派生text index/cacheを持たないため削除境界を小さく保ちます。
+詳細な上限・接続例・未実装範囲は[記憶API説明](../memory.md)を参照してください。
+
+Stage3の実装範囲・進捗は[Issue #30](https://github.com/FYuki/digital-souls-core/issues/30)で管理します。

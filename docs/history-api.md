@@ -105,16 +105,16 @@ conversation IDとtrusted scope/characterと組み合わせて参照します。
 DELETEは本文・receiptを消し、内容なしのsource削除通知を同じtransactionで残します。
 Stage3 consumer用Python portの`deletions(binding)`と`acknowledge_deletion(binding,event_id)`で処理します。
 scope違いの通知は取得・ackできません。通知のHTTP ackは公開しません。
-Stage3のmemory/index実削除は未実装なので、その完了をDELETEの成功として主張しません。
+同じSQLite v3にある派生memory本文も同一transactionで消去します。再構成の完了とは別です。
 source参照自体は削除直後から無効です。
 
-schema v1からv2へ原子的に移行します。履歴・receiptは保持し、未知versionは引き続き拒否します。
+schema v1/v2からv3へ原子的に移行します。履歴・receiptは保持し、未知versionは引き続き拒否します。
 過去発話への後付け除外変更は未実装で、指定はcompletionの入力配列に対して行います。
 
 
-### Stage3で追加する撤回処理
+### Stage3の撤回処理
 
 private化は、そのthread由来の既存memoryを削除する製品仕様として承認済みです。
 複数sourceの旧memoryは直ちに利用停止し、残る適格sourceのみから再構成が成功するまで返しません。
-解除による旧memoryの自動復活は行いません。現行PATCHはsource gate変更までで、撤回通知や
-実memory削除を実装済みとは扱いません。詳細は[ADR 0007](adr/0007-memory-provenance-and-revocation.md)。
+解除による旧memoryの自動復活は行いません。PATCHはepoch更新・派生本文消去・別のmemory撤回通知を
+原子的に確定します。明示batch再構成と制約は[記憶API説明](memory.md)を参照してください。
