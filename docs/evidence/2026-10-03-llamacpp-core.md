@@ -113,12 +113,19 @@ Core TCP 18080 → LiteLLM → 専用HTTPX/AsyncOpenAI → llama.cpp TCP 18081�
 
 対象はepic revision `33f14c3237dd6ec92a55cb2da9a1d15661a219fa` と、
 この証跡・運用手順だけの未コミット変更。製品コード・tests・lockは変更していない。
-Ubuntu側で次を実行した。workspace/toolchain pathはこの検証環境の実際の値。
-初回実行を推測で補完したコマンドではない。
+Ubuntu側で実行したコマンドを以下に記録する。個人固有の絶対pathだけを中立変数へ置換した
+表記であり、当時この変数名で実行したという意味ではない。引数・対象・順序は維持し、
+初回実行を推測で補完していない。変数は手元の実際の絶対pathに設定して読む。
+
+| 変数 | 役割 | 架空の汎用設定例（実行値ではない） |
+| --- | --- | --- |
+| `WORKSPACE` | worktreeとtoolchainを格納した親ディレクトリ | `/example/workspace` |
+| `MODEL_PATH` | 起動時と同じ検証済みGGUFファイル | `/example/models/model.gguf` |
+| `FIXTURE_SCRIPT` | repo外のrollback検証用補助script | `/example/checks/verify_rollback.py` |
 
 ```bash
 set -euo pipefail
-cd /mnt/c/Users/asa/Documents/Codex/2026-10-03/task/core-llamacpp-doc-fixes
+cd "$WORKSPACE/core-llamacpp-doc-fixes"
 ../api-toolchain/bin/uv lock --check
 ../api-toolchain/bin/uv sync --frozen
 bash -n tools/start-llamacpp.sh
@@ -141,8 +148,8 @@ git diff --check
 Ubuntu-dogfood側では、次の読取り専用Compose検査を実行した。
 
 ```bash
-cd /mnt/c/Users/asa/Documents/Codex/2026-10-03/task/core-llamacpp-doc-fixes
-export CORE_LLAMACPP_MODEL=/home/asa/llama-compare.mD4N9V/blob-1278394b.gguf CORE_LLAMACPP_UID=$(id -u) CORE_LLAMACPP_GID=$(id -g)
+cd "$WORKSPACE/core-llamacpp-doc-fixes"
+export CORE_LLAMACPP_MODEL="$MODEL_PATH" CORE_LLAMACPP_UID=$(id -u) CORE_LLAMACPP_GID=$(id -g)
 docker compose -f compose.llamacpp.yml config --quiet
 docker inspect --format '{{.State.Status}}' digital-souls-core-llamacpp
 ```
@@ -154,7 +161,7 @@ rollback例は作業用の合成fixture（repo外、docker/sudoを無害なshim�
 この補助fixtureはcommitted CI testではなく、公開repoだけで再実行できるとは扱わない。
 
 ```bash
-python3 /mnt/c/Users/asa/Documents/Codex/2026-10-03/task/verify_llamacpp_rollback_snippet.py
+python3 "$FIXTURE_SCRIPT"
 ```
 
 再検証結果: 上記コマンドはすべて成功。UT 18 / IT1 184 / docs 23 PASS、skip/xfail/xpass 0。

@@ -17,9 +17,11 @@ WSL内のloopback到達性は環境ごとに確認する。LAN公開や共有ユ
 
 ユーザーが通常ユーザー所有の場所へコピーしたGGUFを指定する。保護原本をroot containerで
 読み取ったり、ACLを緩めたりしない。コピーと公式imageはrollback後も保持する。
+`MODEL_PATH`には手元の検証済みGGUFの絶対pathを設定する。架空の汎用例は
+`/example/models/model.gguf`であり、実際の配置や実行値ではない。未設定なら以下は停止する。
 
 ```bash
-export CORE_LLAMACPP_MODEL=/home/asa/llama-compare.mD4N9V/blob-1278394b.gguf
+export CORE_LLAMACPP_MODEL="${MODEL_PATH:?Set MODEL_PATH to the verified absolute GGUF path}"
 docker pull ghcr.io/ggml-org/llama.cpp@sha256:69019445c94c970496c8f6d6447214b837508162dfe1152768942c51237e3ab7
 nvidia-smi --query-gpu=memory.used,memory.free,utilization.gpu --format=csv
 ```
@@ -67,14 +69,14 @@ Ollamaの起動順との競合を確認してからrestart policyを変更する
 
 今回起動したCoreプロセスを停止し、先にllamaコンテナを停止する。
 repoルートで実行し、Composeには起動時と同じ検証済み絶対モデルpath・uid/gidを指定する。
-この環境で確認したpathを以下に示す。別の配置では起動・rollbackの両方を同じpathへ変更する。
+新しいシェルでも`MODEL_PATH`を起動時と同じ絶対pathに設定する。個人固有の値は公開しない。
 停止コマンドの成功とcontainer状態がexitedであることを確認できた場合だけOllamaを再開する。
 停止失敗・inspect失敗・稼働中・状態不明では再開せず、原因を確認する。
 
 ```bash
 (
   set -euo pipefail
-  export CORE_LLAMACPP_MODEL=/home/asa/llama-compare.mD4N9V/blob-1278394b.gguf
+  export CORE_LLAMACPP_MODEL="${MODEL_PATH:?Set MODEL_PATH to the verified absolute GGUF path}"
   export CORE_LLAMACPP_UID=$(id -u) CORE_LLAMACPP_GID=$(id -g)
   if docker compose -f compose.llamacpp.yml stop llama &&
      state=$(docker inspect --format '{{.State.Status}}' digital-souls-core-llamacpp) &&
