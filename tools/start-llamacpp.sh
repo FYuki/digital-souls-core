@@ -6,8 +6,10 @@ if [[ $(id -u) == 0 ]]; then
   echo 'Run as the normal operator, not root.' >&2
   exit 1
 fi
-if systemctl is-active --quiet digital-souls-ollama.service; then
-  echo 'Ollama is active. Explicitly stop it before switching; existing Ollama clients will be unavailable.' >&2
+ollama_load=$(systemctl show digital-souls-ollama.service --property=LoadState --value)
+ollama_state=$(systemctl show digital-souls-ollama.service --property=ActiveState --value)
+if [[ $ollama_load != loaded || $ollama_state != inactive ]]; then
+  echo 'Ollama must be a known, stopped service. Explicitly stop it before switching; existing Ollama clients will be unavailable.' >&2
   exit 1
 fi
 : "${CORE_LLAMACPP_MODEL:?Set the verified user-owned model GGUF path}"
