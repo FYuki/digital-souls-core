@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 from contextlib import aclosing
+from io import StringIO
 from typing import Any
 
 from pydantic import ValidationError
@@ -17,11 +18,13 @@ MAX_BYTES = 1024 * 1024
 
 
 def bounded(value: object) -> None:
+    """Reject a JSON value exceeding the UTF-8 history byte budget."""
     if len(json.dumps(value, ensure_ascii=False).encode("utf-8")) > MAX_BYTES:
         raise CoreError(413, "history_limit", "Conversation byte limit exceeded")
 
 
 def request_fingerprint(body: TurnInput, config: CharacterConfig) -> str:
+    """Hash input and routing configuration for idempotent receipt lookup."""
     profile = config.profile.model_dump(mode="json")
     if config.profile.transport == "sdk":
         # Preserve pre-llamacpp receipts: newly added defaults do not change routing.
@@ -37,6 +40,8 @@ def request_fingerprint(body: TurnInput, config: CharacterConfig) -> str:
 
 
 class Conversations:
+    """Coordinate scoped history, policy checks and one inference turn."""
+
     def __init__(
         self, inference: Inference, store: HistoryStore, policy: HistoryPolicy | None = None
     ) -> None:
@@ -45,6 +50,7 @@ class Conversations:
         self.policy = policy
 
     def binding(self, character_id: str) -> Binding:
+        """Bind a known character to the trusted server-side access scope."""
         if character_id not in self.inference.characters:
             raise CoreError(404, "character_not_found", "Unknown character")
         return Binding(self.inference.scope, character_id)
@@ -52,6 +58,7 @@ class Conversations:
     def authorize(
         self, operation: Operation, binding: Binding, messages: tuple[Message, ...] = ()
     ) -> None:
+        """Fail closed unless the injected policy explicitly allows the operation."""
         try:
             allowed = (
                 self.policy is not None
@@ -66,16 +73,19 @@ class Conversations:
             raise CoreError(403, "history_policy_denied", "History policy denies operation")
 
     def create(self, character_id: str) -> Snapshot:
+        """Create an empty conversation after explicit policy authorization."""
         binding = self.binding(character_id)
         self.authorize("create", binding)
         return self.store.create(binding)
 
     def list(self, character_id: str) -> list[str]:
+        """List conversation IDs within the authorized character and caller scope."""
         binding = self.binding(character_id)
         self.authorize("list", binding)
         return self.store.list(binding)
 
     def read(self, character_id: str, conversation_id: str) -> Snapshot:
+        """Restore a scoped snapshot and reauthorize its actual content."""
         binding = self.binding(character_id)
         self.authorize("read", binding)
         snapshot = self.store.read(binding, conversation_id)
@@ -83,9 +93,11 @@ class Conversations:
         return snapshot
 
     def delete(self, character_id: str, conversation_id: str) -> None:
+        """Delete scoped history even when storage consent has been revoked."""
         self.store.delete(self.binding(character_id), conversation_id)
 
     async def complete(self, character_id: str, conversation_id: str, body: TurnInput) -> Receipt:
+        """Return an authorized retry receipt or atomically save a completed turn."""
         binding = self.binding(character_id)
         incoming = tuple(body.messages)
         if any(message.role not in ("user", "tool") for message in incoming):
@@ -104,6 +116,8 @@ class Conversations:
         if snapshot.revision != body.expected_revision:
             raise CoreError(409, "revision_conflict", "Conversation revision changed")
         all_input = (*snapshot.messages, *incoming)
+        if len(all_input) > 256:
+            raise CoreError(413, "history_limit", "Conversation message limit exceeded")
         payload = body.model_dump(exclude={"request_id", "expected_revision"}, exclude_none=True)
         payload["messages"] = [m.model_dump(exclude_none=True) for m in all_input]
         bounded(payload)
@@ -185,16 +199,18 @@ class Conversations:
         names = {tool.function.name for tool in request.tools or []}
         if any(call.function.name not in names for call in message.tool_calls or []):
             raise ValueError("unknown tool")
-        # Validate the complete sequence, allowing only the final assistant's pending calls.
-        validation_tail = [
-            Message(role="tool", tool_call_id=call.id, content="")
-            for call in message.tool_calls or []
-        ]
-        CompletionInput(messages=[*request.messages, message, *validation_tail])
+        # Input already has a validated, fully resolved tool sequence. Validate only
+        # new IDs here; the response is not part of the 256-message input budget.
+        used = {call.id for item in request.messages for call in item.tool_calls or []}
+        for call in message.tool_calls or []:
+            if call.id in used:
+                raise ValueError("duplicate tool call id")
+            used.add(call.id)
 
     async def _stream(self, profile: Profile, payload: dict[str, Any]) -> tuple[Message, str]:
-        text = ""
+        text = StringIO()
         calls: dict[int, dict[str, Any]] = {}
+        budget = _StreamBudget()
         finish: str | None = None
         # Bounded buffering permits policy checks over complete tool arguments.
         # No partial result reaches disk or the conversation HTTP response.
@@ -208,25 +224,69 @@ class Conversations:
                 delta = choices[0]["delta"]
                 if delta.get("role", "assistant") != "assistant":
                     raise ValueError("invalid role")
-                text += delta.get("content") or ""
+                budget.write(text, delta.get("content") or "")
                 for part in delta.get("tool_calls") or []:
                     index = part["index"]
                     if type(index) is not int or not 0 <= index < 128:
                         raise ValueError("invalid tool index")
-                    call = calls.setdefault(
-                        index,
-                        {"id": "", "type": "function", "function": {"name": "", "arguments": ""}},
-                    )
+                    if index not in calls:
+                        empty = {
+                            "id": "",
+                            "type": "function",
+                            "function": {"name": "", "arguments": ""},
+                        }
+                        # Add the new dictionary entry, excluding its outer braces.
+                        budget.add(
+                            len(json.dumps({index: empty}).encode("utf-8"))
+                            - 2
+                            + (2 if calls else 0)
+                        )
+                        calls[index] = {
+                            "id": StringIO(),
+                            "type": "function",
+                            "function": {"name": StringIO(), "arguments": StringIO()},
+                        }
+                    call = calls[index]
                     if part.get("type", "function") != "function":
                         raise ValueError("invalid tool type")
-                    call["id"] += part.get("id") or ""
+                    budget.write(call["id"], part.get("id") or "")
                     for field in ("name", "arguments"):
-                        call["function"][field] += (part.get("function") or {}).get(field) or ""
-                bounded([text, calls])
+                        budget.write(
+                            call["function"][field], (part.get("function") or {}).get(field) or ""
+                        )
                 finish = choices[0].get("finish_reason")
         if finish is None or sorted(calls) != list(range(len(calls))):
             raise ValueError("unfinished stream")
-        raw: dict[str, Any] = {"role": "assistant", "content": text}
+        content = text.getvalue()
+        for call in calls.values():
+            call["id"] = call["id"].getvalue()
+            for field in ("name", "arguments"):
+                call["function"][field] = call["function"][field].getvalue()
+        bounded([content, calls])  # Exact final check, independent of incremental accounting.
+        raw: dict[str, Any] = {"role": "assistant", "content": content}
         if calls:
             raw["tool_calls"] = list(calls.values())
         return self._visible(raw), finish
+
+
+class _StreamBudget:
+    """Count serialized bytes once per fragment, retaining no fragment list."""
+
+    def __init__(self) -> None:
+        self.size = len(json.dumps(["", {}]).encode("utf-8"))
+
+    def add(self, size: int) -> None:
+        self.size += size
+        if self.size > MAX_BYTES:
+            raise CoreError(413, "history_limit", "Conversation byte limit exceeded")
+
+    def write(self, buffer: StringIO, fragment: str) -> None:
+        if not isinstance(fragment, str):
+            raise ValueError("invalid stream fragment")
+        if not fragment:
+            return
+        # Reject huge chunks before encoding; every code point needs at least one byte.
+        if len(fragment) > MAX_BYTES - self.size:
+            raise CoreError(413, "history_limit", "Conversation byte limit exceeded")
+        self.add(len(json.dumps(fragment, ensure_ascii=False).encode("utf-8")) - 2)
+        buffer.write(fragment)

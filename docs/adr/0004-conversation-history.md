@@ -75,3 +75,25 @@ DB移行・UI・認証・分類器・記憶は未実装です。保存policyの�
 合成データのUT/IT1で保存/復元/一覧/削除、順序、scope隔離、再試行、tool往復、stream失敗・
 キャンセル、削除との競合、policy撤回を検証します。GPU・実モデル・人格品質評価は不要です。
 APIの詳細は[会話履歴API](../history-api.md)を参照してください。
+
+
+## 代替案と影響
+
+- JSONLは依存を増やしませんが、順序・再試行receipt・会話単位の削除を原子的に扱う独自処理が必要です。
+  SQLiteのtransactionと制約を使い、その実装負担を避けます。
+- 外部DBは複数利用者や分散運用に向きますが、この段階の単一利用者にはサービス管理が過大です。
+- stateless APIへの自動保存は既存callerの保存意図を変えるため採用しません。
+- streamの逐次配送は低遅延ですが、完全なtool引数を保存policyが確認する前に内容を公開します。
+  完了までバッファすることで初回表示は遅くなります。断片ごとの増分バイト計測で処理量を抑え、
+  完了時と保存前の厳密な全体サイズ検証を維持します。
+- 履歴の上限到達時は自動要約・切捨てをせず413を返すため、caller側で新しい会話を作成する必要があります。
+  分類器が未実装の間は保存を既定拒否とし、私的会話の自動取り込みを開始しません。
+
+## 参照
+
+- [作業Issue #18](https://github.com/FYuki/digital-souls-core/issues/18)
+- [初回work PR #19](https://github.com/FYuki/digital-souls-core/pull/19)
+- [epic PR #20](https://github.com/FYuki/digital-souls-core/pull/20)
+- [履歴保存・レビュー修正の検証証跡](../evidence/2026-10-03-conversation-history.md)
+- [llama.cpp統合の検証証跡](../evidence/2026-10-03-history-llamacpp-integration.md)
+- [PoC履歴sanitizer](https://github.com/FYuki/digital-souls/blob/fce7382884d981c42be7fbd3ddaffe7469e27588/backend/app/privacy/history_sanitizer.py)
