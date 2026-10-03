@@ -55,4 +55,5 @@ Ollamaと同時ロードしない起動手順は、既存Ollamaサービスの�
 - [運用・rollback](../llamacpp-operations.md)
 - [既存Ollama SDK修正 PR #11](https://github.com/FYuki/digital-souls-core/pull/11)
 - [Issue #13: 採用範囲と受入条件](https://github.com/FYuki/digital-souls-core/issues/13)
+- [検証証跡](../evidence/2026-10-03-llamacpp-core.md)
 - [llama.cpp固定revision](https://github.com/ggml-org/llama.cpp/tree/5fc4f3c8c7103ffd0b7ff5ee4855bcc78a3ed5cd)
