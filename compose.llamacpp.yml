@@ -1,0 +1,60 @@
+name: digital-souls-core
+services:
+  llama:
+    image: ghcr.io/ggml-org/llama.cpp@sha256:69019445c94c970496c8f6d6447214b837508162dfe1152768942c51237e3ab7
+    container_name: digital-souls-core-llamacpp
+    user: "${CORE_LLAMACPP_UID:?set current uid}:${CORE_LLAMACPP_GID:?set current gid}"
+    restart: "no"
+    gpus: all
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    mem_limit: 12g
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    ports: [127.0.0.1:18081:8080]
+    volumes:
+      - type: bind
+        source: ${CORE_LLAMACPP_MODEL:?set the verified user-owned GGUF path}
+        target: /models/gemma4.gguf
+        read_only: true
+        bind:
+          create_host_path: false
+    command:
+      - -m
+      - /models/gemma4.gguf
+      - --alias
+      - gemma4-12b
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --ctx-size
+      - "4096"
+      - --parallel
+      - "1"
+      - --gpu-layers
+      - "99"
+      - --fit
+      - "off"
+      - --cache-type-k
+      - f16
+      - --cache-type-v
+      - f16
+      - --flash-attn
+      - "on"
+      - --threads
+      - "8"
+      - --threads-batch
+      - "8"
+      - --cache-ram
+      - "0"
+      - --no-warmup
+      - --reasoning
+      - "off"
+      - --chat-template-kwargs
+      - '{"enable_thinking":false}'
+      - --cors-origins
+      - http://127.0.0.1:18081
+      - --no-webui
+      - --no-agent
