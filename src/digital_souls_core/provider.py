@@ -3,6 +3,7 @@
 import inspect
 import os
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any
 
 import anyio
@@ -24,23 +25,24 @@ litellm.turn_off_message_logging = True
 litellm.telemetry = False
 
 
-def require_native_chat_stream(model: str, payload: dict[str, Any]) -> None:
+def require_native_chat_route(
+    model: str, payload: dict[str, Any], *, local_native_chat: bool = False
+) -> None:
     """Use the pinned SDK's local routing probe, denying unknown/Responses modes.
 
     Route metadata is not proof of model capabilities or authorization to use it.
     """
+    code = "unsupported_stream_provider" if payload.get("stream") else "unsupported_provider_route"
     provider, _, name = model.partition("/")
     aliases = litellm.model_alias_map or {}
     if model in aliases or name in aliases:
         raise CoreError(
             400,
-            "unsupported_stream_provider",
+            code,
             "SDK model aliases cannot override the verified route",
         )
     if provider != "openai" or name.startswith("responses/"):
-        raise CoreError(
-            400, "unsupported_stream_provider", "Streaming requires native OpenAI Chat Completions"
-        )
+        raise CoreError(400, code, "Route requires native OpenAI Chat Completions")
     try:
         info, resolved = responses_api_bridge_check(
             model=name,
@@ -52,13 +54,10 @@ def require_native_chat_stream(model: str, payload: dict[str, Any]) -> None:
             api_base=payload.get("api_base"),
         )
     except Exception:
-        raise CoreError(
-            400, "unsupported_stream_provider", "Streaming route is not verified"
-        ) from None
-    if info.get("mode") != "chat" or resolved != name:
-        raise CoreError(
-            400, "unsupported_stream_provider", "Streaming route is not native Chat Completions"
-        )
+        raise CoreError(400, code, "Chat route is not verified") from None
+    verified_modes = {"chat", None} if local_native_chat else {"chat"}
+    if info.get("mode") not in verified_modes or resolved != name:
+        raise CoreError(400, code, "Route is not native Chat Completions")
 
 
 def provider_error(error: Exception) -> CoreError:
@@ -112,14 +111,46 @@ def public_completion(result: dict[str, Any]) -> dict[str, Any]:
 
 class LiteLLMProvider:
     @staticmethod
-    async def _call(profile: Profile, payload: dict[str, Any]) -> Any:
+    @asynccontextmanager
+    async def _client(profile: Profile) -> AsyncGenerator[openai.AsyncOpenAI | None]:
+        if profile.transport != "llamacpp_chat":
+            yield None
+            return
+        # Request-owned transport: never inherit environment proxies or SDK pools.
+        http = httpx.AsyncClient(trust_env=False, follow_redirects=False)
+        try:
+            client = openai.AsyncOpenAI(
+                base_url=profile.api_base,
+                api_key="local-no-auth",
+                http_client=http,
+                max_retries=0,
+                timeout=profile.timeout_seconds,
+            )
+            yield client
+        finally:
+            with anyio.CancelScope(shield=True):
+                await http.aclose()
+
+    @staticmethod
+    async def _call(
+        profile: Profile, payload: dict[str, Any], client: openai.AsyncOpenAI | None = None
+    ) -> Any:
         if not profile.external_send_allowed:
             raise CoreError(403, "external_send_denied", "Character export policy denies inference")
-        if payload.get("stream"):
+        provider_options: dict[str, Any] = {}
+        if profile.transport == "llamacpp_chat":
+            # A public dummy value satisfies the SDK without forwarding cloud credentials.
+            provider_options.update(api_base=profile.api_base, api_key="local-no-auth")
+        if client is not None:
+            provider_options["client"] = client
+        if payload.get("stream") or profile.transport == "llamacpp_chat":
             # Pinned LiteLLM adapters do not share a response ownership contract.
             # Only the native OpenAI SDK stream lifecycle is verified here.
-            require_native_chat_stream(profile.model, payload)
-        provider_options: dict[str, Any] = {}
+            require_native_chat_route(
+                profile.model,
+                {**payload, **provider_options},
+                local_native_chat=profile.transport == "llamacpp_chat",
+            )
         if profile.model.startswith("ollama/"):
             raise CoreError(
                 400, "unsupported_provider_route", "Ollama requires the native ollama_chat route"
@@ -148,7 +179,8 @@ class LiteLLMProvider:
     async def complete(self, profile: Profile, payload: dict[str, Any]) -> dict[str, Any]:
         """Make one SDK call using the fixed profile, preserving normalized completion fields."""
         try:
-            result = await self._call(profile, payload)
+            async with self._client(profile) as client:
+                result = await self._call(profile, payload, client)
             return public_completion(dict(result.model_dump(exclude_none=True)))
         except CoreError:
             raise
@@ -158,13 +190,25 @@ class LiteLLMProvider:
     async def stream(
         self, profile: Profile, payload: dict[str, Any]
     ) -> AsyncGenerator[dict[str, Any]]:
+        async with self._client(profile) as client:
+            iterator = self._stream(profile, payload, client)
+            try:
+                async for chunk in iterator:
+                    yield chunk
+            finally:
+                with anyio.CancelScope(shield=True):
+                    await iterator.aclose()
+
+    async def _stream(
+        self, profile: Profile, payload: dict[str, Any], client: openai.AsyncOpenAI | None
+    ) -> AsyncGenerator[dict[str, Any]]:
         """Yield SDK deltas and own transport cleanup on EOF, errors, and cancellation.
 
         Only verified native Chat Completions routes may acquire a stream.
         """
         upstream = None
         try:
-            upstream = await self._call(profile, payload)
+            upstream = await self._call(profile, payload, client)
             async for chunk in upstream:
                 yield public_completion(chunk.model_dump(exclude_none=True))
         except CoreError:

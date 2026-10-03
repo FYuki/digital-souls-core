@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
@@ -20,12 +21,34 @@ class Profile(BaseModel):
     external_send_allowed: StrictBool = False
     timeout_seconds: float = Field(default=60, gt=0, le=300)
     ollama_think: StrictBool | None = None
+    transport: Literal["sdk", "llamacpp_chat"] = "sdk"
+    api_base: str | None = None
 
     @model_validator(mode="after")
-    def validate_ollama_thinking(self) -> "Profile":
-        """Keep the optional Ollama boolean setting operator-owned and route-specific."""
+    def validate_provider_settings(self) -> "Profile":
+        """Pin route-specific operator options and reject unverified local endpoints."""
         if "ollama_think" in self.model_fields_set and not self.model.startswith("ollama_chat/"):
             raise ValueError("ollama_think requires an ollama_chat model")
+        if self.transport == "llamacpp_chat":
+            if self.model != "openai/gemma4-12b" or self.api_base is None:
+                raise ValueError(
+                    "llamacpp_chat requires the verified gemma4-12b alias and api_base"
+                )
+            endpoint = urlsplit(self.api_base)
+            if (
+                endpoint.scheme != "http"
+                or endpoint.hostname != "127.0.0.1"
+                or endpoint.port is None
+                or endpoint.port == 0
+                or endpoint.username is not None
+                or endpoint.password is not None
+                or endpoint.path != "/v1"
+                or endpoint.query
+                or endpoint.fragment
+            ):
+                raise ValueError("llamacpp_chat requires a loopback HTTP port and /v1 path")
+        elif "api_base" in self.model_fields_set:
+            raise ValueError("api_base is supported only for llamacpp_chat")
         return self
 
 
