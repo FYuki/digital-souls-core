@@ -133,5 +133,10 @@ systemには命令として扱わない固定方針を置く。プロンプト�
 管理されたloopback内のendpoint/profile変更も、保存済み再構築承認の失効対象とする。
 classifier/extractor双方のprovenanceへ秘密を含まないtransport/profile ID/正規化endpointを追加する。
 既存versions JSONを拡張し、旧jobへ現在値を補完するmigrationは行わない。識別不足は不一致として
-本文取得前に拒否し、明示抽出で現在の許可を取り直す。同一identityでの再起動・URL表記差は継続できる。
+classifier/extractorへの送信前に拒否し、明示抽出で現在の許可を取り直す。同一identityでの再起動・URL表記差は継続できる。
 SQLite schema versionと既存migrationのtransaction境界は変更しない。
+
+
+consume/rebaseはrunの設定比較前にsource適格性の確認で本文を読むため、
+再構築全体での本文取得前拒否は保証しない。既存の適格性・transaction境界を維持するため、
+この修正ではmetadata専用の取得経路を追加せず、保証をモデル送信前の拒否に限定する。
