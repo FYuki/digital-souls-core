@@ -7,13 +7,23 @@ from typing import Any
 from fastapi import FastAPI, Request, Response
 
 from .conversations import Conversations
-from .history import Receipt, Snapshot, TurnInput
+from .history import ConversationControls, Receipt, Snapshot, TurnInput
 
 
 def snapshot_body(snapshot: Snapshot) -> dict[str, Any]:
     return {
         "conversation_id": snapshot.conversation_id,
         "revision": snapshot.revision,
+        "private_mode": snapshot.private_mode,
+        "archived": snapshot.archived,
+        "memory_sources": [
+            {
+                "turn_revision": state.reference.turn_revision,
+                "message_index": state.reference.message_index,
+                "eligible": state.eligible,
+            }
+            for state in snapshot.memory_sources
+        ],
         "messages": [m.model_dump(exclude_none=True) for m in snapshot.messages],
     }
 
@@ -30,12 +40,20 @@ def register_conversations(
         return snapshot_body(service.create(character_id))
 
     @app.get(path)
-    async def list_conversations(character_id: str) -> dict[str, Any]:
-        return {"conversation_ids": service.list(character_id)}
+    async def list_conversations(
+        character_id: str, include_archived: bool = False
+    ) -> dict[str, Any]:
+        return {"conversation_ids": service.list(character_id, include_archived=include_archived)}
 
     @app.get(path + "/{conversation_id}")
     async def read(character_id: str, conversation_id: str) -> dict[str, Any]:
         return snapshot_body(service.read(character_id, conversation_id))
+
+    @app.patch(path + "/{conversation_id}")
+    async def controls(
+        character_id: str, conversation_id: str, body: ConversationControls
+    ) -> dict[str, Any]:
+        return snapshot_body(service.controls(character_id, conversation_id, body))
 
     @app.delete(path + "/{conversation_id}", status_code=204)
     async def delete(character_id: str, conversation_id: str) -> Response:

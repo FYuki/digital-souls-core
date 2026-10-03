@@ -9,7 +9,7 @@ from digital_souls_core.application import CoreError, Inference
 from digital_souls_core.character import AccessScope, Profile
 from digital_souls_core.contracts import CompletionInput, Message
 from digital_souls_core.conversations import Conversations
-from digital_souls_core.history import Binding
+from digital_souls_core.history import Binding, SourceReference
 from digital_souls_core.privacy import Permission, PrivacyPolicy
 from digital_souls_core.privacy_classifier import LocalClassifier
 from digital_souls_core.privacy_scan import POLICY_VERSION, scan
@@ -170,25 +170,37 @@ async def test_secret_never_reaches_classifier_or_history(
 
 
 @pytest.mark.parametrize(
-    "instruction,stored",
-    [
-        ("覚えないで", True),
-        ("do not remember", True),
-        ("保存しないで", False),
-        ("履歴に残さないで", False),
-    ],
+    "instruction", ["覚えないで", "do not remember", "保存しないで", "履歴に残さないで"]
 )
-async def test_storage_and_memory_refusal(tmp_path: Path, instruction: str, stored: bool) -> None:
+async def test_natural_language_does_not_change_operation_scope(
+    tmp_path: Path, instruction: str
+) -> None:
     service, _, classifier, policy = policy_setup(tmp_path)
     cid = service.create("synthetic").conversation_id
-    body = turn(messages=[{"role": "user", "content": instruction}])
-    if stored:
-        assert (await service.complete("synthetic", cid, body)).revision == 1
-    else:
-        with pytest.raises(CoreError):
-            await service.complete("synthetic", cid, body)
-    assert not await policy.authorize(BINDING, "memory", instruction)
+    body = turn(messages=[{"role": "user", "content": instruction}], memory_excluded_indices=[0])
+    assert (await service.complete("synthetic", cid, body)).revision == 1
+    # The caller selects the exact utterance through API metadata. Text alone is not a command.
     assert classifier.calls == []
+    assert await policy.authorize(BINDING, "memory", instruction)
+
+
+@pytest.mark.parametrize(
+    "instruction", ["覚えないで", "do not remember", "保存しないで", "履歴に残さないで"]
+)
+async def test_natural_language_without_exclusion_keeps_source_eligible(
+    tmp_path: Path, instruction: str
+) -> None:
+    service, _, _, _ = policy_setup(tmp_path)
+    cid = service.create("synthetic").conversation_id
+    body = turn(messages=[{"role": "user", "content": instruction}])
+    assert body.memory_excluded_indices == []
+    assert (await service.complete("synthetic", cid, body)).revision == 1
+    snapshot = service.read("synthetic", cid)
+    assert snapshot.messages[0].content == instruction
+    source = SourceReference(cid, 1, 0)
+    assert snapshot.memory_sources[0].reference == source
+    assert snapshot.memory_sources[0].eligible
+    assert service.store.source_eligible(BINDING, source)
 
 
 async def test_local_external_memory_permissions_and_sensitive_history(tmp_path: Path) -> None:

@@ -54,9 +54,6 @@ class PrivacyPolicy:
             return self.permits(binding, "local") or self.permits(binding, "external")
         if not self.permits(binding, "history"):
             return False
-        # Only the user's instruction controls storage. Assistant/tool strings cannot grant it.
-        if operation == "store":
-            return not scan([m.content for m in messages if m.role == "user"]).no_history
         return True
 
     async def authorize(self, binding: Binding, permission: Permission, value: object) -> bool:
@@ -65,7 +62,7 @@ class PrivacyPolicy:
         if not self.permits(binding, permission):
             return False
         result = scan(value)
-        if result.failed or result.secret or (permission == "memory" and result.no_memory):
+        if result.failed or result.secret:
             return False
         if permission in {"external", "memory"}:
             if not self.permits(binding, "local"):

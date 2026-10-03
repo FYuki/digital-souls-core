@@ -40,19 +40,20 @@ localとexternalの両permissionが必要です。分類器は同じProvider por
 
 | permission | 検査 | 失敗時 |
 |---|---|---|
-| history | 全messageの秘密値・直接識別値、userの保存拒否 | 保存・復元・receipt返却を拒否 |
+| history | 全messageの秘密値・直接識別値 | 保存・復元・receipt返却を拒否 |
 | local | 実送信payloadの決定論的検査 | ローカル推論を拒否 |
 | external | 決定論的検査＋ローカル意味分類 | 外部推論を拒否 |
-| memory | 決定論的検査＋記憶拒否＋ローカル意味分類 | 将来の記憶形成を拒否 |
+| memory | 決定論的検査＋ローカル意味分類（source除外は別途必須） | 将来の記憶形成を拒否 |
 
 意味分類のsafe判定だけで候補の根拠・型・有用性・保存先が承認されたことにはなりません。
 記憶抽出本体、repository、queue、検索は未実装です。
 
-「覚えないで」は履歴を残しつつ記憶形成を拒否します。「保存しないで／履歴に残さないで」は
-履歴保存も拒否します。現行conversation経路はturn全体が失敗し、部分inputや応答を保存しません。
-この経路に「保存しないで」と入力して、同じAPIから非保存の応答だけ返す機能はありません。
-非保存の会話にはstateless経路を使います。privacyを注入すればその送信前検査も有効です。
-statelessの逐次応答は履歴へ保存せず、応答全体を後からマスクする機能もありません。
+[ADR 0006](adr/0006-conversation-memory-controls.md)のユーザー操作仕様を優先します。
+「記録しないで（指定発話）」は履歴を残し、UI/Agentが`memory_excluded_indices`で指定した発話を
+memory対象外にします。自然語だけから期間や操作を推定しません。thread private/archiveは明示PATCHです。
+履歴を残さない操作は会話削除で、派生memory削除の通知を同時に作ります。
+ただしStage3 memory本体と実通知consumerは未実装です。
+secret検出時は引き続きturnを拒否します。stateless応答の事後マスク機能もありません。
 
 保存の許可と外部送信の許可は独立しています。health等の同一会話内履歴は
 history permissionで扱い、external/memoryでは意味分類が機微と判定すれば拒否します。
