@@ -73,7 +73,8 @@ n、seed、logprobs、その他未記載fieldは未対応です。unknown field�
 400/unsupported_parameterで送信前に拒否します。黙ったJSON形式fallbackは利用しません。
 
 固定profileの`ollama_think`だけがbooleanまたはnullを受け付けます。false/trueは上流の
-`think`へ渡し、省略/nullはモデル既定値です。他providerへの設定は起動時エラーです。
+`think`へ渡し、省略/nullはモデル既定値です。他providerでは未指定だけを許可し、
+明示的なnullを含む設定は起動時エラーです。
 callerの`think`、`ollama_think`、`reasoning_effort`は未対応fieldとして400です。
 thinkingのみで出力上限に達した場合も、空contentと`finish_reason=length`を保持します。
 管理者はモデルの実能力を確認してtools等を許可してください。Ollama streamingは未対応です。

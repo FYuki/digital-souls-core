@@ -24,7 +24,7 @@ class Profile(BaseModel):
     @model_validator(mode="after")
     def validate_ollama_thinking(self) -> "Profile":
         """Keep the optional Ollama boolean setting operator-owned and route-specific."""
-        if self.ollama_think is not None and not self.model.startswith("ollama_chat/"):
+        if "ollama_think" in self.model_fields_set and not self.model.startswith("ollama_chat/"):
             raise ValueError("ollama_think requires an ollama_chat model")
         return self
 
