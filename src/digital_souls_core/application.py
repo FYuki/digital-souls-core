@@ -7,6 +7,8 @@ from typing import Any, Protocol
 
 from .character import AccessScope, Character, ContextSource, EmptyContext, Profile
 from .contracts import CompletionInput
+from .history import Binding
+from .privacy import PrivacyPolicy, destination
 
 
 class CoreError(Exception):
@@ -48,6 +50,8 @@ class Inference:
         characters: tuple[Character, ...],
         provider: Provider,
         context: ContextSource | None = None,
+        *,
+        privacy: PrivacyPolicy | None = None,
     ) -> None:
         by_id = {char.config.character_id: char for char in characters}
         aliases = {char.config.alias: char for char in characters}
@@ -58,6 +62,7 @@ class Inference:
         self.provider = provider
         self.context = context or EmptyContext()
         self.scope = AccessScope()
+        self.privacy = privacy
 
     async def prepare(self, selector: str, request: CompletionInput, *, alias: bool) -> Prepared:
         """Pin the character, authorize export/capabilities, and bound injected context.
@@ -81,10 +86,18 @@ class Inference:
             required.add("tools")
         if required - profile.allowed_parameters:
             raise CoreError(400, "unsupported_parameter", "Parameter capability is not confirmed")
+        binding = Binding(self.scope, character.config.character_id)
+        privacy = self.privacy
+        if privacy is not None and not await privacy.authorize(
+            binding, destination(profile), payload
+        ):
+            raise CoreError(403, "privacy_denied", "Privacy policy denies inference")
+        if privacy is not self.privacy:
+            raise CoreError(403, "privacy_denied", "Privacy policy changed during inference")
         user_text = next(
             (msg.content or "" for msg in reversed(request.messages) if msg.role == "user"), ""
         )
-        extra = await self.context.context(character, self.scope, user_text)
+        extra = await self.context.context(character, binding.scope, user_text)
         prompt = "\n\n".join(
             part
             for part in (
@@ -97,4 +110,11 @@ class Inference:
         if len(prompt.encode("utf-8")) > character.config.context_budget_bytes:
             raise CoreError(400, "context_budget_exceeded", "Injected context exceeds byte budget")
         payload["messages"] = [{"role": "system", "content": prompt}, *payload["messages"]]
+        if privacy is not self.privacy or (
+            privacy is not None
+            and not await privacy.authorize(binding, destination(profile), payload)
+        ):
+            raise CoreError(403, "privacy_denied", "Privacy policy denies inference")
+        if privacy is not self.privacy:
+            raise CoreError(403, "privacy_denied", "Privacy policy changed during inference")
         return Prepared(character, payload)
