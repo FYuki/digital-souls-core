@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 type SupportedParameter = Literal[
     "stream", "tools", "tool_choice", "temperature", "max_completion_tokens"
@@ -19,6 +19,14 @@ class Profile(BaseModel):
     allowed_parameters: frozenset[SupportedParameter] = frozenset()
     external_send_allowed: StrictBool = False
     timeout_seconds: float = Field(default=60, gt=0, le=300)
+    ollama_think: StrictBool | None = None
+
+    @model_validator(mode="after")
+    def validate_ollama_thinking(self) -> "Profile":
+        """Keep the optional Ollama boolean setting operator-owned and route-specific."""
+        if self.ollama_think is not None and not self.model.startswith("ollama_chat/"):
+            raise ValueError("ollama_think requires an ollama_chat model")
+        return self
 
 
 class CharacterConfig(BaseModel):
