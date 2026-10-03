@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Annotated, Literal, Protocol
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .character import AccessScope
 from .contracts import Message, Name, NamedToolChoice, StrictModel, Tool
@@ -13,12 +13,61 @@ class TurnInput(StrictModel):
     request_id: Name
     expected_revision: Annotated[int, Field(ge=0)]
     messages: Annotated[list[Message], Field(min_length=1, max_length=128)]
+    memory_excluded_indices: list[Annotated[int, Field(ge=0)]] = Field(
+        default_factory=list, max_length=128
+    )
     stream: bool = False
     tools: Annotated[list[Tool], Field(min_length=1, max_length=128)] | None = None
     tool_choice: Literal["auto", "none", "required"] | NamedToolChoice | None = None
     temperature: Annotated[float, Field(ge=0, le=2, allow_inf_nan=False)] | None = None
     max_tokens: Annotated[int, Field(gt=0, le=32768)] | None = None
     max_completion_tokens: Annotated[int, Field(gt=0, le=32768)] | None = None
+
+    @model_validator(mode="after")
+    def valid_exclusions(self) -> "TurnInput":
+        if len(set(self.memory_excluded_indices)) != len(self.memory_excluded_indices) or any(
+            index >= len(self.messages) for index in self.memory_excluded_indices
+        ):
+            raise ValueError("invalid message exclusion indices")
+        return self
+
+
+class ConversationControls(StrictModel):
+    expected_revision: Annotated[int, Field(ge=0)]
+    private_mode: bool | None = None
+    archived: bool | None = None
+
+    @model_validator(mode="after")
+    def has_change(self) -> "ConversationControls":
+        if self.private_mode is None and self.archived is None:
+            raise ValueError("at least one control is required")
+        return self
+
+
+@dataclass(frozen=True)
+class SourceReference:
+    """Immutable history address within a separately supplied trusted Binding."""
+
+    conversation_id: str
+    turn_revision: int
+    message_index: int
+
+
+@dataclass(frozen=True)
+class SourceState:
+    """Per-message eligibility metadata; not an approval to create a memory."""
+
+    reference: SourceReference
+    eligible: bool
+
+
+@dataclass(frozen=True)
+class SourceDeletion:
+    """Content-free durable notification; all sources through the revision are gone."""
+
+    event_id: str
+    conversation_id: str
+    through_revision: int
 
 
 @dataclass(frozen=True)
@@ -32,6 +81,9 @@ class Snapshot:
     conversation_id: str
     revision: int
     messages: tuple[Message, ...]
+    private_mode: bool = False
+    archived: bool = False
+    memory_sources: tuple[SourceState, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -60,7 +112,7 @@ class HistoryPolicy(Protocol):
 
 class HistoryStore(Protocol):
     def create(self, binding: Binding) -> Snapshot: ...
-    def list(self, binding: Binding) -> list[str]: ...
+    def list(self, binding: Binding, *, include_archived: bool = False) -> list[str]: ...
     def read(self, binding: Binding, conversation_id: str) -> Snapshot: ...
     def receipt(
         self, binding: Binding, conversation_id: str, request_id: str
@@ -74,5 +126,17 @@ class HistoryStore(Protocol):
         expected_revision: int,
         messages: tuple[Message, ...],
         finish_reason: str,
+        *,
+        memory_excluded_indices: tuple[int, ...] = (),
     ) -> Receipt: ...
     def delete(self, binding: Binding, conversation_id: str) -> None: ...
+
+    def controls(
+        self, binding: Binding, conversation_id: str, changes: ConversationControls
+    ) -> Snapshot: ...
+
+    def source_eligible(self, binding: Binding, source: SourceReference) -> bool: ...
+
+    def deletions(self, binding: Binding) -> tuple[SourceDeletion, ...]: ...
+
+    def acknowledge_deletion(self, binding: Binding, event_id: str) -> None: ...
