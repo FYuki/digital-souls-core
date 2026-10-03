@@ -7,3 +7,4 @@ Acceptedにする際はレビューでの決定を参照してください。
 今回の初期整備では、製品アーキテクチャの決定は承認していません。
 
 - [ADR 0004: 明示的な会話履歴の永続化](0004-conversation-history.md)
+- [ADR 0008: 管理された分類器・抽出器の構造化出力](0008-managed-structured-output.md)

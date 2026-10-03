@@ -12,6 +12,7 @@ from .contracts import StrictModel
 from .memory_contracts import Candidate, Evidence
 from .privacy_classifier import _unique
 from .privacy_scan import POLICY_VERSION, SCANNER_VERSION, scan
+from .structured_output import response_format, structured_provenance
 
 
 class Selection(StrictModel):
@@ -51,6 +52,7 @@ class LocalExtractor:
     def provenance(self) -> dict[str, str]:
         return {
             **local_destination_identity(self._profile),
+            **structured_provenance(Extraction, "memory_selection"),
             "extractor": "evidence-selection-v1",
             "prompt": "evidence-selection-prompt-v1",
             "schema": "memory-v1",
@@ -67,6 +69,7 @@ class LocalExtractor:
             raise CoreError(403, "memory_denied", "Memory input denied")
         try:
             payload = {
+                "response_format": response_format(Extraction, "memory_selection"),
                 "messages": [
                     {
                         "role": "system",

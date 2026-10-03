@@ -136,3 +136,7 @@ userinfo/query/fragmentを含むURLは既存のProfile検証で拒否します�
 再構築全体での本文取得前拒否は保証しません。runの設定比較より先に、
 consume/rebaseの適格性確認が_current/_sourceを通じてSQLite内の本文を読み取って解析します。
 今回の境界はモデルへの送信停止であり、このローカル内部読み取りは残ります。
+
+## 管理された構造化出力
+
+分類器・抽出器は固定JSON Schemaをproviderへ渡し、返却値のstrict検証を維持します。未対応・不正出力は拒否し、制約なしの再試行は行いません。schema・対応契約・SDK versionも承認provenanceに含むため、旧承認は自動的に引き継ぎません。[ADR 0008](adr/0008-managed-structured-output.md)を参照してください。
