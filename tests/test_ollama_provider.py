@@ -168,9 +168,20 @@ def test_operator_think_requires_boolean(value: Any) -> None:
         Profile(profile_id="test", model="ollama_chat/synthetic", ollama_think=value)
 
 
-def test_operator_think_requires_native_ollama_route() -> None:
+@pytest.mark.parametrize("model", ["openai/synthetic", "anthropic/synthetic", "ollama/synthetic"])
+@pytest.mark.parametrize("think", [False, True, None])
+def test_operator_think_requires_native_ollama_route(model: str, think: bool | None) -> None:
     with pytest.raises(ValidationError):
-        Profile(profile_id="test", model="openai/synthetic", ollama_think=False)
+        Profile(profile_id="test", model=model, ollama_think=think)
+
+
+@pytest.mark.parametrize(
+    "model",
+    ["openai/synthetic", "anthropic/synthetic", "ollama/synthetic", "ollama_chat/synthetic"],
+)
+def test_omitted_operator_think_is_allowed(model: str) -> None:
+    profile = Profile(profile_id="test", model=model)
+    assert profile.ollama_think is None and "ollama_think" not in profile.model_fields_set
 
 
 async def test_legacy_ollama_route_is_rejected_before_sdk(monkeypatch: pytest.MonkeyPatch) -> None:

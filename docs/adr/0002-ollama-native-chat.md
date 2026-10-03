@@ -20,6 +20,7 @@ Coreはtool実行、独自Ollama通信、モデルfallbackを追加しない。
 管理者の固定profileに任意の`ollama_think: boolean | null`を追加する。
 false/trueはnative APIの`think`へ転送し、nullまたは省略時は送らずモデル既定値に従う。
 他providerへの設定、文字列や数値によるboolean指定は起動時に拒否する。
+他providerでは未指定だけを許可し、明示的なnullも設定の誤りとして拒否する。
 callerはthinking設定を上書きできず、要求途中のprofile変更も行わない。
 
 SDKは依然`tool_choice`を黙って削除するため、Ollamaでは値によらず送信前に拒否する。
@@ -38,6 +39,24 @@ streamのroute probeにはモデル名だけでなく実要求のtools・reasoni
 GPT-5.4以降等のfunction toolsによるResponsesへの切替も拒否する。SDK実呼出の第2判定と
 Core guardを照合し、endpointの管理者設定順も同じ条件で検証する。
 
+## 代替案
+
+| 選択肢 | 判断と理由 |
+| --- | --- |
+| 旧SDKのままOllama固有の変換をCoreで補修する | 不採用。providerごとの通信・変換の保守がCoreへ入り、SDKとの二重管理になる。 |
+| Ollamaを独自HTTP adapterで実装する | 不採用。native toolsの問題は回避できるが、認証・エラー・stream所有権の保守範囲が増える。 |
+| thinkingを一律無効化し、未対応parameterを黙って削除する | 不採用。管理者が選ぶモデル既定動作とcallerの要求を変更し、契約違反を隠す。 |
+| 固定SDKを更新し、検証済み経路と公開fieldに限定する | 採用提案。既存ライブラリを使い、未対応経路は送信前に拒否して外向き契約を検証できる。 |
+
+## 影響
+
+native toolsと終了理由をSDK経由で保持でき、Coreがtool実行やfallbackを持たない構成を維持できる。
+一方、依存更新には追加パッケージとOpenAI SDKのmajor更新を伴うため、lockと既存契約の回帰検証が必要になる。
+旧ollama経路、Ollama tool_choice、非Ollamaへのollama_think明示設定は起動時または送信前に拒否する。
+既存の該当設定は管理者が修正する必要があり、黙った互換処理は行わない。
+思考等のSDK拡張fieldは公開応答から除外するため、それらを履歴として要求するモデルはこの契約の対象外となる。
+新しいprovider能力やSDK route変更は、固定依存の更新と追加検証なしには対応済みと扱わない。
+
 ## 制約と検証
 
 LiteLLM依存追加はlockに含め、既存のOpenAI streaming・close・cancel・Responses拒否と
@@ -45,6 +64,14 @@ LiteLLM依存追加はlockに含め、既存のOpenAI streaming・close・cancel
 Ollamaのobject形式との変換により空白が変わりうる。意味とID・結果の関連を検証する。
 物理context上限、稼働時context設定、注入文脈byte budgetは別の値として扱う。
 thinking無効化は出力を必ず保証する機構でも、人格品質の証明でもない。
+
+## 関連Issue・PR・証跡
+
+- [Issue #9: 受入条件](https://github.com/FYuki/digital-souls-core/issues/9)
+- [作業PR #10: 実装・独立レビュー修正](https://github.com/FYuki/digital-souls-core/pull/10)
+- [main向けPR #11: レビューと統合](https://github.com/FYuki/digital-souls-core/pull/11)
+- [revision付き検証証跡](../evidence/2026-10-03-ollama-native-chat.md)
+- [修正後headの実モデル機能再試験](https://github.com/FYuki/digital-souls-core/pull/10#issuecomment-5965415841)
 
 ## 一次資料
 
