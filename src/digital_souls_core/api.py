@@ -56,17 +56,27 @@ async def until_disconnect[T](operation: Coroutine[Any, Any, T], request: Reques
 
     work = asyncio.create_task(operation)
     watcher = asyncio.create_task(disconnected())
+    handed_off = False
     try:
         done, _ = await asyncio.wait((work, watcher), return_when=asyncio.FIRST_COMPLETED)
         if watcher in done:
             raise CoreError(499, "client_disconnected", "Client disconnected")
-        return work.result()
+        result = work.result()
+        handed_off = True
+        return result
     finally:
         for task in (work, watcher):
             if not task.done() and not task.cancelling():
                 # A second cancellation can interrupt asynchronous provider cleanup.
                 task.cancel()
         await asyncio.gather(work, watcher, return_exceptions=True)
+        if not handed_off and not work.cancelled() and work.exception() is None:
+            abandoned = work.result()
+            if isinstance(abandoned, ManagedStream):
+                # A completed prefetch can race with disconnect. ASGI never owns
+                # this discarded response, so close its upstream here.
+                with anyio.CancelScope(shield=True):
+                    await abandoned.upstream.aclose()
 
 
 def create_app(
