@@ -55,9 +55,9 @@ caller api_base拒否、無加工tool履歴、stream EOF/close/cancel/timeout、
 起動scriptはroot、不明unit、active/activating/failed、model SHA不一致をDocker呼出前に拒否する。
 実環境でもOllama active時の起動拒否を確認。Ollama停止後の常用切替はNOT RUN。
 
-`uv lock --check`、ruff check/format、mypy、UT/IT1、Node必須reporter/docs検査、
-`bash -n tools/start-llamacpp.sh`、`docker compose ... config --quiet`を使用した。
-packageはCIと同じbuild・hash必須runtime install・no-deps wheel install・isolated importがPASS。
+初回の品質ゲート・package installはPASSだったが、当初の記録はコマンドの要約だった。
+その記録を完全な実行記録とみなさず、下記「文書レビュー修正時の再検証」に、実際に再実行した
+完全なコマンド・revision・結果を記載する。初回と再実行のrevisionは区別する。
 最終headの正確なCI結果はPRに記録する。初回のtest shimの行長違反は修正して再検証した。
 既存Starlette非推奨警告・Pydantic ReadOnly警告は残る。skip/xfail/xpassを合格として扱わない。
 
@@ -108,3 +108,54 @@ Core TCP 18080 → LiteLLM → 専用HTTPX/AsyncOpenAI → llama.cpp TCP 18081�
 ツール実行、人格品質評価、multimodalはNOT RUN。応答本文・思考・生ログは保存しない。
 検証Coreは終了し、ignored local profileはexternal_send_allowed=falseへ復元した。
 専用containerも検証後に停止する。常用切替と自動起動の設定は行わない。
+
+## 文書レビュー修正時の再検証
+
+対象はepic revision `33f14c3237dd6ec92a55cb2da9a1d15661a219fa` と、
+この証跡・運用手順だけの未コミット変更。製品コード・tests・lockは変更していない。
+Ubuntu側で次を実行した。workspace/toolchain pathはこの検証環境の実際の値。
+初回実行を推測で補完したコマンドではない。
+
+```bash
+set -euo pipefail
+cd /mnt/c/Users/asa/Documents/Codex/2026-10-03/task/core-llamacpp-doc-fixes
+../api-toolchain/bin/uv lock --check
+../api-toolchain/bin/uv sync --frozen
+bash -n tools/start-llamacpp.sh
+../api-toolchain/bin/uv run --no-sync ruff check src tests
+../api-toolchain/bin/uv run --no-sync ruff format --check src tests
+../api-toolchain/bin/uv run --no-sync mypy
+../api-toolchain/bin/uv run --no-sync pytest -m ut -q
+../api-toolchain/bin/uv run --no-sync pytest -m it1 -q
+../api-toolchain/bin/uv build --no-build-isolation
+../api-toolchain/bin/uv export --frozen --no-dev --no-emit-project --format requirements-txt > ../llamacpp-docfix-runtime.txt
+../api-toolchain/bin/uv venv .package-check
+../api-toolchain/bin/uv pip install --python .package-check/bin/python --require-hashes -r ../llamacpp-docfix-runtime.txt
+../api-toolchain/bin/uv pip install --python .package-check/bin/python --no-deps dist/digital_souls_core-0.1.0-py3-none-any.whl
+.package-check/bin/python -I -c 'from digital_souls_core.api import create_app; assert create_app().title == "Digital Souls Core"'
+../node-toolchain/node-v24.19.0-linux-x64/bin/node --test --test-reporter=./tools/required-tests-reporter.mjs tools/check-docs.test.mjs tools/required-tests-reporter.test.mjs
+../node-toolchain/node-v24.19.0-linux-x64/bin/node tools/check-docs.mjs
+git diff --check
+```
+
+Ubuntu-dogfood側では、次の読取り専用Compose検査を実行した。
+
+```bash
+cd /mnt/c/Users/asa/Documents/Codex/2026-10-03/task/core-llamacpp-doc-fixes
+export CORE_LLAMACPP_MODEL=/home/asa/llama-compare.mD4N9V/blob-1278394b.gguf CORE_LLAMACPP_UID=$(id -u) CORE_LLAMACPP_GID=$(id -g)
+docker compose -f compose.llamacpp.yml config --quiet
+docker inspect --format '{{.State.Status}}' digital-souls-core-llamacpp
+```
+
+結果はconfig成功、container=exited。停止・起動・sudoは実環境で実行していない。
+rollback例は作業用の合成fixture（repo外、docker/sudoを無害なshimへ置換）で、
+停止済み・停止失敗・inspect失敗・稼働中・状態不明の5条件を検証した。
+停止済み以外ではsudo呼出なし、非ゼロ終了を確認した。実行コマンドは次のとおり。
+この補助fixtureはcommitted CI testではなく、公開repoだけで再実行できるとは扱わない。
+
+```bash
+python3 /mnt/c/Users/asa/Documents/Codex/2026-10-03/task/verify_llamacpp_rollback_snippet.py
+```
+
+再検証結果: 上記コマンドはすべて成功。UT 18 / IT1 184 / docs 23 PASS、skip/xfail/xpass 0。
+実GPU推論と常用切替は今回NOT RUN。変更後の最終head・CIは修正PRへ記録する。
