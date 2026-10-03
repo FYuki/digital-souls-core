@@ -49,7 +49,10 @@ inference profile、provider/modelは別の識別子です。返却JSONの`model
   旧`max_tokens`も同じ内部`max_completion_tokens`へ正規化します。両方指定は400です。
   上限はCoreの入力上限でありモデル能力ではありません。reasoningモデルでは非表示の推論tokenを
   含む場合があり、出力文字数の保証ではありません。providerへの変換はLiteLLMに任せます。
-- 通常のchoices/message/tool_calls/finish_reason/usage、およびstreamのdeltaをそのまま返します。
+- 通常のchoices/finish_reason/usageと、messageまたはstreamのdeltaの対応fieldを返します。
+  message/deltaはrole/content/tool_calls/tool_call_idに限定し、SDKのreasoning_contentや
+  thinking等の拡張fieldは公開・保存しません。思考だけで終わった通常応答のcontentは空文字です。
+  返却assistant messageは加工せず、必要なtool結果を続けて次のmessagesへ再送できます。
   streamのusageはproviderが送った場合のみ保持します。Coreでtoken数を捏造しません。
 
 各parameterは管理者がprofileの`allowed_parameters`で確認済みとしたものだけを許可します。
@@ -80,9 +83,12 @@ thinkingのみで出力上限に達した場合も、空contentと`finish_reason
 
 実providerへのstreamは初期版では、pinned SDKがローカルmetadataで`mode=chat`と解決する
 `openai/`のネイティブChat Completions経路だけに制限します。prefixだけでは許可しません。
-SDK自身と同じResponses bridge判定を送信前に行い、`openai/gpt-5-codex`、`openai/o3-pro`、
+SDK自身と同じResponses bridge判定に実要求のtools・reasoning・api_base等を渡して送信前に判定し、
+`openai/gpt-5-codex`、`openai/o3-pro`、
 `openai/codex-mini-latest`などの既知Responsesモデル、`openai/responses/...`、未知modeを拒否します。
 このmetadataは経路判定専用で、モデル能力・利用資格や実モデル検証の証明ではありません。
+function toolsによってResponsesへ切り替わるGPT-5.4以降等も要求単位で拒否します。
+endpoint解決はSDKと同じ管理者の設定順を使い、callerによるendpoint・reasoning指定は許可しません。
 SDKのglobal model aliasによる経路変更も拒否します。APIの登録済みcharacter aliasとは別のものです。
 LiteLLM 1.103.2のAnthropic等にはHTTP Responseのclose所有権を公開しないiteratorがあるため、
 allowlistにstreamがあっても他providerは送信前に400/unsupported_stream_providerで拒否します。

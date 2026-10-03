@@ -24,7 +24,7 @@ litellm.turn_off_message_logging = True
 litellm.telemetry = False
 
 
-def require_native_chat_stream(model: str) -> None:
+def require_native_chat_stream(model: str, payload: dict[str, Any]) -> None:
     """Use the pinned SDK's local routing probe, denying unknown/Responses modes.
 
     Route metadata is not proof of model capabilities or authorization to use it.
@@ -42,7 +42,15 @@ def require_native_chat_stream(model: str) -> None:
             400, "unsupported_stream_provider", "Streaming requires native OpenAI Chat Completions"
         )
     try:
-        info, resolved = responses_api_bridge_check(model=name, custom_llm_provider="openai")
+        info, resolved = responses_api_bridge_check(
+            model=name,
+            custom_llm_provider="openai",
+            tools=payload.get("tools"),
+            reasoning_effort=payload.get("reasoning_effort"),
+            web_search_options=payload.get("web_search_options"),
+            reasoning_summary=payload.get("reasoning_summary"),
+            api_base=payload.get("api_base"),
+        )
     except Exception:
         raise CoreError(
             400, "unsupported_stream_provider", "Streaming route is not verified"
@@ -84,6 +92,24 @@ def provider_error(error: Exception) -> CoreError:
     return CoreError(502, "provider_error", "Provider request failed")
 
 
+def public_completion(result: dict[str, Any]) -> dict[str, Any]:
+    """Expose only public message/delta fields, never SDK reasoning extensions."""
+    for choice in result.get("choices", []):
+        for key in ("message", "delta"):
+            if key not in choice:
+                continue
+            message = choice[key]
+            choice[key] = {
+                field: value
+                for field, value in message.items()
+                if field in {"role", "content", "tool_calls", "tool_call_id"}
+            }
+            # A reasoning-only terminal message is still a replayable empty text.
+            if key == "message" and not choice[key].get("tool_calls"):
+                choice[key]["content"] = choice[key].get("content") or ""
+    return result
+
+
 class LiteLLMProvider:
     @staticmethod
     async def _call(profile: Profile, payload: dict[str, Any]) -> Any:
@@ -92,7 +118,7 @@ class LiteLLMProvider:
         if payload.get("stream"):
             # Pinned LiteLLM adapters do not share a response ownership contract.
             # Only the native OpenAI SDK stream lifecycle is verified here.
-            require_native_chat_stream(profile.model)
+            require_native_chat_stream(profile.model, payload)
         provider_options: dict[str, Any] = {}
         if profile.model.startswith("ollama/"):
             raise CoreError(
@@ -123,7 +149,7 @@ class LiteLLMProvider:
         """Make one SDK call using the fixed profile, preserving normalized completion fields."""
         try:
             result = await self._call(profile, payload)
-            return dict(result.model_dump(exclude_none=True))
+            return public_completion(dict(result.model_dump(exclude_none=True)))
         except CoreError:
             raise
         except Exception as error:
@@ -140,7 +166,7 @@ class LiteLLMProvider:
         try:
             upstream = await self._call(profile, payload)
             async for chunk in upstream:
-                yield chunk.model_dump(exclude_none=True)
+                yield public_completion(chunk.model_dump(exclude_none=True))
         except CoreError:
             raise
         except Exception as error:

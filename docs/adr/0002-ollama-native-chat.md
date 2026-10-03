@@ -31,6 +31,13 @@ SDK更新時の既存OpenAI stream timeout回帰にも対応する。新SDKの�
 元のHTTPX例外をPythonの`__context__`に保持するため、既存の型による有界探索に
 この経路を追加する。例外本文・生成文・URLからの分類や公開はしない。
 
+独立レビューで確認した契約不整合も修正する。SDKの思考内容等の拡張fieldは
+message/deltaの公開field許可リストで除外し、非streamの返却messageをそのまま再送できる
+入出力契約とする。空の最終contentとlength終了理由は維持し、思考本文は保存・公開しない。
+streamのroute probeにはモデル名だけでなく実要求のtools・reasoning・api_base等を渡す。
+GPT-5.4以降等のfunction toolsによるResponsesへの切替も拒否する。SDK実呼出の第2判定と
+Core guardを照合し、endpointの管理者設定順も同じ条件で検証する。
+
 ## 制約と検証
 
 LiteLLM依存追加はlockに含め、既存のOpenAI streaming・close・cancel・Responses拒否と

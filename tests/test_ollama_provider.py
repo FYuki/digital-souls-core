@@ -3,7 +3,6 @@ from typing import Any
 
 import httpx
 import pytest
-from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler
 from pydantic import ValidationError
 
 from digital_souls_core.api import create_app
@@ -38,6 +37,8 @@ def native_response(message: dict[str, Any], reason: str = "stop") -> dict[str, 
 
 
 async def install_transport(monkeypatch: pytest.MonkeyPatch, http: httpx.AsyncClient) -> None:
+    from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler
+
     sdk = AsyncHTTPHandler()
     await sdk.client.aclose()
     sdk.client = http
@@ -52,8 +53,10 @@ async def install_transport(monkeypatch: pytest.MonkeyPatch, http: httpx.AsyncCl
     monkeypatch.setattr(litellm, "add_function_to_prompt", False)
 
 
+@pytest.mark.parametrize("think", [False, True, None])
 async def test_native_tools_roundtrip_keeps_ids_arguments_and_result(
     monkeypatch: pytest.MonkeyPatch,
+    think: bool | None,
 ) -> None:
     sent: list[dict[str, Any]] = []
 
@@ -61,7 +64,8 @@ async def test_native_tools_roundtrip_keeps_ids_arguments_and_result(
         assert request.url.path == "/api/chat"
         body = json.loads(request.content)
         sent.append(body)
-        assert body["model"] == "gemma4:12b" and body["think"] is False
+        assert body["model"] == "gemma4:12b" and body.get("think") is think
+        assert "SYNTHETIC_PRIVATE_REASONING" not in request.content.decode()
         assert body["tools"] == [TOOL]
         assert "format" not in body
         assert body["options"]["num_predict"] == 128
@@ -69,6 +73,7 @@ async def test_native_tools_roundtrip_keeps_ids_arguments_and_result(
         if len(sent) == 1:
             message = {
                 "content": "",
+                "thinking": "SYNTHETIC_PRIVATE_REASONING",
                 "tool_calls": [{"function": {"name": "weather", "arguments": {"city": "Tokyo"}}}],
             }
         else:
@@ -77,7 +82,7 @@ async def test_native_tools_roundtrip_keeps_ids_arguments_and_result(
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
         await install_transport(monkeypatch, http)
-        app = create_app(Inference((ollama_character(),), LiteLLMProvider()))
+        app = create_app(Inference((ollama_character(think),), LiteLLMProvider()))
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
         ) as client:
@@ -92,13 +97,15 @@ async def test_native_tools_roundtrip_keeps_ids_arguments_and_result(
             }
             first = await client.post("/v1/chat/completions", json=payload)
             assert first.status_code == 200
+            assert "SYNTHETIC_PRIVATE_REASONING" not in first.text
+            assert "reasoning_content" not in first.text
             choice = first.json()["choices"][0]
             assert choice["finish_reason"] == "tool_calls"
             call = choice["message"]["tool_calls"][0]
             assert call["id"] and json.loads(call["function"]["arguments"]) == {"city": "Tokyo"}
             messages.extend(
                 [
-                    {"role": "assistant", "tool_calls": [call]},
+                    choice["message"],
                     {"role": "tool", "tool_call_id": call["id"], "content": "SYNTHETIC_RESULT"},
                 ]
             )
@@ -132,6 +139,10 @@ async def test_operator_thinking_and_length_are_preserved(
         )
     assert result["choices"][0]["finish_reason"] == "length"
     assert result["choices"][0]["message"]["content"] in (None, "")
+    assert "synthetic reasoning" not in json.dumps(result)
+    from digital_souls_core.contracts import Message
+
+    Message.model_validate(result["choices"][0]["message"])
 
 
 @pytest.mark.parametrize(
