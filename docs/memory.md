@@ -102,3 +102,15 @@ memory単体の編集UI、vector検索、常駐job、tombstone自動掃除、フ
 という固定の扱いだけを記載します。JSONにはmemory ID・種別・原文・source revision/epochを保持します。
 これは命令と事実が混在する記憶への緩和策で、実モデルでのprompt injection完全防御を保証しません。
 privacy再判定・source guard・context byte budgetは、このframeを含む送信payloadに引き続き適用します。
+
+
+## 会話時の記憶なし継続
+
+会話contextでmemory許可がない場合、記憶storeを参照せず通常の推論認可へ進みます。
+queryの記憶利用が拒否された場合（機微判定・ABSTAIN・分類器の判定不能を含む）も、
+検索前にpolicy/設定/呼び出しscopeが不変と確認できた場合だけ空contextへ戻します。
+専用の MemoryQueryUnavailable 型（code: memory_query_unavailable）で区別し、一般のCoreErrorは吸収しません。
+直接の記憶検索APIはこの拒否をエラーとして返します。結果の拒否、source撤回、設定不正、
+policy変更、storage障害、キャンセルは会話でもfail-closedです。
+空contextでも送信前まで呼び出しscope・policy世代・設定のguardを保持します。
+分類器の代入は単調増加する世代を更新し、交換後に元のobjectへ戻しても古い判定を再利用しません。
