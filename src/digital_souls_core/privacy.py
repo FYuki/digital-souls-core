@@ -25,9 +25,25 @@ class PrivacyPolicy:
     """
 
     def __init__(self, classifier: Classifier | None = None) -> None:
+        self._generation = 0
+        self._classifier_generation = 0
         self.classifier = classifier
         self._grants: dict[Binding, frozenset[Permission]] = {}
-        self._generation = 0
+
+    @property
+    def classifier(self) -> Classifier | None:
+        return self._classifier
+
+    @classifier.setter
+    def classifier(self, value: Classifier | None) -> None:
+        self._classifier = value
+        self._classifier_generation += 1
+        self._generation += 1
+
+    @property
+    def stamp(self) -> tuple[int, int]:
+        """Content-free consent/classifier generation for adjacent no-await guards."""
+        return self._generation, self._classifier_generation
 
     def configure(self, grants: Mapping[Binding, frozenset[Permission]]) -> None:
         """Atomically replace trusted consent; outstanding decisions become stale."""

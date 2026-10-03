@@ -473,6 +473,10 @@ def test_classifier_requires_operator_capabilities(field: str, value: object) ->
 def test_classifier_provenance_is_content_free() -> None:
     classifier = LocalClassifier(FakeProvider(), local_profile(), model_digest="synthetic")
     assert set(classifier.provenance) == {
+        "destination_version",
+        "transport",
+        "profile_id",
+        "endpoint",
         "classifier_version",
         "prompt_version",
         "policy_version",
@@ -480,3 +484,24 @@ def test_classifier_provenance_is_content_free() -> None:
         "model_digest",
     }
     assert classifier.provenance["policy_version"] == POLICY_VERSION
+
+
+async def test_classifier_setter_generation_catches_await_aba() -> None:
+    policy = PrivacyPolicy()
+    initial = policy.stamp
+
+    class Swapping:
+        async def safe(self, value: object, version: str) -> bool:
+            policy.classifier = None
+            policy.classifier = self
+            return True
+
+    classifier = Swapping()
+    policy.classifier = classifier
+    assigned = policy.stamp
+    assert assigned[0] > initial[0] and assigned[1] > initial[1]
+    policy.configure({BINDING: frozenset({"local", "memory"})})
+    configured = policy.stamp
+    assert configured[0] > assigned[0] and configured[1] == assigned[1]
+    assert not await policy.authorize(BINDING, "memory", "Synthetic tea")
+    assert policy.classifier is classifier and policy.stamp[1] == configured[1] + 2

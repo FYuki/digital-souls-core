@@ -1,7 +1,8 @@
 """Immutable runtime snapshots and the small bundled-card context importer."""
 
 import json
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol
 from urllib.parse import urlsplit
@@ -50,6 +51,20 @@ class Profile(BaseModel):
         elif "api_base" in self.model_fields_set:
             raise ValueError("api_base is supported only for llamacpp_chat")
         return self
+
+
+def local_destination_identity(profile: Profile) -> dict[str, str]:
+    """Whitelist non-secret identity from the validated managed loopback profile."""
+    checked = Profile.model_validate(profile.model_dump(exclude_none=True))
+    if checked.transport != "llamacpp_chat" or checked.api_base is None:
+        raise ValueError("managed local destination required")
+    endpoint = urlsplit(checked.api_base)
+    return {
+        "destination_version": "managed-loopback-v1",
+        "transport": checked.transport,
+        "profile_id": checked.profile_id,
+        "endpoint": f"http://{endpoint.hostname}:{endpoint.port}/v1",
+    }
 
 
 class CharacterConfig(BaseModel):
@@ -104,6 +119,27 @@ class ContextSource(Protocol):
     """
 
     async def context(self, character: Character, scope: AccessScope, user_text: str) -> str: ...
+
+
+@dataclass(frozen=True)
+class GuardedContext:
+    text: str = field(repr=False)
+    valid: Callable[[], bool] = field(repr=False)
+    policy: object = field(repr=False)
+
+
+class GuardedContextSource(Protocol):
+    @property
+    def policy(self) -> object: ...
+
+    async def context(
+        self,
+        character: Character,
+        scope: AccessScope,
+        user_text: str,
+        *,
+        authorized: Callable[[], bool],
+    ) -> GuardedContext: ...
 
 
 class EmptyContext:

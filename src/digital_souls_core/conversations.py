@@ -159,9 +159,12 @@ class Conversations:
         except ValidationError:
             raise CoreError(400, "invalid_turn", "Invalid conversation or tool sequence") from None
         self.authorize("export", binding, all_input)
-        prepared = await self.inference.prepare(character_id, request, alias=False)
+        prepared = await self.inference.prepare(
+            character_id, request, alias=False, conversation_id=conversation_id
+        )
         profile = prepared.character.config.profile
         self.authorize("export", binding, all_input)
+        self.inference.check(prepared)
         try:
             if body.stream:
                 message, finish = await self._stream(profile, prepared.payload)

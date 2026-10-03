@@ -148,6 +148,7 @@ def create_app(
         except Exception:
             raise CoreError(500, "context_error", "Context preparation failed") from None
         profile = prepared.character.config.profile
+        service.check(prepared)
         if not body.stream:
             result = await service.provider.complete(profile, prepared.payload)
             return JSONResponse(result, headers=prepared.headers)
