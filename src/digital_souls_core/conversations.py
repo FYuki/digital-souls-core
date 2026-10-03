@@ -23,6 +23,10 @@ def bounded(value: object) -> None:
 
 def request_fingerprint(body: TurnInput, config: CharacterConfig) -> str:
     profile = config.profile.model_dump(mode="json")
+    if config.profile.transport == "sdk":
+        # Preserve pre-llamacpp receipts: newly added defaults do not change routing.
+        profile.pop("transport")
+        profile.pop("api_base")
     profile["allowed_parameters"] = sorted(config.profile.allowed_parameters)
     return hashlib.sha256(
         json.dumps(
