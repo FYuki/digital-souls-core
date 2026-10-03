@@ -315,7 +315,7 @@ async def test_context_provenance_survives_final_classifier_await(
 
     async def revoke(value: object, version: str) -> bool:
         result = await original(value, version)
-        if isinstance(value, dict) and "memory_id" in json.dumps(value):
+        if isinstance(value, dict) and "retrieved_memory_data" in json.dumps(value):
             conversation.delete("synthetic", ref.conversation_id)
         return result
 
@@ -338,11 +338,11 @@ async def test_context_opt_in_stateless_compatibility_and_dispatch_guard(tmp_pat
     inference = conversation.inference
     request = CompletionInput(messages=[Message(role="user", content="tea")])
     stateless = await inference.prepare("synthetic", request, alias=False)
-    assert "memory_id" not in json.dumps(stateless.payload)
+    assert "memory_ref" not in json.dumps(stateless.payload)
     prepared = await inference.prepare(
         "synthetic", request, alias=False, conversation_id=ref.conversation_id
     )
-    assert "memory_id" in json.dumps(prepared.payload)
+    assert "memory_ref" in json.dumps(prepared.payload)
     conversation.delete("synthetic", ref.conversation_id)
     with pytest.raises(CoreError):
         inference.check(prepared)
@@ -771,10 +771,12 @@ async def test_mixed_fact_and_instruction_is_framed_as_historical_data(tmp_path:
     assert messages[1]["role"] == "user"
     data = json.loads(messages[1]["content"].split("\n", 1)[1])
     assert data[0]["user_evidence"] == ["I like synthetic tea. " + instruction]
-    assert data[0]["memory_id"] == memory.memory_id
+    assert data[0]["memory_ref"] == "memory-1"
+    assert memory.memory_id not in json.dumps(prepared.payload)
+    assert ref.conversation_id not in json.dumps(prepared.payload)
     assert data[0]["sources"] == [
         {
-            "conversation_id": ref.conversation_id,
+            "conversation_ref": "conversation-1",
             "turn_revision": 1,
             "message_index": 0,
             "epoch": 0,

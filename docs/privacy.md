@@ -82,3 +82,7 @@ scanner v3はJSON文字列内のdecimal・指数表記をDecimalで桁落ちな�
 これは秘密の確定判定ではなく、未対応の数値表現としてのfail-closedです。小さな有限floatは
 decimal表記へ変換して検査します。非有限値は拒否し、boolean/nullは識別子として扱いません。
 元の字句を失う前の全形式を復元できる保証や、任意の難読化検出を追加するものではありません。
+
+## 管理された構造化出力
+
+分類器・抽出器は固定JSON Schemaをproviderへ渡し、返却値のstrict検証を維持します。未対応・不正出力は拒否し、制約なしの再試行は行いません。schema・対応契約・SDK versionも承認provenanceに含むため、旧承認は自動的に引き継ぎません。[ADR 0008](adr/0008-managed-structured-output.md)を参照してください。
