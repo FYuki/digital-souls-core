@@ -136,4 +136,5 @@ CORE_CHARACTER_CONFIG=examples/characters.json uv run --no-sync uvicorn digital_
 ```
 
 環境変数なしならキャラクター0件で起動します。無課金のfake/SDK mock検証は`uv run --no-sync pytest`。
-fakeの定型返答は人格品質や実モデル動作の証明ではありません。実モデル試験は未実施です。
+fakeの定型返答は人格品質や実モデル動作の証明ではありません。
+限定した実モデル試験の範囲は[検証証跡](evidence/2026-10-03-ollama-native-chat.md)を参照してください。
