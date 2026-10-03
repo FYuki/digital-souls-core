@@ -87,3 +87,24 @@ runbookのhealth確認はcold load中の503/接続待ちを上限付きで再試
 
 修正後のローカル結果: UT 18 / IT1 184 / docs tests 23 PASS、skip/xfail/xpass 0。
 ruff check/format、mypy、locked sync、sdist/wheel buildを実施。
+
+## transport隔離後の実機再検証
+
+独立再レビューCLEAR後、実装revision
+`8475c941f492bb5e817a0c5c10045c8ab3d88c64`（tracked変更なし）で再実行した。
+同じ固定image/model設定を用い、公開Mioriと合成入力だけを送信した。
+Core TCP 18080 → LiteLLM → 専用HTTPX/AsyncOpenAI → llama.cpp TCP 18081を検証した。
+
+- text: HTTP 200、nonempty、character=miori、model=gemma4-12b、finish=stop。
+- tools: HTTP 200、単一fixture_ping、非空ID、引数JSON={}。assistantを変更せず、
+  同じtool_call_idの合成結果を返してHTTP 200・結果認識・追加callなし。
+- tool_choice none/required/named: いずれもHTTP 200、期待した0/1/1 call。
+- tool stream: ID/name/argumentsの再構成、finish=tool_calls、[DONE]を確認。
+- text stream: 正常終端[DONE]、errorなし、upstream slot idle。
+- 実TCPのdownstream切断: 最初のcontent受信後に切断し、upstream slot idleを確認。
+- timeout: TestClient → 実SDK → 実サーバーで504/provider_timeout、slot idle。
+  timeout検証のdownstreamはTCPではない。
+
+ツール実行、人格品質評価、multimodalはNOT RUN。応答本文・思考・生ログは保存しない。
+検証Coreは終了し、ignored local profileはexternal_send_allowed=falseへ復元した。
+専用containerも検証後に停止する。常用切替と自動起動の設定は行わない。
