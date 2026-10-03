@@ -12,7 +12,16 @@ from pydantic import ValidationError
 from .application import CoreError, Inference
 from .character import CharacterConfig, Profile
 from .contracts import CompletionInput, Message
-from .history import Binding, HistoryPolicy, HistoryStore, Operation, Receipt, Snapshot, TurnInput
+from .history import (
+    Binding,
+    ConversationControls,
+    HistoryPolicy,
+    HistoryStore,
+    Operation,
+    Receipt,
+    Snapshot,
+    TurnInput,
+)
 from .privacy import PrivacyPolicy
 
 MAX_BYTES = 1024 * 1024
@@ -32,9 +41,12 @@ def request_fingerprint(body: TurnInput, config: CharacterConfig) -> str:
         profile.pop("transport")
         profile.pop("api_base")
     profile["allowed_parameters"] = sorted(config.profile.allowed_parameters)
+    request_body = body.model_dump()
+    if not body.memory_excluded_indices:
+        request_body.pop("memory_excluded_indices")  # Preserve pre-control receipts.
     return hashlib.sha256(
         json.dumps(
-            [body.model_dump(), config.config_version, profile],
+            [request_body, config.config_version, profile],
             sort_keys=True,
         ).encode()
     ).hexdigest()
@@ -85,11 +97,11 @@ class Conversations:
         self.authorize("create", binding)
         return self.store.create(binding)
 
-    def list(self, character_id: str) -> list[str]:
+    def list(self, character_id: str, *, include_archived: bool = False) -> list[str]:
         """List conversation IDs within the authorized character and caller scope."""
         binding = self.binding(character_id)
         self.authorize("list", binding)
-        return self.store.list(binding)
+        return self.store.list(binding, include_archived=include_archived)
 
     def read(self, character_id: str, conversation_id: str) -> Snapshot:
         """Restore a scoped snapshot and reauthorize its actual content."""
@@ -102,6 +114,17 @@ class Conversations:
     def delete(self, character_id: str, conversation_id: str) -> None:
         """Delete scoped history even when storage consent has been revoked."""
         self.store.delete(self.binding(character_id), conversation_id)
+
+    def controls(
+        self, character_id: str, conversation_id: str, changes: ConversationControls
+    ) -> Snapshot:
+        """Apply explicit thread modes without inferring them from conversation text."""
+        binding = self.binding(character_id)
+        self.authorize("store", binding)
+        self.read(character_id, conversation_id)
+        snapshot = self.store.controls(binding, conversation_id, changes)
+        self.authorize("read", binding, snapshot.messages)
+        return snapshot
 
     async def complete(self, character_id: str, conversation_id: str, body: TurnInput) -> Receipt:
         """Return an authorized retry receipt or atomically save a completed turn."""
@@ -125,7 +148,10 @@ class Conversations:
         all_input = (*snapshot.messages, *incoming)
         if len(all_input) > 256:
             raise CoreError(413, "history_limit", "Conversation message limit exceeded")
-        payload = body.model_dump(exclude={"request_id", "expected_revision"}, exclude_none=True)
+        payload = body.model_dump(
+            exclude={"request_id", "expected_revision", "memory_excluded_indices"},
+            exclude_none=True,
+        )
         payload["messages"] = [m.model_dump(exclude_none=True) for m in all_input]
         bounded(payload)
         try:
@@ -172,6 +198,11 @@ class Conversations:
             snapshot.revision,
             stored,
             finish,
+            **(
+                {"memory_excluded_indices": tuple(body.memory_excluded_indices)}
+                if body.memory_excluded_indices
+                else {}
+            ),
         )
         # A concurrent identical request may have won with a different answer.
         # Authorize the actual receipt, never substitute or rewrite that winner.

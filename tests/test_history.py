@@ -130,7 +130,10 @@ print(request_fingerprint(body, character("synthetic").config))
     assert values[0] == values[1]
 
 
-@pytest.mark.parametrize("crash_at", ["CREATE TABLE turns", "PRAGMA user_version=1"])
+@pytest.mark.parametrize(
+    "crash_at",
+    ["CREATE TABLE turns", "PRAGMA user_version=1", "ALTER TABLE turns", "PRAGMA user_version=2"],
+)
 def test_first_schema_creation_recovers_after_process_exit(tmp_path: Path, crash_at: str) -> None:
     path = tmp_path / "private" / "db"
     script = """
@@ -153,10 +156,10 @@ SQLiteHistory(Path(sys.argv[1]))
     store = SQLiteHistory(path)
     assert store.create(BINDING).revision == 0
     with sqlite3.connect(path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 2
         assert {
             row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        } == {"conversations", "turns"}
+        } == {"conversations", "turns", "source_deletions"}
 
 
 def test_unknown_unversioned_schema_still_fails_closed(tmp_path: Path) -> None:

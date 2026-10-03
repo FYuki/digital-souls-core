@@ -76,3 +76,37 @@ policy欠落・判定不能・拒否は403、不明会話は404、上限超過�
 初回schemaのDDLとversion設定は単一transactionです。初期化途中にprocessが終了しても、
 SQLiteのrollback後に再初期化できます。未知のversion 0 DBや旧実装で残った部分schemaは
 自動修復・削除せず拒否します。既存データを識別せず上書きする移行は行いません。
+
+
+## 明示的な記憶対象とthread操作
+
+[ADR 0006](adr/0006-conversation-memory-controls.md)の操作表を適用します。
+completionに`memory_excluded_indices: [0]`を渡すと、今回の`messages`内のindex 0を
+履歴に保存したまま記憶対象外にします。indexは0始まりで重複・範囲外を拒否します。
+省略時は空配列で、旧receipt fingerprint互換を維持します。再送で指定を変えると409です。
+このmetadataはモデルへ送信しません。自然文だけから指定期間や操作を推測しません。
+
+`PATCH /v1/characters/{character_id}/conversations/{conversation_id}`へ
+`{"expected_revision": 1, "private_mode": true}`または`{"expected_revision": 1, "archived": true}`を渡します。
+両fieldの同時指定も可能です。少なくとも一方が必要で、revision不一致は409です。
+変更もrevisionを進めるため、旧revisionで進行中の推論は保存できません。
+通信失敗後はGETで現在の状態を確認してください。PATCHにrequest IDによるreceiptはありません。
+
+通常一覧はarchiveを除外します。`?include_archived=true`で含められます。
+archive中もID指定のGET・DELETEと記憶sourceの有効性は維持します。
+private中は全sourceを利用不可にし、その間に保存したturnは解除後も自動採用しません。
+除外履歴に依存し得る後続assistant/toolも対象外です。新user発話は明示指定に従います。
+
+GETレスポンスには`private_mode`、`archived`、message順の`memory_sources`を追加します。
+各sourceは`turn_revision`、そのturn内の`message_index`、`eligible`を持ちます。
+conversation IDとtrusted scope/characterと組み合わせて参照します。現在のconversation revisionと
+過去のturn revisionは異なり得ます。eligibleはsource条件だけで、privacyや候補採用の許可ではありません。
+
+DELETEは本文・receiptを消し、内容なしのsource削除通知を同じtransactionで残します。
+Stage3 consumer用Python portの`deletions(binding)`と`acknowledge_deletion(binding,event_id)`で処理します。
+scope違いの通知は取得・ackできません。通知のHTTP ackは公開しません。
+Stage3のmemory/index実削除は未実装なので、その完了をDELETEの成功として主張しません。
+source参照自体は削除直後から無効です。
+
+schema v1からv2へ原子的に移行します。履歴・receiptは保持し、未知versionは引き続き拒否します。
+過去発話への後付け除外変更は未実装で、指定はcompletionの入力配列に対して行います。
