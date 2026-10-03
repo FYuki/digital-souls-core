@@ -19,7 +19,7 @@ WSL内のloopback到達性は環境ごとに確認する。LAN公開や共有ユ
 読み取ったり、ACLを緩めたりしない。コピーと公式imageはrollback後も保持する。
 
 ```bash
-export CORE_LLAMACPP_MODEL=/absolute/path/to/user-owned/blob-1278394b.gguf
+export CORE_LLAMACPP_MODEL=/home/asa/llama-compare.mD4N9V/blob-1278394b.gguf
 docker pull ghcr.io/ggml-org/llama.cpp@sha256:69019445c94c970496c8f6d6447214b837508162dfe1152768942c51237e3ab7
 nvidia-smi --query-gpu=memory.used,memory.free,utilization.gpu --format=csv
 ```
@@ -66,12 +66,25 @@ Ollamaの起動順との競合を確認してからrestart policyを変更する
 ## rollback
 
 今回起動したCoreプロセスを停止し、先にllamaコンテナを停止する。
-Composeコマンドには起動時と同じモデルpath・uid/gidを指定する。
+repoルートで実行し、Composeには起動時と同じ検証済み絶対モデルpath・uid/gidを指定する。
+この環境で確認したpathを以下に示す。別の配置では起動・rollbackの両方を同じpathへ変更する。
+停止コマンドの成功とcontainer状態がexitedであることを確認できた場合だけOllamaを再開する。
+停止失敗・inspect失敗・稼働中・状態不明では再開せず、原因を確認する。
 
 ```bash
-export CORE_LLAMACPP_UID=$(id -u) CORE_LLAMACPP_GID=$(id -g)
-docker compose -f compose.llamacpp.yml stop llama
-sudo systemctl start digital-souls-ollama.service
+(
+  set -euo pipefail
+  export CORE_LLAMACPP_MODEL=/home/asa/llama-compare.mD4N9V/blob-1278394b.gguf
+  export CORE_LLAMACPP_UID=$(id -u) CORE_LLAMACPP_GID=$(id -g)
+  if docker compose -f compose.llamacpp.yml stop llama &&
+     state=$(docker inspect --format '{{.State.Status}}' digital-souls-core-llamacpp) &&
+     [[ "$state" == exited ]]; then
+    sudo systemctl start digital-souls-ollama.service
+  else
+    echo 'llama.cppの停止を確認できないため、Ollamaを再開しません。' >&2
+    exit 1
+  fi
+)
 ```
 
 その後Coreを保持してある旧Ollama profileで再起動する。旧API/model/unit、ユーザーコピー、
