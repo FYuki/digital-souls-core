@@ -153,11 +153,12 @@ async def test_encoded_json_rejected_before_classifier_and_provider(
     assert service.store.receipt(BINDING, cid, "r1") is None
 
 
-async def test_numeric_tool_enum_rejected_before_send(tmp_path: Path) -> None:
+@pytest.mark.parametrize("number", [4111111111111111, 4111111111111111.0, 4.111111111111111e15])
+async def test_numeric_tool_enum_rejected_before_send(tmp_path: Path, number: int | float) -> None:
     service, provider, classifier, _ = policy_setup(tmp_path, local=False)
     cid = service.create("synthetic").conversation_id
     tool = json.loads(json.dumps(TOOL))
-    tool["function"]["parameters"]["properties"]["city"]["enum"] = [4111111111111111]
+    tool["function"]["parameters"]["properties"]["city"]["enum"] = [number]
     with pytest.raises(CoreError):
         await service.complete("synthetic", cid, turn(tools=[tool]))
     assert provider.calls == [] and classifier.calls == []
@@ -182,3 +183,98 @@ def test_structured_label_variants_preserve_detection(key: str, encoded: bool) -
     payload = {"nested": {key: "SYNTHETIC_OPAQUE_VALUE"}}
     value: object = {"arguments": json.dumps(payload)} if encoded else payload
     assert scan(value).secret
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "4111111111111111.0",
+        "4.111111111111111e15",
+        "411111111111111100e-2",
+        "4111111111111111.25",
+        "411111111111111100000000000000000000e-20",
+    ],
+)
+@pytest.mark.parametrize("shape", ["scalar", "enum", "arguments"])
+def test_decimal_json_preserves_identifier_digits(token: str, shape: str) -> None:
+    value: object = token
+    if shape == "enum":
+        value = '{"enum":[' + token + "]}"
+    elif shape == "arguments":
+        value = {"arguments": '{"value":' + token + "}"}
+    finding = scan(value)
+    assert finding.secret and not finding.failed
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        4111111111111111.0,
+        4111111111111111111.0,
+        1e13,
+        1e100,
+        float("nan"),
+        float("inf"),
+        float("-inf"),
+        "NaN",
+        "Infinity",
+        "-Infinity",
+        "1e309",
+        '{"value":1e309}',
+        '{"value":-1e309}',
+        "1e10000",
+        "1e-10000",
+        '{"enum":[NaN]}',
+        '{"enum":[1e10000]}',
+    ],
+)
+def test_unsupported_numeric_forms_fail_closed(value: object) -> None:
+    assert scan({"value": value}).failed
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        1.8e-13,
+        {"tolerance": 1.8e-13},
+        "0e-13",
+        "0.0000000000000",
+        '{"tolerance": 0.0000000000000}',
+        '{"tolerance": 1.8e-13}',
+        0.0,
+        -0.0,
+        0.25,
+        -12.5,
+        42.0,
+        1e-6,
+        1e6,
+        "0.25",
+        "-12.5",
+        "4.2e1",
+        "1e-6",
+        "1e6",
+        {"enum": [0.25, 42.0]},
+        '{"enum":[0.25,4.2e1]}',
+    ],
+)
+def test_ordinary_float_values_are_not_secrets(value: object) -> None:
+    finding = scan(value)
+    assert not finding.secret and not finding.failed
+
+
+@pytest.mark.parametrize("token", ["4.111111111111111e15", "4111111111111111.0"])
+async def test_decimal_encoded_value_blocked_before_send(tmp_path: Path, token: str) -> None:
+    service, provider, classifier, _ = policy_setup(tmp_path, local=False)
+    cid = service.create("synthetic").conversation_id
+    with pytest.raises(CoreError):
+        await service.complete(
+            "synthetic",
+            cid,
+            turn(
+                messages=[
+                    {"role": "user", "content": '{"enum":[' + token + "]}"},
+                ]
+            ),
+        )
+    assert provider.calls == [] and classifier.calls == []
+    assert service.read("synthetic", cid).messages == ()

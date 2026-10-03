@@ -1,12 +1,14 @@
 """Bounded deterministic screening; never returns matched values or source spans."""
 
 import json
+import math
 import re
 import unicodedata
 from dataclasses import dataclass
+from decimal import Decimal
 
 POLICY_VERSION = "core-privacy-v1"
-SCANNER_VERSION = "core-scanner-v2"
+SCANNER_VERSION = "core-scanner-v3"
 MAX_SCAN_BYTES = 1024 * 1024
 
 
@@ -125,11 +127,33 @@ def scan(value: object) -> Scan:
                 pending.extend((child, depth + 1) for child in item)
             elif type(item) is int:
                 texts.append(str(item))
+            elif type(item) is float or isinstance(item, Decimal):
+                # High-magnitude binary floats may already have lost identifier
+                # digits before this boundary. Do not guess the original token.
+                if isinstance(item, float):
+                    if not math.isfinite(item) or abs(item) >= 1e13:
+                        return Scan(failed=True)
+                    number = Decimal(str(item))
+                else:
+                    number = item
+                if not number.is_finite() or not -1024 <= number.adjusted() <= 308:
+                    return Scan(failed=True)
+                # Decimal parsing preserves JSON digits and expands exponents
+                # without binary rounding or context-sensitive normalization.
+                integer, _, fractional = format(number, "f").partition(".")
+                texts.append(integer)
+                # Fractional place-value padding is not an identifier. Inspect
+                # significant fractional digits separately, without joining.
+                if significant := fractional.lstrip("0"):
+                    texts.append(significant)
             elif isinstance(item, str):
                 texts.append(item)
                 try:
                     decoded = json.loads(
-                        item, object_pairs_hook=_unique_object, parse_constant=_invalid_constant
+                        item,
+                        object_pairs_hook=_unique_object,
+                        parse_constant=_invalid_constant,
+                        parse_float=Decimal,
                     )
                 except json.JSONDecodeError:
                     if item.lstrip().startswith(("{", "[", '"')):
@@ -137,7 +161,10 @@ def scan(value: object) -> Scan:
                     continue
                 except (ValueError, RecursionError):
                     return Scan(failed=True)
-                if isinstance(decoded, (str, dict, list)) and decoded != item:
+                if isinstance(decoded, (str, dict, list, int, Decimal)) and decoded != item:
+                    # The decoded leaves are checked below; the original JSON
+                    # would reintroduce numeric padding and duplicate fields.
+                    texts.pop()
                     pending.append((decoded, depth + 1))
         secret = keyed_secret
         no_history = no_memory = False
