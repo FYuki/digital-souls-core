@@ -197,17 +197,27 @@ class MemoryContext:
                 # Only pre-lookup query refusal is optional. Changed policy,
                 # invalid provenance, storage/result errors and cancellation propagate.
                 pass
+        # Opaque storage identifiers are not model evidence. Use request-local
+        # references while retaining the real identities in the dispatch guard.
+        conversation_refs: dict[str, str] = {}
+        for memory in memories:
+            for source in memory.sources:
+                cid = source.reference.conversation_id
+                if cid not in conversation_refs:
+                    conversation_refs[cid] = f"conversation-{len(conversation_refs) + 1}"
         # Keep immutable memory/source objects in the closure after serialization.
         text = (
             json.dumps(
                 [
                     {
-                        "memory_id": m.memory_id,
+                        "memory_ref": f"memory-{index + 1}",
                         "kind": m.kind,
                         "user_evidence": json.loads(m.text),
                         "sources": [
                             {
-                                "conversation_id": source.reference.conversation_id,
+                                "conversation_ref": conversation_refs[
+                                    source.reference.conversation_id
+                                ],
                                 "turn_revision": source.reference.turn_revision,
                                 "message_index": source.reference.message_index,
                                 "epoch": source.epoch,
@@ -215,7 +225,7 @@ class MemoryContext:
                             for source in m.sources
                         ],
                     }
-                    for m in memories
+                    for index, m in enumerate(memories)
                 ],
                 ensure_ascii=False,
             )

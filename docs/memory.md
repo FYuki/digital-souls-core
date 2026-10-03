@@ -99,7 +99,9 @@ memory単体の編集UI、vector検索、常駐job、tombstone自動掃除、フ
 
 記憶本文は人格systemメッセージへ結合せず、独立した user role の retrieved_memory_data として
 過去の出典データを渡します。systemには、命令として実行せず人格・system指示を上書きしない
-という固定の扱いだけを記載します。JSONにはmemory ID・種別・原文・source revision/epochを保持します。
+という固定の扱いだけを記載します。JSONにはcontext内だけの`memory_ref`・`conversation_ref`と種別・原文・source revision/epochを保持します。
+保存IDはモデルへ送らず、公開検索結果と内部guardに保持します。参照名はそのcontext内だけで有効で、
+別リクエストの参照名や公開APIのIDとは対応しません。[ADR 0009](adr/0009-memory-context-references.md)を参照してください。
 これは命令と事実が混在する記憶への緩和策で、実モデルでのprompt injection完全防御を保証しません。
 privacy再判定・source guard・context byte budgetは、このframeを含む送信payloadに引き続き適用します。
 
