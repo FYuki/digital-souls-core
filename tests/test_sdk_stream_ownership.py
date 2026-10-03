@@ -110,7 +110,9 @@ async def test_pinned_anthropic_iterator_does_not_own_http_response_close() -> N
     assert wire.closed
 
 
-@pytest.mark.parametrize("provider", ["anthropic", "bedrock", "openrouter", "ollama"])
+@pytest.mark.parametrize(
+    "provider", ["anthropic", "bedrock", "openrouter", "ollama", "ollama_chat"]
+)
 async def test_unverified_stream_adapter_rejected_before_any_sdk_call(
     monkeypatch: pytest.MonkeyPatch, provider: str
 ) -> None:

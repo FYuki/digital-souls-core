@@ -1,0 +1,46 @@
+# ADR 0002: Ollama native Chat経路の明示
+
+- Status: Proposed
+- Date: 2026-10-03
+
+## 背景
+
+既存のLiteLLM 1.77.7では、Ollamaのtemplate文字列によるtools能力判定が
+gemma4:12bのnative toolsを認識せず、JSON形式への暗黙変換に進むことを確認した。
+またthinkingで出力上限に達した応答の`done_reason=length`が`stop`へ変換された。
+HTTP 200や空のcontentだけを正常なテキスト応答の証拠にはできない。
+
+## 提案
+
+LiteLLMを1.103.2、対応するOpenAI SDKを2.54.0に固定し、lockを更新する。
+Ollamaには`ollama_chat/`のみを使用し、旧`ollama/`経路は送信前に拒否する。
+固定SDKのnative tools直接転送と終了理由変換をmock HTTPで検証する。
+Coreはtool実行、独自Ollama通信、モデルfallbackを追加しない。
+
+管理者の固定profileに任意の`ollama_think: boolean | null`を追加する。
+false/trueはnative APIの`think`へ転送し、nullまたは省略時は送らずモデル既定値に従う。
+他providerへの設定、文字列や数値によるboolean指定は起動時に拒否する。
+callerはthinking設定を上書きできず、要求途中のprofile変更も行わない。
+
+SDKは依然`tool_choice`を黙って削除するため、Ollamaでは値によらず送信前に拒否する。
+`allowed_parameters`への登録でもこの制限は解除しない。toolsを提示した場合の選択は
+モデルに委ねられ、必ず呼び出す保証はない。streamingは引き続き検証済みのOpenAI
+native Chat経路のみとし、Ollamaへ拡張しない。
+
+SDK更新時の既存OpenAI stream timeout回帰にも対応する。新SDKの例外変換は
+元のHTTPX例外をPythonの`__context__`に保持するため、既存の型による有界探索に
+この経路を追加する。例外本文・生成文・URLからの分類や公開はしない。
+
+## 制約と検証
+
+LiteLLM依存追加はlockに含め、既存のOpenAI streaming・close・cancel・Responses拒否と
+全品質ゲートを再実行する。native toolsのIDはSDKが生成する場合があり、引数のJSON表記は
+Ollamaのobject形式との変換により空白が変わりうる。意味とID・結果の関連を検証する。
+物理context上限、稼働時context設定、注入文脈byte budgetは別の値として扱う。
+thinking無効化は出力を必ず保証する機構でも、人格品質の証明でもない。
+
+## 一次資料
+
+- [LiteLLM 1.103.2 release](https://github.com/BerriAI/litellm/releases/tag/v1.103.2)
+- [固定版Ollama Chat変換](https://github.com/BerriAI/litellm/blob/v1.103.2/litellm/llms/ollama/chat/transformation.py)
+- [LiteLLM Ollama公式資料](https://docs.litellm.ai/docs/providers/ollama)

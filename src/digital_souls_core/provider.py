@@ -74,7 +74,11 @@ def provider_error(error: Exception) -> CoreError:
             return CoreError(504, "provider_timeout", "Provider timed out")
         if isinstance(current, (litellm.RateLimitError, openai.RateLimitError)):
             return CoreError(429, "provider_rate_limit", "Provider rate limit reached")
-        for cause in (getattr(current, "original_exception", None), current.__cause__):
+        for cause in (
+            getattr(current, "original_exception", None),
+            current.__cause__,
+            current.__context__,
+        ):
             if isinstance(cause, BaseException):
                 pending.append(cause)
     return CoreError(502, "provider_error", "Provider request failed")
@@ -89,9 +93,25 @@ class LiteLLMProvider:
             # Pinned LiteLLM adapters do not share a response ownership contract.
             # Only the native OpenAI SDK stream lifecycle is verified here.
             require_native_chat_stream(profile.model)
+        provider_options: dict[str, Any] = {}
+        if profile.model.startswith("ollama/"):
+            raise CoreError(
+                400, "unsupported_provider_route", "Ollama requires the native ollama_chat route"
+            )
+        if profile.model.startswith("ollama_chat/"):
+            # The pinned SDK still silently removes tool_choice. Do not claim support.
+            if "tool_choice" in payload:
+                raise CoreError(400, "unsupported_parameter", "Ollama tool_choice is not supported")
+            if "think" in payload or "reasoning_effort" in payload:
+                raise CoreError(
+                    400, "unsupported_parameter", "Thinking is controlled by the operator profile"
+                )
+            if profile.ollama_think is not None:
+                provider_options["think"] = profile.ollama_think
         return await litellm.acompletion(
             model=profile.model,
             **payload,
+            **provider_options,
             timeout=profile.timeout_seconds,
             num_retries=0,
             max_retries=0,
@@ -127,7 +147,7 @@ class LiteLLMProvider:
             raise provider_error(error) from None
         finally:
             if upstream is not None:
-                # LiteLLM 1.77's wrapper exposes its underlying SDK stream.
+                # The pinned LiteLLM wrapper exposes its underlying SDK stream.
                 # OpenAI AsyncStream uses close(); async generators use aclose().
                 transport = getattr(upstream, "completion_stream", upstream)
                 close = getattr(transport, "aclose", None) or getattr(transport, "close", None)
