@@ -13,6 +13,9 @@
 localhostの単独利用者向けで、公開サービス用の認証・記憶永続化・tool実行は未実装です。
 サンプルは外部送信を拒否し、fakeで無課金検証できます。
 
+ローカルGemma 4を使う場合は[llama.cppの起動・切替・rollback](docs/llamacpp-operations.md)を参照してください。
+固定Dockerと運用者profileを使用し、Ollamaや他クライアントの設定を自動変更しません。
+
 [光織 / Miori](characters/miori/README.md)をサンプルキャラクターとして格納しています。
 素材固有の利用条件と、保留・省略した項目のmanifestを確認してください。
 
