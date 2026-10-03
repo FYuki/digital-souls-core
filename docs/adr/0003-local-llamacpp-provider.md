@@ -40,6 +40,12 @@ toolsの実行ループは追加せず、native tool call・ID・引数・結果
 
 ## 影響と制約
 
+loopback URLだけでは環境proxy経由の外部送信を防げないため、ローカルprofile専用の
+リクエスト所有HTTPX/AsyncOpenAIクライアントをLiteLLMへ渡す。`trust_env=False`と
+`follow_redirects=False`を明示し、SDK共有clientと環境変数は変更しない。
+streamのEOF・途中終了・cancel・timeoutでも、応答を閉じた後に専用clientを閉じる。
+接続poolはリクエスト間で共有しない。この小さいローカル用途では境界と所有を優先する。
+
 Dockerは非root、read-only filesystem/model、capabilityなし、loopback公開、restart=noを既定とする。
 新規host systemd unit、認証情報、LAN公開、原本ACL変更を追加しない。
 自動再起動はGPUメモリ占有と待受の自動復帰を伴うため、別途ユーザーが判断する。

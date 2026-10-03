@@ -32,11 +32,16 @@ Ubuntu-dogfoodで次を実行する。unitは削除・無効化せず、sudoを�
 ```bash
 sudo systemctl stop digital-souls-ollama.service
 bash tools/start-llamacpp.sh
-curl --fail http://127.0.0.1:18081/health
+curl --noproxy '*' --fail --silent --show-error \
+  --connect-timeout 1 --max-time 2 --retry 60 --retry-delay 2 \
+  --retry-max-time 120 --retry-all-errors http://127.0.0.1:18081/health
 ```
 
 起動scriptはOllama active時やmodel SHA不一致時に拒否する。停止済みという確認は起動時の条件であり、
 別の管理者が後からOllamaを再開することまで防ぐ排他機構ではない。両方を同時に起動しない。
+health確認はcold load中の503や接続待ちを再試行する。再試行の開始期限は120秒、
+最後の試行を含め最大約122秒で失敗する。失敗時はCoreを起動せず、containerの状態を確認する。
+Coreのローカル専用HTTPクライアントも環境proxyを無視し、redirectを追跡しない。
 
 Coreの[サンプルprofile](../examples/characters.llamacpp.json)を同じexamples内の
 `characters.llamacpp.local.json`へコピーし、運用者がexternal_send_allowedだけをtrueにする。

@@ -63,3 +63,27 @@ packageはCIと同じbuild・hash必須runtime install・no-deps wheel install�
 
 人格品質、multimodal、他モデル、他の互換サーバー、他クライアント移行、
 systemd常駐・自動再起動、mainマージ、外部公開はNOT RUNまたは範囲外。
+
+## PR #14 独立レビュー後のtransport隔離修正
+
+対象: head `0172e9bedf298374f9743af35461fa52895def8b` への指摘。
+固定loopback URLでもSDK既定clientが環境proxyを参照し得たため、ローカルprofileでは
+CoreがリクエストごとにHTTPX/AsyncOpenAIを構築してLiteLLMへ渡す。
+環境proxyを無視しredirectを追わず、既存の他provider設定・共有clientを変更しない。
+応答と専用clientのcloseはAnyIO cancellationからshieldする。
+
+回帰テストはsocket禁止で、実際のCore→LiteLLM→AsyncOpenAI→HTTPX生成経路を通す。
+HTTPX transportの送受信メソッドだけを置換し、実際に選択されたpoolが
+AsyncHTTPProxyでなくAsyncConnectionPoolであることを検証する。
+HTTP_PROXY/HTTPS_PROXY/ALL_PROXY（大小文字）、空NO_PROXY、
+DISABLE_AIOHTTP_TRANSPORTの両値、AIOHTTP_TRUST_ENV=trueを合成値で設定した。
+text、307 redirect拒否、接続失敗、stream EOF/明示close/task cancel/AnyIO cancel/timeout、
+リクエスト間の専用pool分離、他profileが専用clientを作らないことを検証する。
+外部proxyへの実送信はしていない。既存stream/tool履歴テストも維持する。
+
+runbookのhealth確認はcold load中の503/接続待ちを上限付きで再試行する方式へ変更。
+この修正では実GPUサーバー検証と常用切替はNOT RUN。上記の実サーバー結果は
+記載済みrevisionのものであり、この修正後の実サーバー合格とは扱わない。
+
+修正後のローカル結果: UT 18 / IT1 184 / docs tests 23 PASS、skip/xfail/xpass 0。
+ruff check/format、mypy、locked sync、sdist/wheel buildを実施。

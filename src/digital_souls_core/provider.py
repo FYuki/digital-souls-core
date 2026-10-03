@@ -3,6 +3,7 @@
 import inspect
 import os
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any
 
 import anyio
@@ -110,13 +111,38 @@ def public_completion(result: dict[str, Any]) -> dict[str, Any]:
 
 class LiteLLMProvider:
     @staticmethod
-    async def _call(profile: Profile, payload: dict[str, Any]) -> Any:
+    @asynccontextmanager
+    async def _client(profile: Profile) -> AsyncGenerator[openai.AsyncOpenAI | None]:
+        if profile.transport != "llamacpp_chat":
+            yield None
+            return
+        # Request-owned transport: never inherit environment proxies or SDK pools.
+        http = httpx.AsyncClient(trust_env=False, follow_redirects=False)
+        try:
+            client = openai.AsyncOpenAI(
+                base_url=profile.api_base,
+                api_key="local-no-auth",
+                http_client=http,
+                max_retries=0,
+                timeout=profile.timeout_seconds,
+            )
+            yield client
+        finally:
+            with anyio.CancelScope(shield=True):
+                await http.aclose()
+
+    @staticmethod
+    async def _call(
+        profile: Profile, payload: dict[str, Any], client: openai.AsyncOpenAI | None = None
+    ) -> Any:
         if not profile.external_send_allowed:
             raise CoreError(403, "external_send_denied", "Character export policy denies inference")
         provider_options: dict[str, Any] = {}
         if profile.transport == "llamacpp_chat":
             # A public dummy value satisfies the SDK without forwarding cloud credentials.
             provider_options.update(api_base=profile.api_base, api_key="local-no-auth")
+        if client is not None:
+            provider_options["client"] = client
         if payload.get("stream") or profile.transport == "llamacpp_chat":
             # Pinned LiteLLM adapters do not share a response ownership contract.
             # Only the native OpenAI SDK stream lifecycle is verified here.
@@ -153,7 +179,8 @@ class LiteLLMProvider:
     async def complete(self, profile: Profile, payload: dict[str, Any]) -> dict[str, Any]:
         """Make one SDK call using the fixed profile, preserving normalized completion fields."""
         try:
-            result = await self._call(profile, payload)
+            async with self._client(profile) as client:
+                result = await self._call(profile, payload, client)
             return public_completion(dict(result.model_dump(exclude_none=True)))
         except CoreError:
             raise
@@ -163,13 +190,25 @@ class LiteLLMProvider:
     async def stream(
         self, profile: Profile, payload: dict[str, Any]
     ) -> AsyncGenerator[dict[str, Any]]:
+        async with self._client(profile) as client:
+            iterator = self._stream(profile, payload, client)
+            try:
+                async for chunk in iterator:
+                    yield chunk
+            finally:
+                with anyio.CancelScope(shield=True):
+                    await iterator.aclose()
+
+    async def _stream(
+        self, profile: Profile, payload: dict[str, Any], client: openai.AsyncOpenAI | None
+    ) -> AsyncGenerator[dict[str, Any]]:
         """Yield SDK deltas and own transport cleanup on EOF, errors, and cancellation.
 
         Only verified native Chat Completions routes may acquire a stream.
         """
         upstream = None
         try:
-            upstream = await self._call(profile, payload)
+            upstream = await self._call(profile, payload, client)
             async for chunk in upstream:
                 yield public_completion(chunk.model_dump(exclude_none=True))
         except CoreError:

@@ -86,6 +86,7 @@ async def test_operator_endpoint_and_dummy_auth_with_unmodified_tool_history(
         original = litellm.acompletion
 
         async def call(**kwargs: Any) -> Any:
+            kwargs.pop("client", None)
             assert kwargs["api_key"] == "local-no-auth"
             assert kwargs["api_base"] == "http://127.0.0.1:18081/v1"
             sdk = AsyncOpenAI(
@@ -144,6 +145,7 @@ async def test_verified_local_sdk_stream_ownership(
         original = litellm.acompletion
 
         async def call(**kwargs: Any) -> Any:
+            kwargs.pop("client", None)
             return await original(**kwargs, client=sdk)
 
         monkeypatch.setattr(litellm, "acompletion", call)
