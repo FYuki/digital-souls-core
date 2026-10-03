@@ -23,7 +23,7 @@ from digital_souls_core.sqlite_memory import SQLiteMemory
 
 from .support import FakeProvider
 from .test_conversations import turn
-from .test_privacy import BINDING, local_profile, policy_setup
+from .test_privacy import BINDING, assessment, local_profile, policy_setup
 
 pytestmark = pytest.mark.it1
 
@@ -940,3 +940,160 @@ async def test_empty_memory_context_retains_dispatch_guard(tmp_path: Path, chang
         service.policy.classifier = service.policy.classifier
     with pytest.raises(CoreError):
         conversation.inference.check(prepared)
+
+
+@pytest.mark.parametrize("adapter", ["classifier", "extractor"])
+@pytest.mark.parametrize("change", ["endpoint", "profile"])
+async def test_rebuild_approval_binds_managed_destination(
+    tmp_path: Path, adapter: str, change: str
+) -> None:
+    service, conversation, extractor_provider = setup(tmp_path)
+    a = await source(conversation, "Synthetic alpha")
+    b = await source(conversation, "Synthetic beta")
+    extractor_provider.response["choices"][0]["message"]["content"] = selection([0, 1])
+    await service.extract(BINDING, (a, b))
+    previous = service._versions()
+    conversation.delete("synthetic", a.conversation_id)
+    profile = local_profile().model_copy(
+        update=(
+            {"api_base": "http://127.0.0.1:18081/v1"}
+            if change == "endpoint"
+            else {"profile_id": "synthetic-other-profile"}
+        )
+    )
+    classifier_provider = FakeProvider()
+    classifier_provider.response["choices"][0]["message"]["content"] = assessment()
+    if adapter == "classifier":
+        service.policy.classifier = LocalClassifier(
+            classifier_provider, profile, model_digest="synthetic-digest"
+        )
+    else:
+        service.extractor = LocalExtractor(extractor_provider, profile, model_digest="synthetic")
+    extractor_provider.response["choices"][0]["message"]["content"] = selection()
+    extractor_provider.calls.clear()
+    with pytest.raises(CoreError, match="explicit extraction"):
+        await service.rebuild(BINDING)
+    assert service._versions() != previous
+    assert classifier_provider.calls == [] and extractor_provider.calls == []
+    assert service.store.pending(BINDING) == ()
+    assert await service.rebuild(BINDING) == 0
+    assert service.store.search(BINDING, "beta") == ()
+    # Only explicit current-policy extraction reauthorizes the remaining source.
+    current = await service.extract(BINDING, (b,))
+    assert len(current) == 1
+    assert "alpha" not in extractor_provider.calls[0][1]["messages"][1]["content"]
+    with sqlite3.connect(store(service).path) as db:
+        approved = db.execute(
+            "SELECT versions FROM memory_jobs WHERE state='done' ORDER BY rowid DESC LIMIT 1"
+        ).fetchone()[0]
+    assert approved == service._versions()
+
+
+async def test_same_destination_identity_reopen_and_normalized_noop(tmp_path: Path) -> None:
+    service, conversation, provider = setup(tmp_path)
+    a = await source(conversation, "Synthetic alpha")
+    b = await source(conversation, "Synthetic beta")
+    provider.response["choices"][0]["message"]["content"] = selection([0, 1])
+    await service.extract(BINDING, (a, b))
+    versions = service._versions()
+    conversation.delete("synthetic", a.conversation_id)
+    path = store(service).path
+    classifier_provider = FakeProvider()
+    classifier_provider.response["choices"][0]["message"]["content"] = assessment()
+    # URL spelling does not change validated loopback destination identity.
+    normalized = local_profile().model_copy(update={"api_base": "HTTP://127.0.0.1:018080/v1"})
+    policy = PrivacyPolicy(
+        LocalClassifier(classifier_provider, normalized, model_digest="synthetic-digest")
+    )
+    policy.configure({BINDING: frozenset({"history", "local", "memory"})})
+    service = MemoryService(
+        SQLiteMemory(path),
+        policy,
+        LocalExtractor(provider, normalized, model_digest="synthetic"),
+    )
+    assert service._versions() == versions
+    provider.response["choices"][0]["message"]["content"] = selection()
+    assert await service.rebuild(BINDING) == 1
+    assert await service.rebuild(BINDING) == 0
+    assert len(await service.search(BINDING, "beta")) == 1
+
+
+async def test_legacy_job_without_destination_is_not_implicitly_upgraded(tmp_path: Path) -> None:
+    service, conversation, provider = setup(tmp_path)
+    ref = await source(conversation)
+    legacy = json.loads(service._versions())
+    for adapter in ("classifier", "extractor"):
+        for field in ("destination_version", "transport", "profile_id", "endpoint"):
+            legacy[adapter].pop(field)
+    legacy_versions = json.dumps(legacy, sort_keys=True)
+    evidence = service.store.sources(BINDING, (ref,))
+    job = service.store.begin(BINDING, tuple(e.source for e in evidence), legacy_versions)
+    path = store(service).path
+    service.store = SQLiteMemory(path)
+    with pytest.raises(CoreError, match="explicit extraction"):
+        await service.rebuild(BINDING)
+    assert provider.calls == [] and service.store.pending(BINDING) == ()
+    with sqlite3.connect(path) as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert db.execute(
+            "SELECT versions,state FROM memory_jobs WHERE id=?", (job.job_id,)
+        ).fetchone() == (legacy_versions, "failed")
+    assert len(await service.extract(BINDING, (ref,))) == 1
+    with sqlite3.connect(path) as db:
+        assert db.execute(
+            "SELECT versions,state FROM memory_jobs WHERE id=?", (job.job_id,)
+        ).fetchone() == (legacy_versions, "failed")
+
+
+@pytest.mark.parametrize("adapter", ["classifier", "extractor"])
+async def test_destination_changes_during_extraction_prevent_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, adapter: str
+) -> None:
+    service, conversation, provider = setup(tmp_path)
+    ref = await source(conversation)
+    started, release = asyncio.Event(), asyncio.Event()
+    original = provider.complete
+
+    async def wait(profile: Profile, payload: dict[str, Any]) -> dict[str, Any]:
+        started.set()
+        await release.wait()
+        return await original(profile, payload)
+
+    monkeypatch.setattr(provider, "complete", wait)
+    task = asyncio.create_task(service.extract(BINDING, (ref,)))
+    await started.wait()
+    changed = local_profile().model_copy(update={"api_base": "http://127.0.0.1:18081/v1"})
+    if adapter == "extractor":
+        service.extractor = LocalExtractor(provider, changed, model_digest="synthetic")
+    else:
+        service.policy.classifier = LocalClassifier(
+            FakeProvider(), changed, model_digest="synthetic-digest"
+        )
+    release.set()
+    with pytest.raises(CoreError):
+        await task
+    assert service.store.search(BINDING, "tea") == ()
+    assert service.store.pending(BINDING)
+
+
+@pytest.mark.parametrize("adapter", ["classifier", "extractor"])
+def test_destination_identity_is_whitelisted_and_secret_free(adapter: str) -> None:
+    profile = local_profile().model_copy(update={"api_base": "HTTP://127.0.0.1:018080/v1"})
+    instance = (
+        LocalClassifier(FakeProvider(), profile, model_digest="synthetic")
+        if adapter == "classifier"
+        else LocalExtractor(FakeProvider(), profile, model_digest="synthetic")
+    )
+    provenance = instance.provenance
+    assert provenance["endpoint"] == "http://127.0.0.1:18080/v1"
+    assert provenance["transport"] == "llamacpp_chat"
+    assert provenance["profile_id"] == profile.profile_id
+    assert not any(key in provenance for key in ("api_key", "token", "password", "headers"))
+    for endpoint in (
+        "http://synthetic:secret@127.0.0.1:18080/v1",
+        "http://127.0.0.1:18080/v1?token=synthetic",
+        "http://127.0.0.1:18080/v1#synthetic",
+    ):
+        invalid = local_profile().model_copy(update={"api_base": endpoint})
+        with pytest.raises(ValueError):
+            type(instance)(FakeProvider(), invalid, model_digest="synthetic")

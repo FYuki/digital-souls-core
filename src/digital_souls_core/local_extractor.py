@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 from pydantic import Field, model_validator
 
 from .application import CoreError, Provider
-from .character import Profile
+from .character import Profile, local_destination_identity
 from .contracts import StrictModel
 from .memory_contracts import Candidate, Evidence
 from .privacy_classifier import _unique
@@ -50,6 +50,7 @@ class LocalExtractor:
     @property
     def provenance(self) -> dict[str, str]:
         return {
+            **local_destination_identity(self._profile),
             "extractor": "evidence-selection-v1",
             "prompt": "evidence-selection-prompt-v1",
             "schema": "memory-v1",

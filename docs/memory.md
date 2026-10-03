@@ -114,3 +114,20 @@ queryの記憶利用が拒否された場合（機微判定・ABSTAIN・分類�
 policy変更、storage障害、キャンセルは会話でもfail-closedです。
 空contextでも送信前まで呼び出しscope・policy世代・設定のguardを保持します。
 分類器の代入は単調増加する世代を更新し、交換後に元のobjectへ戻しても古い判定を再利用しません。
+
+
+## 承認済み処理先の識別
+
+classifier/extractor双方のprovenanceには、model/digestに加えて transport・profile ID・
+正規化したloopback endpoint・識別形式のversionを保存します。http scheme、127.0.0.1、
+数値port、固定/v1 pathから組み立て、URLの同値な表記差は同じidentityとします。
+profile IDだけの変更も別の承認先と扱います。token/key/headerは保存せず、
+userinfo/query/fragmentを含むURLは既存のProfile検証で拒否します。
+これは運用者が固定した設定の識別であり、endpoint背後の実プロセスやmodel digestの真正性保証ではありません。
+
+既存SQLite v3のversions JSONを拡張するため、DDL migrationや旧行の書き換えはありません。
+送信先識別を欠く旧jobは新設定と一致せず、再構築時には本文を取り出す前に拒否され、
+既存のfailed終端化・後続処理へ進みます。現在のendpointを旧承認へ補完しません。
+旧active memoryの出典検証・検索と履歴データは維持しますが、再構築・抽出jobを再利用する際には
+現在のsource適格性とprivacyを満たす明示extractが必要です。
+既存v1/v2→v3 migrationとoutboxの原子性は変更せず、crash回帰も継続します。

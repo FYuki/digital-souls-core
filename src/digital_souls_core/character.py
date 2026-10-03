@@ -53,6 +53,20 @@ class Profile(BaseModel):
         return self
 
 
+def local_destination_identity(profile: Profile) -> dict[str, str]:
+    """Whitelist non-secret identity from the validated managed loopback profile."""
+    checked = Profile.model_validate(profile.model_dump(exclude_none=True))
+    if checked.transport != "llamacpp_chat" or checked.api_base is None:
+        raise ValueError("managed local destination required")
+    endpoint = urlsplit(checked.api_base)
+    return {
+        "destination_version": "managed-loopback-v1",
+        "transport": checked.transport,
+        "profile_id": checked.profile_id,
+        "endpoint": f"http://{endpoint.hostname}:{endpoint.port}/v1",
+    }
+
+
 class CharacterConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     character_id: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
