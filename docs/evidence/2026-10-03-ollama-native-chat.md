@@ -72,3 +72,29 @@ Ollama tool_choiceと旧ollama経路は非対応として送信前拒否を検�
 大contextでの推論能力や安全性をこの試験から推定しない。
 
 最終PR headのCI結果はPRで確認・記録する。このローカル証跡はCI実行結果の代用ではない。
+
+## 独立レビュー後の契約修正
+
+修正実装revision: `f393201a2917a54510782a4979db160c2f411e55`。
+初回の実モデル試験revisionとは別であり、この追補で実モデルを再実行したとは扱わない。
+
+- SDKのreasoning_content等が入力Messageのextra=forbidと整合しなかったため、
+  message/deltaを公開fieldに限定する。思考内容は保存・公開せず、reasoning-onlyの
+  通常応答は空contentと元の終了理由を返す。
+- Ollamaのthink=false/true/default全条件で、返却messageを加工せずtool結果と再送し、
+  正常応答・call ID/引数/結果の保持、思考が応答にも再送payloadにも出ないことを確認。
+- stream guardへtools/reasoning/api_base等の実要求条件を渡す。
+  gpt-5.4 / gpt-5.4-mini / gpt-6-astraそれぞれ9条件で、実SDKの第2route判定を
+  transport取得直前に観測し、Coreの拒否/通過と一致することを確認。
+  endpoint条件は既定、管理者環境変数、SDK global、adapter引数を含む。
+  api_baseやreasoningのcaller入力許可を追加したものではない。
+- GPT-4o-miniのfunction tools付きnative Chat streamについて、実SDK＋mock HTTPで
+  EOF/consumer close/cancelと非公開reasoning field除外を検証。
+
+ローカルでは修正作業treeでUT 18・IT1 129・docs 23がPASS。その後、既存の
+stream所有権テストをfunction tools付きに強化して同ファイル21件を再実行しPASS。
+最終内容でruff check/format・mypy（20 files）もPASS。skip/xfail/xpassなし。
+途中でSDK mock helperのimportがCoreのoffline metadata設定より先になり既存metadata検査が
+1件FAILしたため、helperのSDK importをCore初期化後へ移し、対象68件と全suiteを再検証した。
+最終head CIで全テストおよびpackage build/独立installを確認する。
+実モデル・Docker・デプロイ・CodeRabbit再レビュー・マージはこの修正ではNOT RUN。
