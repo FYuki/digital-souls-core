@@ -24,23 +24,24 @@ litellm.turn_off_message_logging = True
 litellm.telemetry = False
 
 
-def require_native_chat_stream(model: str, payload: dict[str, Any]) -> None:
+def require_native_chat_route(
+    model: str, payload: dict[str, Any], *, local_native_chat: bool = False
+) -> None:
     """Use the pinned SDK's local routing probe, denying unknown/Responses modes.
 
     Route metadata is not proof of model capabilities or authorization to use it.
     """
+    code = "unsupported_stream_provider" if payload.get("stream") else "unsupported_provider_route"
     provider, _, name = model.partition("/")
     aliases = litellm.model_alias_map or {}
     if model in aliases or name in aliases:
         raise CoreError(
             400,
-            "unsupported_stream_provider",
+            code,
             "SDK model aliases cannot override the verified route",
         )
     if provider != "openai" or name.startswith("responses/"):
-        raise CoreError(
-            400, "unsupported_stream_provider", "Streaming requires native OpenAI Chat Completions"
-        )
+        raise CoreError(400, code, "Route requires native OpenAI Chat Completions")
     try:
         info, resolved = responses_api_bridge_check(
             model=name,
@@ -52,13 +53,10 @@ def require_native_chat_stream(model: str, payload: dict[str, Any]) -> None:
             api_base=payload.get("api_base"),
         )
     except Exception:
-        raise CoreError(
-            400, "unsupported_stream_provider", "Streaming route is not verified"
-        ) from None
-    if info.get("mode") != "chat" or resolved != name:
-        raise CoreError(
-            400, "unsupported_stream_provider", "Streaming route is not native Chat Completions"
-        )
+        raise CoreError(400, code, "Chat route is not verified") from None
+    verified_modes = {"chat", None} if local_native_chat else {"chat"}
+    if info.get("mode") not in verified_modes or resolved != name:
+        raise CoreError(400, code, "Route is not native Chat Completions")
 
 
 def provider_error(error: Exception) -> CoreError:
@@ -115,11 +113,18 @@ class LiteLLMProvider:
     async def _call(profile: Profile, payload: dict[str, Any]) -> Any:
         if not profile.external_send_allowed:
             raise CoreError(403, "external_send_denied", "Character export policy denies inference")
-        if payload.get("stream"):
+        provider_options: dict[str, Any] = {}
+        if profile.transport == "llamacpp_chat":
+            # A public dummy value satisfies the SDK without forwarding cloud credentials.
+            provider_options.update(api_base=profile.api_base, api_key="local-no-auth")
+        if payload.get("stream") or profile.transport == "llamacpp_chat":
             # Pinned LiteLLM adapters do not share a response ownership contract.
             # Only the native OpenAI SDK stream lifecycle is verified here.
-            require_native_chat_stream(profile.model, payload)
-        provider_options: dict[str, Any] = {}
+            require_native_chat_route(
+                profile.model,
+                {**payload, **provider_options},
+                local_native_chat=profile.transport == "llamacpp_chat",
+            )
         if profile.model.startswith("ollama/"):
             raise CoreError(
                 400, "unsupported_provider_route", "Ollama requires the native ollama_chat route"

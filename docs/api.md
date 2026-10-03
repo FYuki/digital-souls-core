@@ -82,7 +82,7 @@ thinkingのみで出力上限に達した場合も、空contentと`finish_reason
 
 ## streaming・取消・エラー
 
-実providerへのstreamは初期版では、pinned SDKがローカルmetadataで`mode=chat`と解決する
+通常のSDK transportのstreamは、pinned SDKがローカルmetadataで`mode=chat`と解決する
 `openai/`のネイティブChat Completions経路だけに制限します。prefixだけでは許可しません。
 SDK自身と同じResponses bridge判定に実要求のtools・reasoning・api_base等を渡して送信前に判定し、
 `openai/gpt-5-codex`、`openai/o3-pro`、
@@ -95,6 +95,14 @@ LiteLLM 1.103.2のAnthropic等にはHTTP Responseのclose所有権を公開し�
 allowlistにstreamがあっても他providerは送信前に400/unsupported_stream_providerで拒否します。
 OpenRouter等のOpenAI互換サービスもこの保証範囲には含めません。非streamの他providerは管理者の
 能力確認が必要で、実モデル検証済みとは称しません。汎用Provider port自体は差し替え可能です。
+
+運用者が`transport=llamacpp_chat`を指定した場合だけ、別途検証したlocal Chat経路を利用できます。
+`model=openai/gemma4-12b`と`api_base=http://127.0.0.1:<port>/v1`が必須です。
+このaliasのmetadata未登録は許可しますが、Responses mode、Responses prefix、SDK alias書換えは
+非streamでも拒否します。他モデルや互換サービス一般への許可拡大ではありません。
+CoreはSDKに固定の公開ダミー認証値を渡し、環境内のクラウドAPIキーを転送しません。
+callerのapi_base/transport/api_keyは400です。管理者設定は起動中の要求に混ざりません。
+[固定サーバーと運用条件](llamacpp-operations.md)および[ADR 0003](adr/0003-local-llamacpp-provider.md)を参照してください。
 
 SSEの`data: {chunk}`と正常終了時の`data: [DONE]`を返します。最初のchunkを待ってから
 HTTP 200を開始するので、それ以前の失敗は通常のHTTPエラーです。途中失敗は
