@@ -41,42 +41,62 @@ class ManagedStream(StreamingResponse):
                 await self.upstream.aclose()
 
 
+async def finish_owned(future: asyncio.Future[Any]) -> bool:
+    """Join owned cleanup despite direct Task.cancel; report cancellation to re-raise."""
+    cancelled = False
+    while not future.done():
+        try:
+            await asyncio.shield(future)
+        except asyncio.CancelledError:
+            cancelled = True
+    future.result()
+    return cancelled
+
+
 async def until_disconnect[T](operation: Coroutine[Any, Any, T], request: Request) -> T:
-    """Cancel request-owned work on disconnect without leaving a detached task."""
+    """Keep result ownership until child cleanup finishes and return cannot suspend."""
 
     async def disconnected() -> None:
         # FastAPI has already consumed the JSON body before invoking the route.
         while True:
             event = await request.receive()
             if event["type"] == "http.disconnect":
-                # Cancel in the observer task, not later in the waiting parent:
-                # both tasks can become runnable in the same event-loop tick.
+                # Cancel here: parent notification alone races with history commit.
                 work.cancel()
                 return
 
     work = asyncio.create_task(operation)
     watcher = asyncio.create_task(disconnected())
-    handed_off = False
+    result_ready = False
     try:
         done, _ = await asyncio.wait((work, watcher), return_when=asyncio.FIRST_COMPLETED)
         if watcher in done:
             raise CoreError(499, "client_disconnected", "Client disconnected")
         result = work.result()
-        handed_off = True
-        return result
+        result_ready = True
     finally:
         for task in (work, watcher):
             if not task.done() and not task.cancelling():
-                # A second cancellation can interrupt asynchronous provider cleanup.
                 task.cancel()
-        await asyncio.gather(work, watcher, return_exceptions=True)
-        if not handed_off and not work.cancelled() and work.exception() is None:
-            abandoned = work.result()
-            if isinstance(abandoned, ManagedStream):
-                # A completed prefetch can race with disconnect. ASGI never owns
-                # this discarded response, so close its upstream here.
-                with anyio.CancelScope(shield=True):
-                    await abandoned.upstream.aclose()
+        # AnyIO scopes and direct asyncio Task.cancel require separate shielding.
+        # Always join cleanup; do not detach children or cancel their finalizers twice.
+        with anyio.CancelScope(shield=True):
+            cancelled = await finish_owned(asyncio.gather(work, watcher, return_exceptions=True))
+            if (
+                (not result_ready or cancelled)
+                and not work.cancelled()
+                and work.exception() is None
+            ):
+                abandoned = work.result()
+                if isinstance(abandoned, ManagedStream):
+                    cancelled = (
+                        await finish_owned(asyncio.ensure_future(abandoned.upstream.aclose()))
+                        or cancelled
+                    )
+            if cancelled:
+                raise asyncio.CancelledError
+    # No await after cleanup: a candidate response becomes caller-owned only here.
+    return result
 
 
 def create_app(
