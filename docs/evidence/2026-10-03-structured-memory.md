@@ -16,7 +16,7 @@
 
 通常入力は創作した茶の嗜好、機微入力は架空人物の健康情報。私的会話・knowledgeは使用していない。合成historyから現在の承認versionを持つpending jobをテスト用に作り、production `MemoryService.run`（入力分類・抽出・出力分類・返却分類の4回）、`search`（2回）、健康情報のpolicy判定（1回）を通した。新規`extract`入口にある重複した事前分類は呼出予算のため省略している。その入口まで実機で通した検証ではない。
 
-抽出候補1件・検索結果1件、出典整合確認成功。通常の分類5回はNOT_SENSITIVE、健康情報1回はSENSITIVEとなり拒否した。出典削除後の検索は空。DBはGit外の一時領域（directory 0700 / DB 0600）で作成・削除した。生出力・内部思考・秘密値を証跡に残していない。
+抽出候補1件・検索結果1件、出典整合確認成功。通常の分類5回はNOT_SENSITIVE、健康情報1回はSENSITIVEとなり拒否した。出典削除後はstore層の`service.store.search(BINDING, "tea") == ()`を確認した（結果ログの`delete_revoked=true`）。削除後の`MemoryService.search`やHTTP APIでの再検索は実施していない。このstore層確認はモデルを呼ばず、修正後7回の内訳はrun 4回・削除前のservice検索2回・健康情報判定1回で全て計上している。DBはGit外の一時領域（directory 0700 / DB 0600）で作成・削除した。生出力・内部思考・秘密値を証跡に残していない。
 
 実リクエストはLiteLLM/OpenAI SDK経由で既存loopback endpointだけへ送った。プロセス内だけで無効proxyを指定し、環境proxyを使わないことを確認。socket監査はlocal接続7、外部接続0。llama/Whisperの起動時刻とimageは前後で同じ。llama開始時刻は2026-10-03T11:53:31.998122844Z。終了時GPU使用量11787/16376 MiB、利用率0%。手動Coreの18080は待受なしであり、起動・停止・設定変更していない。
 
