@@ -16,3 +16,22 @@ history/source/outbox契約を読み、private通知と解除後の旧memory非�
 
 独立文書レビューでjob keyのsource epoch不足と、ContextSourceから送信境界への出典metadata不足を
 指摘され、ADR 0007へ必要な拡張を明記しました。実装済みの動作とは扱いません。
+
+
+## レビュー後の正確なrevisionでの再検証
+
+2026-10-03、検証対象はcommit `35e83fd6376946b4e09ddf6412a84b2e348c076d`。
+既存の記録はcommit前の作業treeでの確認を含むため、ここで確定revisionを再検証しました。
+Node 24.19.0をPATHで選択し、repository rootで以下を実際に実行しました。
+
+```sh
+git rev-parse HEAD
+node --version
+node --test --test-reporter=./tools/required-tests-reporter.mjs tools/check-docs.test.mjs tools/required-tests-reporter.test.mjs
+node tools/check-docs.mjs
+git diff --check
+```
+
+結果: 上記SHA・v24.19.0を確認、required docs tests 23件PASS（skip/TODO/cancelなし）、
+check-docs PASS、diff check成功。この再検証でUT/IT/buildは実行していません。
+別のレビュー修正テスト/CIの結果と混同しません。

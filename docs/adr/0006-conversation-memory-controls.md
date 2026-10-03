@@ -76,3 +76,9 @@ fixture consumerの成功は実memory削除の証明ではありません。
 - [履歴API](../history-api.md)
 - [privacy境界](../privacy.md)
 - [第1段階ADR](0004-conversation-history.md)
+
+- [Issue #24: 操作仕様とStage3後続受入条件](https://github.com/FYuki/digital-souls-core/issues/24)
+- [PR #25: controls実装](https://github.com/FYuki/digital-souls-core/pull/25)
+- [PR #27: 承認済み仕様の整理](https://github.com/FYuki/digital-souls-core/pull/27)
+- [PR #28: main統合レビュー](https://github.com/FYuki/digital-souls-core/pull/28)
+- [契約整理の検証証跡](../evidence/2026-10-03-stage3-contract-review.md)

@@ -95,15 +95,10 @@ source参照・epoch・memory IDを本文と共に内部で保持する接続口
 このmetadataをモデル入力へそのまま公開する必要はありません。返却/送信時のpolicy取消とsource撤回を
 別々に検証し、最後のawait後に撤回済みcontextが送られない競合試験を追加します。
 
-## 受入試験と段階
+## 関連する実装計画
 
-1. 合成memory repository・scope・順序・再試行・migrationを先に検証。
-2. private on→off/consumer停止、delete、通知重複/順序逆転、ack前後crashを検証。
-   即時取得拒否、本文/index削除、旧ID非復活、残存sourceだけのrebuildを確認。
-3. fake Providerでepisode/semanticのstrict schema、根拠、秘密、timeout/cancel、不正応答、
-   推論中のsource撤回、policy世代変更を検証。LLM await中にDB transactionを保持しない。
-4. 検索/contextの別Binding混線、archive、stale cache、採用直前/送信直前撤回を検証。
-5. 必須lint/type/UT/IT/docs/build/install・独立差分レビュー・CI・CodeRabbit gateを通す。
+受入条件と実施段階は[Issue #24のStage3後続条件](https://github.com/FYuki/digital-souls-core/issues/24)
+で管理します。このADRは設計判断と理由を扱い、チェックの進捗を複製しません。
 
 全て合成データから始めます。実classifier品質・実抽出品質の評価は別途明示された実環境作業で行い、
 未検証を成功と扱いません。private input importの許可は引き続きありません。
