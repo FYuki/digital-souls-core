@@ -54,12 +54,22 @@ control変更もconversation revisionを進め、進行中の旧revision推論�
   除外を含む会話で生成された安全な独立応答も対象外になり得ます。
 - 過去発話への後付け訂正・除外変更、通知の自動consumer、memory/index実削除はこの実装に含めません。
 
-## Stage3前の判断点
+## Stage3の確定した製品動作（2026-10-03）
 
-1. private切替時、既に形成済みの過去memoryを物理削除するか、private中だけ利用停止するか。
-   この段階はsource利用停止までで、過去memoryの削除動作を確定しません。
-2. 複数sourceで統合したmemoryで一つのsourceが削除された場合、全体を削除するか、残る根拠から再形成するか。
-   fixture consumerは削除通知の受渡しだけを検証し、製品の統合記憶ルールを確定しません。
+以下の2点はユーザーが提案を承認しました。実データを今削除する許可ではなく、実装仕様です。
+
+1. threadをprivateへ切り替えたら、そのthread由来の既存memoryを削除します。
+   private解除で削除済memoryを自動復活させません。将来の新規抽出はsource適格性を再判定します。
+2. 複数sourceのmemoryで一つのsourceが削除/対象外になったら、旧memoryを直ちに利用停止し、
+   残る適格sourceだけから再構成します。成功して再審査を通るまで検索/コンテキストへ出しません。
+   根拠が残らなければ削除状態を維持します。private化もsource対象外化として同じ規則を適用します。
+
+上記はまだ実装済みではありません。現行private切替はoutboxを生成せず、解除後のsource gateだけでは
+旧memoryの復活を防げません。現行`SourceDeletion`は履歴が消えたことを表すため、履歴を残すprivate化の
+通知に流用しません。Stage3で撤回通知・永続的な撤回世代・memory状態を追加する必要があります。
+既存source参照は維持し、削除通知の既存契約も壊さずに拡張します。
+fixture consumerの成功は実memory削除の証明ではありません。
+詳細な実装提案・ゲートは[ADR 0007](0007-memory-provenance-and-revocation.md)に分離します。
 
 ## 参照
 

@@ -110,3 +110,11 @@ source参照自体は削除直後から無効です。
 
 schema v1からv2へ原子的に移行します。履歴・receiptは保持し、未知versionは引き続き拒否します。
 過去発話への後付け除外変更は未実装で、指定はcompletionの入力配列に対して行います。
+
+
+### Stage3で追加する撤回処理
+
+private化は、そのthread由来の既存memoryを削除する製品仕様として承認済みです。
+複数sourceの旧memoryは直ちに利用停止し、残る適格sourceのみから再構成が成功するまで返しません。
+解除による旧memoryの自動復活は行いません。現行PATCHはsource gate変更までで、撤回通知や
+実memory削除を実装済みとは扱いません。詳細は[ADR 0007](adr/0007-memory-provenance-and-revocation.md)。
