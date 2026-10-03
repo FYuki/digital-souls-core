@@ -98,3 +98,18 @@ stream所有権テストをfunction tools付きに強化して同ファイル21�
 1件FAILしたため、helperのSDK importをCore初期化後へ移し、対象68件と全suiteを再検証した。
 最終head CIで全テストおよびpackage build/独立installを確認する。
 実モデル・Docker・デプロイ・CodeRabbit再レビュー・マージはこの修正ではNOT RUN。
+
+## CodeRabbit minor指摘への対応
+
+実装修正revision: `a85aa35752ad0c2278c5d3d2c8bafe0a2d60095b`。
+PR #11の[設定指摘](https://github.com/FYuki/digital-souls-core/pull/11#discussion_r4171682729)と
+[ADR指摘](https://github.com/FYuki/digital-souls-core/pull/11#discussion_r4171682726)を検証して修正した。
+
+非Ollamaでollama_thinkを明示した場合はnullも含め起動時に拒否し、未指定は許可する。
+3経路×明示null/false/trueの拒否と、4経路の未指定許可を検証し、Ollama native wireの
+null/false/trueテストも維持した。ADRには代替案・影響・Issue/PR/証跡リンクを追加し、Proposedを維持。
+
+同内容の作業treeでuv sync --frozen、ruff check/format、mypy（20 files）、
+UT 18・IT1 141・docs 23がPASS、skip/xfail/xpassなし。初回lintの行長1件はformat修正後に解消。
+既存SDK由来の警告は前節と同じ。実モデル再試験はNOT RUN。
+最終work/epic headのCI結果と独立レビュー・CodeRabbit差分レビューはPRで別途記録する。
