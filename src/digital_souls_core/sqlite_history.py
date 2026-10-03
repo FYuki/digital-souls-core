@@ -20,6 +20,7 @@ from .history import (
     SourceReference,
     SourceState,
 )
+from .memory_sql import initialize, revoke
 
 
 def default_history_path() -> Path:
@@ -49,7 +50,7 @@ class SQLiteHistory:
             # executescript would implicitly commit an existing transaction.
             db.execute("BEGIN IMMEDIATE")
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, 1, 2):
+            if version not in (0, 1, 2, 3):
                 raise ValueError("unsupported history schema")
             if version == 0:
                 if db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchone():
@@ -90,6 +91,8 @@ class SQLiteHistory:
                     )
                 """)
                 db.execute("PRAGMA user_version=2")
+            if version in (0, 1, 2):
+                initialize(db)
 
     def _check_directory(self) -> None:
         info = self.path.parent.lstat()
@@ -253,7 +256,7 @@ class SQLiteHistory:
         with self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute(
-                "SELECT revision FROM conversations WHERE binding=? AND id=?",
+                "SELECT revision,memory_epoch FROM conversations WHERE binding=? AND id=?",
                 (_key(binding), conversation_id),
             ).fetchone()
             if row is None:
@@ -262,6 +265,7 @@ class SQLiteHistory:
                 "INSERT INTO source_deletions VALUES (?, ?, ?, ?)",
                 (str(uuid4()), _key(binding), conversation_id, row[0]),
             )
+            revoke(db, _key(binding), conversation_id, row[1] + 1, "delete")
             # Idempotent; event and physical source deletion commit together.
             db.execute(
                 "DELETE FROM conversations WHERE binding=? AND id=?",
@@ -274,6 +278,10 @@ class SQLiteHistory:
         """Change thread state with the same revision CAS as inference commits."""
         with self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
+            before = db.execute(
+                "SELECT private_mode,memory_epoch FROM conversations WHERE binding=? AND id=?",
+                (_key(binding), conversation_id),
+            ).fetchone()
             result = db.execute(
                 "UPDATE conversations SET revision=revision+1, "
                 "private_mode=COALESCE(?,private_mode), archived=COALESCE(?,archived) "
@@ -288,6 +296,12 @@ class SQLiteHistory:
             )
             if result.rowcount != 1:
                 raise CoreError(409, "revision_conflict", "Conversation changed or was deleted")
+            if changes.private_mode is True and before is not None and not before[0]:
+                db.execute(
+                    "UPDATE conversations SET memory_epoch=memory_epoch+1 WHERE binding=? AND id=?",
+                    (_key(binding), conversation_id),
+                )
+                revoke(db, _key(binding), conversation_id, before[1] + 1, "private")
         return self.read(binding, conversation_id)
 
     def source_eligible(self, binding: Binding, source: SourceReference) -> bool:

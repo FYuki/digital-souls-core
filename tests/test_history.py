@@ -156,10 +156,18 @@ SQLiteHistory(Path(sys.argv[1]))
     store = SQLiteHistory(path)
     assert store.create(BINDING).revision == 0
     with sqlite3.connect(path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 3
         assert {
             row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        } == {"conversations", "turns", "source_deletions"}
+        } == {
+            "conversations",
+            "turns",
+            "source_deletions",
+            "memory_events",
+            "memory_jobs",
+            "memories",
+            "memory_sources",
+        }
 
 
 def test_unknown_unversioned_schema_still_fails_closed(tmp_path: Path) -> None:

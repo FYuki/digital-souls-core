@@ -1,7 +1,8 @@
 """Immutable runtime snapshots and the small bundled-card context importer."""
 
 import json
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol
 from urllib.parse import urlsplit
@@ -104,6 +105,27 @@ class ContextSource(Protocol):
     """
 
     async def context(self, character: Character, scope: AccessScope, user_text: str) -> str: ...
+
+
+@dataclass(frozen=True)
+class GuardedContext:
+    text: str = field(repr=False)
+    valid: Callable[[], bool] = field(repr=False)
+    policy: object = field(repr=False)
+
+
+class GuardedContextSource(Protocol):
+    @property
+    def policy(self) -> object: ...
+
+    async def context(
+        self,
+        character: Character,
+        scope: AccessScope,
+        user_text: str,
+        *,
+        authorized: Callable[[], bool],
+    ) -> GuardedContext: ...
 
 
 class EmptyContext:
