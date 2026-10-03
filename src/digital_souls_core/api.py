@@ -17,6 +17,9 @@ from starlette.types import Receive, Scope, Send
 from .application import CoreError, Inference
 from .character import load_characters
 from .contracts import AliasCompletion, CharacterCompletion, CompletionInput
+from .conversation_api import register_conversations
+from .conversations import Conversations
+from .history import HistoryPolicy, HistoryStore, Receipt, TurnInput
 from .local_http import LocalHTTPBoundary
 from .provider import LiteLLMProvider
 
@@ -38,31 +41,70 @@ class ManagedStream(StreamingResponse):
                 await self.upstream.aclose()
 
 
+async def finish_owned(future: asyncio.Future[Any]) -> bool:
+    """Join owned cleanup despite direct Task.cancel; report cancellation to re-raise."""
+    cancelled = False
+    while not future.done():
+        try:
+            await asyncio.shield(future)
+        except asyncio.CancelledError:
+            cancelled = True
+    future.result()
+    return cancelled
+
+
 async def until_disconnect[T](operation: Coroutine[Any, Any, T], request: Request) -> T:
-    """Cancel request-owned work on disconnect without leaving a detached task."""
+    """Keep result ownership until child cleanup finishes and return cannot suspend."""
 
     async def disconnected() -> None:
         # FastAPI has already consumed the JSON body before invoking the route.
         while True:
             event = await request.receive()
             if event["type"] == "http.disconnect":
+                # Cancel here: parent notification alone races with history commit.
+                work.cancel()
                 return
 
     work = asyncio.create_task(operation)
     watcher = asyncio.create_task(disconnected())
+    result_ready = False
     try:
         done, _ = await asyncio.wait((work, watcher), return_when=asyncio.FIRST_COMPLETED)
-        if work in done:
-            return work.result()
-        raise CoreError(499, "client_disconnected", "Client disconnected")
+        if watcher in done:
+            raise CoreError(499, "client_disconnected", "Client disconnected")
+        result = work.result()
+        result_ready = True
     finally:
         for task in (work, watcher):
-            if not task.done():
+            if not task.done() and not task.cancelling():
                 task.cancel()
-        await asyncio.gather(work, watcher, return_exceptions=True)
+        # AnyIO scopes and direct asyncio Task.cancel require separate shielding.
+        # Always join cleanup; do not detach children or cancel their finalizers twice.
+        with anyio.CancelScope(shield=True):
+            cancelled = await finish_owned(asyncio.gather(work, watcher, return_exceptions=True))
+            if (
+                (not result_ready or cancelled)
+                and not work.cancelled()
+                and work.exception() is None
+            ):
+                abandoned = work.result()
+                if isinstance(abandoned, ManagedStream):
+                    cancelled = (
+                        await finish_owned(asyncio.ensure_future(abandoned.upstream.aclose()))
+                        or cancelled
+                    )
+            if cancelled:
+                raise asyncio.CancelledError
+    # No await after cleanup: a candidate response becomes caller-owned only here.
+    return result
 
 
-def create_app(inference: Inference | None = None) -> FastAPI:
+def create_app(
+    inference: Inference | None = None,
+    *,
+    history_store: HistoryStore | None = None,
+    history_policy: HistoryPolicy | None = None,
+) -> FastAPI:
     """Load the operator registry once or inject a service for offline integration.
 
     No characters are registered implicitly. Host/Origin checks supplement the
@@ -189,5 +231,17 @@ def create_app(inference: Inference | None = None) -> FastAPI:
             "model_context_window_tokens": None,
             "capability_verification": "operator_configured_not_live_verified",
         }
+
+    if history_store is not None:
+        conversations = Conversations(service, history_store, history_policy)
+
+        async def run_conversation(
+            character_id: str, conversation_id: str, body: TurnInput, request: Request
+        ) -> Receipt:
+            return await until_disconnect(
+                conversations.complete(character_id, conversation_id, body), request
+            )
+
+        register_conversations(app, conversations, run_conversation)
 
     return app
