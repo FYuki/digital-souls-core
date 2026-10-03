@@ -6,7 +6,7 @@ import unicodedata
 from dataclasses import dataclass
 
 POLICY_VERSION = "core-privacy-v1"
-SCANNER_VERSION = "core-scanner-v1"
+SCANNER_VERSION = "core-scanner-v2"
 MAX_SCAN_BYTES = 1024 * 1024
 
 
@@ -57,6 +57,19 @@ def _luhn(digits: str) -> bool:
     return total % 10 == 0
 
 
+def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("ambiguous JSON object")
+        result[key] = value
+    return result
+
+
+def _invalid_constant(value: str) -> object:
+    raise ValueError("nonfinite JSON constant")
+
+
 def scan(value: object) -> Scan:
     """Inspect nested JSON and decoded strings fail-closed, with bounded depth/work."""
     try:
@@ -76,50 +89,74 @@ def scan(value: object) -> Scan:
                 for key, child in item.items():
                     if not isinstance(key, str):
                         return Scan(failed=True)
-                    if normalized(key) in {
-                        "password",
-                        "passwd",
-                        "api_key",
-                        "apikey",
-                        "api-key",
-                        "access_token",
-                        "private_key",
-                        "secret",
-                        "session_cookie",
-                        "recovery_code",
-                        "seed_phrase",
-                        "パスワード",
-                        "秘密鍵",
-                        "暗証番号",
-                    } and child not in (None, "", [], {}):
+                    if (
+                        _SECRET.search(normalized(key) + ":x")
+                        or normalized(key)
+                        in {
+                            "password",
+                            "passwd",
+                            "api_key",
+                            "apikey",
+                            "api-key",
+                            "access_token",
+                            "private_key",
+                            "secret",
+                            "session_cookie",
+                            "recovery_code",
+                            "seed_phrase",
+                            "パスワード",
+                            "秘密鍵",
+                            "暗証番号",
+                            "住所",
+                            "自宅",
+                            "現在地",
+                            "address",
+                            "ssn",
+                            "social security",
+                            "マイナンバー",
+                            "bank account",
+                            "口座番号",
+                        }
+                    ) and child not in (None, "", [], {}):
                         keyed_secret = True
-                    texts.append(key + ":" + (str(child) if isinstance(child, (str, int)) else ""))
+                    texts.append(key)
                     pending.append((child, depth + 1))
             elif isinstance(item, (list, tuple)):
                 pending.extend((child, depth + 1) for child in item)
+            elif type(item) is int:
+                texts.append(str(item))
             elif isinstance(item, str):
                 texts.append(item)
                 try:
-                    decoded = json.loads(item)
-                except (ValueError, RecursionError):
+                    decoded = json.loads(
+                        item, object_pairs_hook=_unique_object, parse_constant=_invalid_constant
+                    )
+                except json.JSONDecodeError:
+                    if item.lstrip().startswith(("{", "[", '"')):
+                        return Scan(failed=True)
                     continue
+                except (ValueError, RecursionError):
+                    return Scan(failed=True)
                 if isinstance(decoded, (str, dict, list)) and decoded != item:
                     pending.append((decoded, depth + 1))
-        text = normalized("\n".join(texts))
-        compact = re.sub(r"[\s()\-]", "", text)
-        secret = keyed_secret or bool(
-            _SECRET.search(text)
-            or _SECRET.search(compact)
-            or _SECRET.search(re.sub(r"\s", "", text))
-        )
-        # Direct phone identifiers and checksummed payment numbers, not arbitrary numbers.
-        secret |= bool(
-            re.search(r"(?<!\d)(?:\+81[1-9]\d{8,9}|0[789]0\d{8}|\+1[2-9]\d{9})(?!\d)", compact)
-        )
-        secret |= any(_luhn(m.group()) for m in re.finditer(r"(?<!\d)\d{13,19}(?!\d)", compact))
-        no_history = bool(_HISTORY.search(text))
-        return Scan(
-            secret=secret, no_history=no_history, no_memory=no_history or bool(_MEMORY.search(text))
-        )
+        secret = keyed_secret
+        no_history = no_memory = False
+        # Normalize each key/value independently. JSON/array boundaries are not
+        # whitespace: removing them can merge unrelated numbers and hide findings.
+        for source in texts:
+            text = normalized(source)
+            compact = re.sub(r"[\s()\-]", "", text)
+            secret |= bool(
+                _SECRET.search(text)
+                or _SECRET.search(compact)
+                or _SECRET.search(re.sub(r"\s", "", text))
+            )
+            secret |= bool(
+                re.search(r"(?<!\d)(?:\+81[1-9]\d{8,9}|0[789]0\d{8}|\+1[2-9]\d{9})(?!\d)", compact)
+            )
+            secret |= any(_luhn(m.group()) for m in re.finditer(r"(?<!\d)\d{13,19}(?!\d)", compact))
+            no_history |= bool(_HISTORY.search(text))
+            no_memory |= bool(_MEMORY.search(text))
+        return Scan(secret=secret, no_history=no_history, no_memory=no_history or no_memory)
     except Exception:
         return Scan(failed=True)
