@@ -11,6 +11,8 @@
 音声・STT・TTS、LiveKit、常駐エージェント基盤、scheduler、worker、UIは
 現在のCoreの対象外です。最初の実装は人格文脈付きLLM Providerの
 [推論API](docs/api.md)です。外部Agentのtool実行ループを持たず、通常チャットUIからも呼べます。
-記憶の永続化と自動技能学習は初期実装の対象外で、差し替え境界だけを用意します。
+記憶の抽出・検索と自動技能学習は未実装です。次の段階として、明示的な会話履歴の保存・復元を
+[ADR 0004](docs/adr/0004-conversation-history.md)で提案しています。分類器実装前は既定拒否とし、
+私的実会話を自動取り込みしません。
 
 開発規約はこの文書に重複させず、[CONTRIBUTING](CONTRIBUTING.md)で管理します。

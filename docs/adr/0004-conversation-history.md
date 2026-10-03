@@ -1,0 +1,73 @@
+# ADR 0004: 明示的な会話履歴の永続化
+
+Status: Proposed
+
+日付: 2026-10-03
+
+## 背景
+
+ユーザーが承認した順序は「会話履歴の保存 → 機微情報の扱い → 記憶の抽出・検索」です。
+このADRは第1段階だけを扱います。汎用Agentは目的とtoolsを渡し、Coreが人格・モデル設定を
+所有します。Coreにtool実行ループを追加しません。[ADR 0001](0001-character-inference-api.md)の
+stateless APIは互換性を維持します。
+
+PoCの会話schemaとHistorySanitizerを参照しました
+（公開digital-souls、revision `fce7382884d981c42be7fbd3ddaffe7469e27588`、
+`backend/app/conversation_history/schema.py`、`backend/app/privacy/history_sanitizer.py`、
+`backend/app/privacy/contracts.py`）。SQLite、会話単位の境界、判定不能時の保存拒否を参考にし、
+UI設定・音声turn・常駐worker・記憶queue・既存DB移行は移植しません。私的会話を参照しません。
+
+## 決定案
+
+Python標準のSQLiteをadapterとし、新規依存やDBサービスを増やしません。
+JSONLは原子的な再試行・順序・削除の管理が複雑になり、外部DBは単独利用には過大です。
+applicationはHistoryStore portに依存し、SQLiteやHTTPには依存しません。
+
+保存は`create_app`へのstore/policyの明示的注入で有効にした専用conversation経路だけです。
+通常起動は経路もDBも作りません。保存policyが欠落・例外・厳密なTrue以外なら拒否します。
+第1段階では本番用allow-all、分類器、環境変数による私的会話の自動保存は提供しません。
+テスト用policyは合成入力のみを対象にし、秘密判定実装として配布しません。
+
+subject/client/audienceはサーバーのAccessScopeから取得します。会話ID、キャラクターID、
+scopeの組をすべてのDB操作で照合し、呼び出しJSONからscopeを受け取りません。
+localhost単一利用者限定で、別ローカルプロセスに対する認証やmulti-tenant隔離ではありません。
+
+会話ごとにrevisionを持ち、request IDの一意性と期待revisionを同一transactionで検証します。
+request IDは同一入力・同一設定の再送なら保存済みreceiptを返し、違う入力なら409です。
+入力・assistant最終応答をまとめて保存し、未完了input・部分応答・例外本文は保存しません。
+保存済みtool callの未解決状態は許容し、次の入力は一致する全tool resultを要求します。
+callerによるassistant/system挿入や、重複・未知・不足したtool resultを拒否します。
+
+更新は楽観的排他です。同時推論自体は重複し得ますが、保存の二重反映や上書きを拒否します。
+削除が先に確定した進行中推論はcommitできず、会話を復活させません。
+プロセス停止はSQLiteのtransaction回復に任せ、未確定推論は再試行可能です。
+保存後の送信断ではreceiptが残るため同じrequest IDで復旧します。
+
+会話用streamは上流の完了まで最大1 MiBの可視内容をバッファします。完全なtool引数と
+最終文面をpolicyへ渡し、保存確定後に`completed`イベントと`[DONE]`を返します。
+途中失敗・キャンセル・終端なし・length終了は保存せず、statelessの逐次SSEは変更しません。
+この段階では逐次表示の体験より、保存・秘密判定の境界を小さく確実にする方針です。
+
+保存対象はuser/toolと公開assistant messageのallowlistのみです。system、Lore、ContextSource、
+SDK envelope、reasoning/thinkingフィールド、usage、認証情報、例外は保存しません。
+可視content内の既知think/analysisタグも拒否します。未知形式の秘密や思考を識別する保証は
+なく、信頼されたpolicyが全content・tool引数・resultを許可しない限り保存できません。
+第2段階の接続口はHistoryPolicyで、read・export・storeごとに再判定します。
+第3段階は別途設計し、今は抽出・検索・自動学習やContextSourceへの自動接続を行いません。
+
+既定保存先は`~/.local/share/digital-souls-core/history.sqlite3`です。Git配下とsymlinkを拒否し、
+専用ディレクトリ0700、DB0600、所有者・hardlinkを検証します。Linux/WSLのPOSIX filesystemが
+対象で、Windows ACLやネットワークfilesystemを検証済みとはしません。
+rollback journalのDELETE modeとsecure_deleteを使用し、WAL・全文検索・バックアップを作りません。
+削除は会話のturn・receiptをcascade削除します。バックアップ、SSD、OS snapshot、外部Agentや
+送信先モデルが保持するコピーの消去は保証しません。
+
+## 制約と検証
+
+会話履歴は自動要約せず、推論入力256 message・履歴1 MiBの上限で拒否します。
+モデルの実token上限は別問題です。巨大履歴のpaging・retention・会話単位以外の削除・暗号化・
+DB移行・UI・認証・分類器・記憶は未実装です。保存policyの本番実装前に私的実会話を使いません。
+
+合成データのUT/IT1で保存/復元/一覧/削除、順序、scope隔離、再試行、tool往復、stream失敗・
+キャンセル、削除との競合、policy撤回を検証します。GPU・実モデル・人格品質評価は不要です。
+APIの詳細は[会話履歴API](../history-api.md)を参照してください。

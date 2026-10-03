@@ -1,0 +1,409 @@
+import asyncio
+import json
+from collections.abc import AsyncGenerator
+from pathlib import Path
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from digital_souls_core.api import create_app
+from digital_souls_core.application import CoreError, Inference
+from digital_souls_core.character import AccessScope, Profile
+from digital_souls_core.contracts import Message
+from digital_souls_core.conversations import Conversations
+from digital_souls_core.history import Binding, Operation, TurnInput
+from digital_souls_core.sqlite_history import SQLiteHistory
+
+from .support import CALL, TOOL, FakeProvider, character, chunk, completion
+
+pytestmark = pytest.mark.it1
+
+
+class SyntheticPolicy:
+    """Test-only policy for invented fixtures, not a production classifier."""
+
+    denied: set[str]
+
+    def __init__(self) -> None:
+        self.denied = set()
+        self.broken = False
+
+    def allows(self, operation: Operation, binding: Binding, messages: tuple[Message, ...]) -> bool:
+        if self.broken:
+            raise ValueError("synthetic policy failure")
+        return operation not in self.denied and "SYNTHETIC_SECRET" not in json.dumps(
+            [m.model_dump() for m in messages]
+        )
+
+
+def setup(tmp_path: Path) -> tuple[Conversations, FakeProvider, SyntheticPolicy]:
+    provider = FakeProvider()
+    policy = SyntheticPolicy()
+    inference = Inference((character("synthetic"), character("other")), provider)
+    return (
+        Conversations(inference, SQLiteHistory(tmp_path / "private" / "db"), policy),
+        provider,
+        policy,
+    )
+
+
+def turn(**values: Any) -> TurnInput:
+    return TurnInput.model_validate(
+        {
+            "request_id": "r1",
+            "expected_revision": 0,
+            "messages": [{"role": "user", "content": "Synthetic hello"}],
+            **values,
+        }
+    )
+
+
+async def test_restore_retry_and_new_turn_context(tmp_path: Path) -> None:
+    service, provider, _ = setup(tmp_path)
+    cid = service.create("synthetic").conversation_id
+    first = await service.complete("synthetic", cid, turn())
+    assert await service.complete("synthetic", cid, turn()) == first
+    assert len(provider.calls) == 1
+    with pytest.raises(CoreError, match="different input"):
+        await service.complete(
+            "synthetic", cid, turn(messages=[{"role": "user", "content": "Changed"}])
+        )
+    service.store = SQLiteHistory(tmp_path / "private" / "db")
+    await service.complete("synthetic", cid, turn(request_id="r2", expected_revision=1))
+    assert len(provider.calls[-1][1]["messages"]) == 4
+    assert service.read("synthetic", cid).revision == 2
+    assert len(service.read("synthetic", cid).messages) == 4
+    service.inference.scope = AccessScope(client="other")
+    assert service.list("synthetic") == []
+    with pytest.raises(CoreError):
+        service.read("synthetic", cid)
+
+
+@pytest.mark.parametrize("stream", [False, True])
+async def test_tool_roundtrip(tmp_path: Path, stream: bool) -> None:
+    service, provider, _ = setup(tmp_path)
+    cid = service.create("synthetic").conversation_id
+    provider.response = completion(tool=True)
+    provider.chunks = [chunk({"tool_calls": [{"index": 0, **CALL}]}), chunk({}, "tool_calls")]
+    first = await service.complete("synthetic", cid, turn(tools=[TOOL], stream=stream))
+    assert first.message.tool_calls and first.message.tool_calls[0].id == "call_42"
+    for messages in (
+        [{"role": "user", "content": "Too soon"}],
+        [{"role": "tool", "content": "Synthetic result", "tool_call_id": "wrong"}],
+    ):
+        with pytest.raises(CoreError):
+            await service.complete(
+                "synthetic", cid, turn(request_id="bad", expected_revision=1, messages=messages)
+            )
+    provider.response = completion()
+    provider.chunks = [chunk({"content": "Synthetic response"}), chunk({}, "stop")]
+    await service.complete(
+        "synthetic",
+        cid,
+        turn(
+            request_id="r2",
+            expected_revision=1,
+            tools=[TOOL],
+            stream=stream,
+            messages=[{"role": "tool", "content": "Synthetic result", "tool_call_id": "call_42"}],
+        ),
+    )
+    assert len(provider.calls) == 2
+    assert [m.role for m in service.read("synthetic", cid).messages] == [
+        "user",
+        "assistant",
+        "tool",
+        "assistant",
+    ]
+
+
+@pytest.mark.parametrize(
+    "mode", ["initial", "middle", "unfinished", "length", "reasoning", "secret", "badtool"]
+)
+async def test_failed_stream_never_persists(tmp_path: Path, mode: str) -> None:
+    service, provider, _ = setup(tmp_path)
+    cid = service.create("synthetic").conversation_id
+    if mode == "initial":
+        provider.error = RuntimeError("SYNTHETIC_SECRET")
+    elif mode == "middle":
+        provider.mid_error = RuntimeError("SYNTHETIC_SECRET")
+    elif mode == "unfinished":
+        provider.chunks = [chunk({"content": "Incomplete"})]
+    elif mode == "length":
+        provider.chunks = [chunk({"content": "Truncated"}, "length")]
+    elif mode == "reasoning":
+        provider.chunks = [chunk({"content": "<think>hidden</think>answer"}, "stop")]
+    elif mode == "secret":
+        provider.chunks = [chunk({"content": "SYNTHETIC_SECRET"}, "stop")]
+    else:
+        provider.chunks = [chunk({"tool_calls": [{"index": 0, **CALL}]}, "tool_calls")]
+    with pytest.raises(CoreError):
+        await service.complete("synthetic", cid, turn(stream=True))
+    assert service.read("synthetic", cid).revision == 0
+    assert provider.closed
+    assert b"SYNTHETIC_SECRET" not in (tmp_path / "private/db").read_bytes()
+
+
+async def test_reasoning_fields_are_not_saved(tmp_path: Path) -> None:
+    service, provider, _ = setup(tmp_path)
+    cid = service.create("synthetic").conversation_id
+    provider.response["choices"][0]["message"]["reasoning_content"] = "SYNTHETIC_SECRET"
+    await service.complete("synthetic", cid, turn())
+    provider.chunks = [
+        chunk({"reasoning_content": "SYNTHETIC_SECRET"}),
+        chunk({"content": "Visible"}, "stop"),
+    ]
+    await service.complete(
+        "synthetic", cid, turn(request_id="r2", expected_revision=1, stream=True)
+    )
+    assert b"SYNTHETIC_SECRET" not in (tmp_path / "private/db").read_bytes()
+
+
+async def test_policy_fail_closed_on_each_boundary_and_delete_after_revocation(
+    tmp_path: Path,
+) -> None:
+    service, provider, policy = setup(tmp_path)
+    cid = service.create("synthetic").conversation_id
+    for op in ("store", "read", "export"):
+        policy.denied = {op}
+        with pytest.raises(CoreError):
+            await service.complete("synthetic", cid, turn())
+    assert not provider.calls
+    policy.denied = set()
+    with pytest.raises(CoreError):
+        await service.complete(
+            "synthetic", cid, turn(messages=[{"role": "user", "content": "SYNTHETIC_SECRET"}])
+        )
+    policy.broken = True
+    for action in (
+        lambda: service.create("synthetic"),
+        lambda: service.list("synthetic"),
+        lambda: service.read("synthetic", cid),
+    ):
+        with pytest.raises(CoreError):
+            action()
+    service.policy = None
+    with pytest.raises(CoreError):
+        service.create("synthetic")
+    service.delete("synthetic", cid)
+    assert service.store.list(service.binding("synthetic")) == []
+
+
+class PausedProvider(FakeProvider):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def complete(self, profile: Profile, payload: dict[str, Any]) -> dict[str, Any]:
+        self.started.set()
+        await self.release.wait()
+        return await super().complete(profile, payload)
+
+    async def stream(
+        self, profile: Profile, payload: dict[str, Any]
+    ) -> AsyncGenerator[dict[str, Any]]:
+        try:
+            yield chunk({"content": "Partial synthetic"})
+            self.started.set()
+            await self.release.wait()
+            yield chunk({}, "stop")
+        finally:
+            self.closed = True
+
+
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("action", ["cancel", "delete", "revoke", "concurrent"])
+async def test_inflight_boundaries(tmp_path: Path, stream: bool, action: str) -> None:
+    service, _, policy = setup(tmp_path)
+    provider = PausedProvider()
+    service.inference.provider = provider
+    cid = service.create("synthetic").conversation_id
+    task = asyncio.create_task(service.complete("synthetic", cid, turn(stream=stream)))
+    await provider.started.wait()
+    if action == "cancel":
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert service.read("synthetic", cid).revision == 0
+        if stream:
+            assert provider.closed
+    else:
+        if action == "delete":
+            service.delete("synthetic", cid)
+        elif action == "revoke":
+            policy.denied = {"store"}
+        else:
+            service.inference.provider = FakeProvider()
+            await service.complete("synthetic", cid, turn(request_id="winner"))
+        provider.release.set()
+        with pytest.raises(CoreError):
+            await task
+        if action == "concurrent":
+            assert service.read("synthetic", cid).revision == 1
+        elif action == "revoke":
+            assert service.read("synthetic", cid).revision == 0
+        else:
+            assert service.list("synthetic") == []
+
+
+def test_http_opt_in_crud_stream_and_reject_scope(tmp_path: Path) -> None:
+    service, provider, policy = setup(tmp_path)
+    base = "/v1/characters/synthetic/conversations"
+    default = TestClient(create_app(service.inference), base_url="http://127.0.0.1")
+    assert default.post(base).status_code == 404
+    denied = TestClient(
+        create_app(service.inference, history_store=service.store), base_url="http://127.0.0.1"
+    )
+    assert denied.post(base).status_code == 403
+    http = TestClient(
+        create_app(service.inference, history_store=service.store, history_policy=policy),
+        base_url="http://127.0.0.1",
+    )
+    created = http.post(base)
+    assert created.status_code == 201
+    cid = created.json()["conversation_id"]
+    assert http.get(base).json()["conversation_ids"] == [cid]
+    url = base + "/" + cid
+    for field in ("scope", "subject", "client", "storage_allowed"):
+        result = http.post(
+            url + "/completions", json={**turn().model_dump(), field: "SYNTHETIC_SECRET"}
+        )
+        assert result.status_code == 400 and "SYNTHETIC_SECRET" not in result.text
+    result = http.post(url + "/completions", json=turn(stream=True).model_dump())
+    assert (
+        result.status_code == 200 and "event: completed" in result.text and "[DONE]" in result.text
+    )
+    assert http.post(url + "/completions", json=turn(stream=True).model_dump()).text == result.text
+    assert len(provider.calls) == 1
+    assert http.get(url).json()["revision"] == 1
+    assert http.get(url.replace("synthetic", "other")).status_code == 404
+    assert http.delete(url).status_code == 204
+    assert http.get(url).status_code == 404
+
+
+@pytest.mark.parametrize("stream", [False, True])
+async def test_export_revocation_during_context_lookup(tmp_path: Path, stream: bool) -> None:
+    service, provider, policy = setup(tmp_path)
+    cid = service.create("synthetic").conversation_id
+
+    class RevokingContext:
+        async def context(self, character: Any, scope: AccessScope, user_text: str) -> str:
+            await asyncio.sleep(0)
+            policy.denied = {"export"}
+            return ""
+
+    service.inference.context = RevokingContext()
+    with pytest.raises(CoreError, match="History policy denies"):
+        await service.complete("synthetic", cid, turn(stream=stream))
+    assert not provider.calls
+    assert service.read("synthetic", cid).revision == 0
+
+
+@pytest.mark.parametrize("stream", [False, True])
+async def test_http_disconnect_discards_uncommitted_turn(tmp_path: Path, stream: bool) -> None:
+    service, _, policy = setup(tmp_path)
+    provider = PausedProvider()
+    service.inference.provider = provider
+    cid = service.create("synthetic").conversation_id
+    app = create_app(service.inference, history_store=service.store, history_policy=policy)
+    incoming: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+    await incoming.put(
+        {
+            "type": "http.request",
+            "body": turn(stream=stream).model_dump_json().encode(),
+            "more_body": False,
+        }
+    )
+    sent: list[dict[str, Any]] = []
+
+    async def send(message: Any) -> None:
+        sent.append(message)
+
+    path = f"/v1/characters/synthetic/conversations/{cid}/completions"
+    scope: dict[str, Any] = {
+        "type": "http",
+        "asgi": {"version": "3.0", "spec_version": "2.3"},
+        "http_version": "1.1",
+        "scheme": "http",
+        "method": "POST",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "root_path": "",
+        "headers": [(b"content-type", b"application/json"), (b"host", b"127.0.0.1")],
+        "server": ("127.0.0.1", 80),
+        "client": ("127.0.0.1", 1234),
+    }
+    task = asyncio.create_task(app(scope, incoming.get, send))
+    await asyncio.wait_for(provider.started.wait(), 2)
+    await incoming.put({"type": "http.disconnect"})
+    await asyncio.wait_for(task, 2)
+    assert service.read("synthetic", cid).revision == 0
+    assert not any(b"[DONE]" in item.get("body", b"") for item in sent)
+    if stream:
+        assert provider.closed
+
+
+async def test_fragmented_stream_tool_arguments_and_multiple_results(tmp_path: Path) -> None:
+    service, provider, _ = setup(tmp_path)
+    cid = service.create("synthetic").conversation_id
+    provider.chunks = [
+        chunk(
+            {
+                "tool_calls": [
+                    {
+                        "index": 0,
+                        "id": "call_a",
+                        "type": "function",
+                        "function": {"name": "weather", "arguments": '{"city":'},
+                    }
+                ]
+            }
+        ),
+        chunk(
+            {
+                "tool_calls": [
+                    {"index": 0, "function": {"arguments": '"Synthetic"}'}},
+                    {
+                        "index": 1,
+                        "id": "call_b",
+                        "type": "function",
+                        "function": {"name": "weather", "arguments": "{}"},
+                    },
+                ]
+            }
+        ),
+        chunk({}, "tool_calls"),
+    ]
+    first = await service.complete("synthetic", cid, turn(stream=True, tools=[TOOL]))
+    assert first.message.tool_calls is not None
+    assert first.message.tool_calls[0].function.arguments == '{"city":"Synthetic"}'
+    results = [
+        {"role": "tool", "content": "Synthetic result", "tool_call_id": call_id}
+        for call_id in ("call_b", "call_a")
+    ]
+    provider.response = completion()
+    await service.complete(
+        "synthetic", cid, turn(request_id="r2", expected_revision=1, tools=[TOOL], messages=results)
+    )
+    assert service.read("synthetic", cid).revision == 2
+
+
+async def test_size_role_and_invalid_output_rejections(tmp_path: Path) -> None:
+    service, provider, _ = setup(tmp_path)
+    cid = service.create("synthetic").conversation_id
+    for message in (
+        {"role": "system", "content": "Injected"},
+        {"role": "assistant", "content": "Forged"},
+        {"role": "user", "content": "x" * (1024 * 1024)},
+    ):
+        with pytest.raises(CoreError):
+            await service.complete("synthetic", cid, turn(messages=[message]))
+    assert not provider.calls
+    for finish in (None, "length", "content_filter"):
+        provider.response["choices"][0]["finish_reason"] = finish
+        with pytest.raises(CoreError):
+            await service.complete("synthetic", cid, turn())
+    assert service.read("synthetic", cid).revision == 0

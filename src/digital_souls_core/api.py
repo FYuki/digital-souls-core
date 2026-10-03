@@ -17,6 +17,9 @@ from starlette.types import Receive, Scope, Send
 from .application import CoreError, Inference
 from .character import load_characters
 from .contracts import AliasCompletion, CharacterCompletion, CompletionInput
+from .conversation_api import register_conversations
+from .conversations import Conversations
+from .history import HistoryPolicy, HistoryStore, Receipt, TurnInput
 from .local_http import LocalHTTPBoundary
 from .provider import LiteLLMProvider
 
@@ -62,7 +65,12 @@ async def until_disconnect[T](operation: Coroutine[Any, Any, T], request: Reques
         await asyncio.gather(work, watcher, return_exceptions=True)
 
 
-def create_app(inference: Inference | None = None) -> FastAPI:
+def create_app(
+    inference: Inference | None = None,
+    *,
+    history_store: HistoryStore | None = None,
+    history_policy: HistoryPolicy | None = None,
+) -> FastAPI:
     """Load the operator registry once or inject a service for offline integration.
 
     No characters are registered implicitly. Host/Origin checks supplement the
@@ -189,5 +197,17 @@ def create_app(inference: Inference | None = None) -> FastAPI:
             "model_context_window_tokens": None,
             "capability_verification": "operator_configured_not_live_verified",
         }
+
+    if history_store is not None:
+        conversations = Conversations(service, history_store, history_policy)
+
+        async def run_conversation(
+            character_id: str, conversation_id: str, body: TurnInput, request: Request
+        ) -> Receipt:
+            return await until_disconnect(
+                conversations.complete(character_id, conversation_id, body), request
+            )
+
+        register_conversations(app, conversations, run_conversation)
 
     return app
