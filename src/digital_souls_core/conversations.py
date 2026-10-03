@@ -1,5 +1,6 @@
 """Opt-in stateful path; the existing Inference API remains stateless."""
 
+import asyncio
 import hashlib
 import json
 from contextlib import aclosing
@@ -127,12 +128,18 @@ class Conversations:
             raise CoreError(
                 502, "invalid_history_result", "Provider result cannot be saved"
             ) from None
+        # Let an already queued disconnect cancel this task before the synchronous
+        # policy/commit section. No event-loop await occurs inside that section.
+        await asyncio.sleep(0)
+        task = asyncio.current_task()
+        if task is not None and task.cancelling():
+            raise asyncio.CancelledError
         stored = (*incoming, message)
         bounded([m.model_dump() for m in (*snapshot.messages, *stored)])
         # Re-evaluate after await: consent can be revoked while inference is active.
         self.authorize("store", binding, (*snapshot.messages, *stored))
         self.authorize("read", binding, (message,))
-        return self.store.append(
+        receipt = self.store.append(
             binding,
             conversation_id,
             body.request_id,
@@ -141,6 +148,10 @@ class Conversations:
             stored,
             finish,
         )
+        # A concurrent identical request may have won with a different answer.
+        # Authorize the actual receipt, never substitute or rewrite that winner.
+        self.authorize("read", binding, (receipt.message,))
+        return receipt
 
     @staticmethod
     def _visible(raw: dict[str, Any]) -> Message:

@@ -210,6 +210,8 @@ class PausedProvider(FakeProvider):
             await self.release.wait()
             yield chunk({}, "stop")
         finally:
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
             self.closed = True
 
 
@@ -407,3 +409,164 @@ async def test_size_role_and_invalid_output_rejections(tmp_path: Path) -> None:
         with pytest.raises(CoreError):
             await service.complete("synthetic", cid, turn())
     assert service.read("synthetic", cid).revision == 0
+
+
+@pytest.mark.parametrize("stream", [False, True])
+async def test_concurrent_retry_reauthorizes_actual_winner_receipt(
+    tmp_path: Path, stream: bool
+) -> None:
+    service, _, policy = setup(tmp_path)
+    cid = service.create("synthetic").conversation_id
+    started = [asyncio.Event(), asyncio.Event()]
+    released = [asyncio.Event(), asyncio.Event()]
+    denied_winner = False
+
+    class WinnerPolicy(SyntheticPolicy):
+        def allows(
+            self, operation: Operation, binding: Binding, messages: tuple[Message, ...]
+        ) -> bool:
+            return super().allows(operation, binding, messages) and not (
+                denied_winner and any(m.content == "Synthetic winner" for m in messages)
+            )
+
+    class RacingProvider(FakeProvider):
+        entered = 0
+
+        async def answer(self) -> str:
+            index = self.entered
+            self.entered += 1
+            started[index].set()
+            await released[index].wait()
+            return "Synthetic winner" if index == 0 else "Synthetic loser"
+
+        async def complete(self, profile: Profile, payload: dict[str, Any]) -> dict[str, Any]:
+            result = completion()
+            result["choices"][0]["message"]["content"] = await self.answer()
+            return result
+
+        async def stream(
+            self, profile: Profile, payload: dict[str, Any]
+        ) -> AsyncGenerator[dict[str, Any]]:
+            yield chunk({"content": await self.answer()}, "stop")
+
+    service.policy = WinnerPolicy()
+    service.inference.provider = RacingProvider()
+    tasks = [
+        asyncio.create_task(service.complete("synthetic", cid, turn(stream=stream)))
+        for _ in range(2)
+    ]
+    await asyncio.wait_for(asyncio.gather(*(event.wait() for event in started)), 2)
+    released[0].set()
+    winner = await tasks[0]
+    denied_winner = True
+    with pytest.raises(CoreError):
+        service.read("synthetic", cid)
+    released[1].set()
+    with pytest.raises(CoreError, match="History policy denies"):
+        await tasks[1]
+    # Denial neither rewrites the winning receipt nor creates a second turn.
+    snapshot = service.store.read(service.binding("synthetic"), cid)
+    assert snapshot.revision == 1 and snapshot.messages[-1] == winner.message
+    assert service.store.receipt(service.binding("synthetic"), cid, "r1") == winner
+    service.policy = policy
+    assert await service.complete("synthetic", cid, turn(stream=stream)) == winner
+
+
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("disconnect_first", [False, True])
+async def test_same_tick_disconnect_and_provider_completion(
+    tmp_path: Path,
+    stream: bool,
+    disconnect_first: bool,
+) -> None:
+    service, _, policy = setup(tmp_path)
+    provider = PausedProvider()
+    service.inference.provider = provider
+    cid = service.create("synthetic").conversation_id
+    app = create_app(service.inference, history_store=service.store, history_policy=policy)
+    incoming: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+    await incoming.put(
+        {
+            "type": "http.request",
+            "body": turn(stream=stream).model_dump_json().encode(),
+            "more_body": False,
+        }
+    )
+    sent: list[dict[str, Any]] = []
+
+    async def send(message: Any) -> None:
+        sent.append(message)
+
+    path = f"/v1/characters/synthetic/conversations/{cid}/completions"
+    scope: dict[str, Any] = {
+        "type": "http",
+        "asgi": {"version": "3.0", "spec_version": "2.3"},
+        "http_version": "1.1",
+        "scheme": "http",
+        "method": "POST",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "root_path": "",
+        "headers": [(b"content-type", b"application/json"), (b"host", b"127.0.0.1")],
+        "server": ("127.0.0.1", 80),
+        "client": ("127.0.0.1", 1234),
+    }
+    task = asyncio.create_task(app(scope, incoming.get, send))
+    await asyncio.wait_for(provider.started.wait(), 2)
+    # Queue both wakeups without yielding; test both event-loop ready-queue orders.
+    if disconnect_first:
+        incoming.put_nowait({"type": "http.disconnect"})
+        provider.release.set()
+    else:
+        provider.release.set()
+        incoming.put_nowait({"type": "http.disconnect"})
+    await asyncio.wait_for(task, 2)
+    assert service.read("synthetic", cid).revision == 0
+    assert service.store.receipt(service.binding("synthetic"), cid, "r1") is None
+    assert not any(b"[DONE]" in message.get("body", b"") for message in sent)
+    # Nothing was committed: the same request remains retryable.
+    service.inference.provider = FakeProvider()
+    assert (await service.complete("synthetic", cid, turn(stream=stream))).revision == 1
+
+
+@pytest.mark.parametrize("stream", [False, True])
+async def test_delivery_failure_after_commit_keeps_retry_receipt(
+    tmp_path: Path, stream: bool
+) -> None:
+    service, provider, policy = setup(tmp_path)
+    cid = service.create("synthetic").conversation_id
+    app = create_app(service.inference, history_store=service.store, history_policy=policy)
+    incoming: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+    await incoming.put(
+        {
+            "type": "http.request",
+            "body": turn(stream=stream).model_dump_json().encode(),
+            "more_body": False,
+        }
+    )
+
+    async def send(message: Any) -> None:
+        if message["type"] == "http.response.body":
+            raise OSError("Synthetic transport failure after commit")
+
+    path = f"/v1/characters/synthetic/conversations/{cid}/completions"
+    scope: dict[str, Any] = {
+        "type": "http",
+        "asgi": {"version": "3.0", "spec_version": "2.3"},
+        "http_version": "1.1",
+        "scheme": "http",
+        "method": "POST",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "root_path": "",
+        "headers": [(b"content-type", b"application/json"), (b"host", b"127.0.0.1")],
+        "server": ("127.0.0.1", 80),
+        "client": ("127.0.0.1", 1234),
+    }
+    with pytest.raises(OSError, match="Synthetic transport failure"):
+        await app(scope, incoming.get, send)
+    assert service.read("synthetic", cid).revision == 1
+    receipt = await service.complete("synthetic", cid, turn(stream=stream))
+    assert receipt.revision == 1 and len(provider.calls) == 1

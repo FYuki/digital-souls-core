@@ -128,3 +128,46 @@ print(request_fingerprint(body, character("synthetic").config))
     ]
     assert len(values[0]) == 64
     assert values[0] == values[1]
+
+
+@pytest.mark.parametrize("crash_at", ["CREATE TABLE turns", "PRAGMA user_version=1"])
+def test_first_schema_creation_recovers_after_process_exit(tmp_path: Path, crash_at: str) -> None:
+    path = tmp_path / "private" / "db"
+    script = """
+import os, sqlite3, sys
+from pathlib import Path
+from digital_souls_core.sqlite_history import SQLiteHistory
+connect = sqlite3.connect
+def crashing_connect(*args, **kwargs):
+    db = connect(*args, **kwargs)
+    def trace(sql):
+        if sys.argv[2] in sql:
+            os._exit(73)
+    db.set_trace_callback(trace)
+    return db
+sqlite3.connect = crashing_connect
+SQLiteHistory(Path(sys.argv[1]))
+"""
+    result = subprocess.run([sys.executable, "-c", script, str(path), crash_at], check=False)
+    assert result.returncode == 73
+    store = SQLiteHistory(path)
+    assert store.create(BINDING).revision == 0
+    with sqlite3.connect(path) as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert {
+            row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        } == {"conversations", "turns"}
+
+
+def test_unknown_unversioned_schema_still_fails_closed(tmp_path: Path) -> None:
+    path = tmp_path / "private" / "db"
+    path.parent.mkdir(mode=0o700)
+    path.touch(mode=0o600)
+    with sqlite3.connect(path) as db:
+        db.execute("CREATE TABLE unknown (value TEXT)")
+        db.execute("INSERT INTO unknown VALUES ('Synthetic preserved value')")
+    with pytest.raises(ValueError, match="unrecognized history database"):
+        SQLiteHistory(path)
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT value FROM unknown").fetchone()[0] == "Synthetic preserved value"
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 0

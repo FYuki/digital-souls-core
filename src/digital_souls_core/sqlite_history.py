@@ -37,17 +37,22 @@ class SQLiteHistory:
         fd = os.open(self.path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
         os.close(fd)
         with self._connection() as db:
+            # Serialize initialization and atomically commit schema + version.
+            # executescript would implicitly commit an existing transaction.
+            db.execute("BEGIN IMMEDIATE")
             version = db.execute("PRAGMA user_version").fetchone()[0]
             if version not in (0, 1):
                 raise ValueError("unsupported history schema")
             if version == 0:
                 if db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchone():
                     raise ValueError("unrecognized history database")
-                db.executescript("""
+                db.execute("""
                     CREATE TABLE conversations (
                         binding TEXT NOT NULL, id TEXT NOT NULL, revision INTEGER NOT NULL,
                         PRIMARY KEY(binding, id)
-                    );
+                    )
+                """)
+                db.execute("""
                     CREATE TABLE turns (
                         binding TEXT NOT NULL, conversation TEXT NOT NULL,
                         request TEXT NOT NULL, fingerprint TEXT NOT NULL,
@@ -56,9 +61,9 @@ class SQLiteHistory:
                         UNIQUE(binding, conversation, revision),
                         FOREIGN KEY(binding, conversation) REFERENCES conversations(binding, id)
                             ON DELETE CASCADE
-                    );
-                    PRAGMA user_version=1;
+                    )
                 """)
+                db.execute("PRAGMA user_version=1")
 
     def _check_directory(self) -> None:
         info = self.path.parent.lstat()

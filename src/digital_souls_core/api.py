@@ -49,18 +49,22 @@ async def until_disconnect[T](operation: Coroutine[Any, Any, T], request: Reques
         while True:
             event = await request.receive()
             if event["type"] == "http.disconnect":
+                # Cancel in the observer task, not later in the waiting parent:
+                # both tasks can become runnable in the same event-loop tick.
+                work.cancel()
                 return
 
     work = asyncio.create_task(operation)
     watcher = asyncio.create_task(disconnected())
     try:
         done, _ = await asyncio.wait((work, watcher), return_when=asyncio.FIRST_COMPLETED)
-        if work in done:
-            return work.result()
-        raise CoreError(499, "client_disconnected", "Client disconnected")
+        if watcher in done:
+            raise CoreError(499, "client_disconnected", "Client disconnected")
+        return work.result()
     finally:
         for task in (work, watcher):
-            if not task.done():
+            if not task.done() and not task.cancelling():
+                # A second cancellation can interrupt asynchronous provider cleanup.
                 task.cancel()
         await asyncio.gather(work, watcher, return_exceptions=True)
 

@@ -40,8 +40,12 @@ callerによるassistant/system挿入や、重複・未知・不足したtool re
 
 更新は楽観的排他です。同時推論自体は重複し得ますが、保存の二重反映や上書きを拒否します。
 削除が先に確定した進行中推論はcommitできず、会話を復活させません。
-プロセス停止はSQLiteのtransaction回復に任せ、未確定推論は再試行可能です。
-保存後の送信断ではreceiptが残るため同じrequest IDで復旧します。
+初回schemaの全DDLとversionも単一transactionとし、途中process停止はrollback後に再初期化します。
+未知・旧部分schemaは自動修復しません。未確定推論は再試行可能です。
+同時requestの先行receiptを返す場合も、その実際の内容を現在のread policyで再認可します。
+provider完了後のcommit直前にcancel受付点を設け、観測済み切断は保存しません。
+SQLite commit区間はawaitなしとし、commit後の切断通知や配送失敗ではreceiptを維持します。
+ネットワーク上の切断時刻を保証するものではなく、同じrequest IDで復旧します。
 
 会話用streamは上流の完了まで最大1 MiBの可視内容をバッファします。完全なtool引数と
 最終文面をpolicyへ渡し、保存確定後に`completed`イベントと`[DONE]`を返します。
