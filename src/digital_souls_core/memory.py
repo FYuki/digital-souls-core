@@ -51,6 +51,8 @@ class MemoryService:
         return await self.run(binding, job)
 
     async def run(self, binding: Binding, job: MemoryJob) -> tuple[Memory, ...]:
+        if job.state not in {"pending", "done"}:
+            raise CoreError(409, "memory_job_invalid", "Explicit extraction required")
         policy, extractor = self.policy, self.extractor
         stamp = policy.stamp
         if job.versions != self._versions():
@@ -131,15 +133,25 @@ class MemoryService:
         return result
 
     async def rebuild(self, binding: Binding, *, limit: int = 16) -> int:
-        """Finite trusted drain; no background worker, retries preserve pending work."""
+        """Finite drain; isolate failed work without migrating approved configuration."""
         for event in self.store.events(binding):
             self.store.consume(binding, event)
         completed = 0
+        failed = False
         for job in self.store.pending(binding, limit):
             current = self.store.rebase(binding, job)
             if current is not None:
-                await self.run(binding, current)
-                completed += 1
+                try:
+                    await self.run(binding, current)
+                except CoreError:
+                    self.store.fail(binding, current)
+                    failed = True
+                else:
+                    completed += 1
+        if failed:
+            raise CoreError(
+                409, "memory_rebuild_incomplete", "Some memory jobs require explicit extraction"
+            )
         return completed
 
 
@@ -176,7 +188,20 @@ class MemoryContext:
         text = (
             json.dumps(
                 [
-                    {"memory_id": m.memory_id, "kind": m.kind, "user_evidence": json.loads(m.text)}
+                    {
+                        "memory_id": m.memory_id,
+                        "kind": m.kind,
+                        "user_evidence": json.loads(m.text),
+                        "sources": [
+                            {
+                                "conversation_id": source.reference.conversation_id,
+                                "turn_revision": source.reference.turn_revision,
+                                "message_index": source.reference.message_index,
+                                "epoch": source.epoch,
+                            }
+                            for source in m.sources
+                        ],
+                    }
                     for m in memories
                 ],
                 ensure_ascii=False,

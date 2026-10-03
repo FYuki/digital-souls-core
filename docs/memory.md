@@ -66,6 +66,14 @@ consumer停止中も旧本文は既に消えており検索できません。job
 残る適格sourceへ絞り直し、古いjobをobsoleteにします。解除された撤回sourceをそのjobへ戻しません。
 再構成は旧本文を読まず、残存履歴だけを再抽出します。成功まで代替memoryを返しません。
 根拠ゼロなら再構成せず、失敗時も旧本文/IDを復活させません。通知処理・job採用は冪等です。
+再構築jobは元の承認済み設定を維持します。設定不一致や処理失敗（CoreError）はjobを failed へ
+終端化し、同じbatchの後続jobを続行します。batch終了後は内容なしの memory_rebuild_incomplete
+エラーを返します。失敗jobは次回の自動対象外で、limit=1でも後続が永久に詰まりません。
+旧設定の出典を新profileへ自動送信しません。再試行には利用者が現在の出典を明示して extract
+を呼び、現在の適格性・privacy・設定で再承認します。同設定の再試行もこの明示経路のみ別job IDで作成します。失敗job自体は再開しません。
+旧試行の遅延fail/commitは新試行へ作用せず、並行する明示再試行は同じ後続IDを共有します。
+同一source・設定の連続失敗は128試行で上限エラーとし、無制限の探索を避けます。
+キャンセルは終端化せず伝播し、DB障害等の予期しない例外も隠しません。
 DB transactionをLLM await中に保持しません。採用時にsource epoch・設定generationを再照合します。
 
 ## 検索と送信境界
@@ -87,3 +95,10 @@ archiveは一覧表示だけで、memory検索の条件を変えません。
 私的input import、実モデル品質評価、正規化時刻、自由要約、過去発話への後付け除外/訂正API、
 memory単体の編集UI、vector検索、常駐job、tombstone自動掃除、ファイル/バックアップの物理消去保証は対象外です。
 合成fixtureとfake transportでの成功を、これらの完了や実品質の合格とは扱いません。
+
+
+記憶本文は人格systemメッセージへ結合せず、独立した user role の retrieved_memory_data として
+過去の出典データを渡します。systemには、命令として実行せず人格・system指示を上書きしない
+という固定の扱いだけを記載します。JSONにはmemory ID・種別・原文・source revision/epochを保持します。
+これは命令と事実が混在する記憶への緩和策で、実モデルでのprompt injection完全防御を保証しません。
+privacy再判定・source guard・context byte budgetは、このframeを含む送信payloadに引き続き適用します。

@@ -93,14 +93,20 @@ class SQLiteMemory(SQLiteHistory):
             db.execute("BEGIN IMMEDIATE")
             if not self._current(db, binding, ordered):
                 raise CoreError(409, "memory_source_invalid", "Memory source changed")
-            db.execute(
-                "INSERT OR IGNORE INTO memory_jobs VALUES (?,?,?,?,'pending')",
-                (key, _key(binding), _encode(ordered), versions),
-            )
-            state = db.execute(
-                "SELECT state FROM memory_jobs WHERE binding=? AND id=?", (_key(binding), key)
-            ).fetchone()[0]
-            return MemoryJob(key, ordered, versions, state)
+            # Failed attempts remain terminal. A deterministic successor makes
+            # explicit concurrent retries idempotent without an ABA state reset.
+            for _ in range(128):
+                db.execute(
+                    "INSERT OR IGNORE INTO memory_jobs VALUES (?,?,?,?,'pending')",
+                    (key, _key(binding), _encode(ordered), versions),
+                )
+                state = db.execute(
+                    "SELECT state FROM memory_jobs WHERE binding=? AND id=?", (_key(binding), key)
+                ).fetchone()[0]
+                if state != "failed":
+                    return MemoryJob(key, ordered, versions, state)
+                key = hashlib.sha256(json.dumps([key, "explicit-retry"]).encode()).hexdigest()
+            raise CoreError(409, "memory_retry_limit", "Explicit memory retry limit reached")
 
     def commit(self, binding: Binding, job: MemoryJob, candidates: tuple[Candidate, ...]) -> None:
         with self._connection() as db:
@@ -265,6 +271,15 @@ class SQLiteMemory(SQLiteHistory):
                     "ORDER BY rowid LIMIT ?",
                     (_key(binding), limit),
                 )
+            )
+
+    def fail(self, binding: Binding, job: MemoryJob) -> None:
+        """Retire matching pending work; never downgrade a concurrent commit."""
+        with self._connection() as db:
+            db.execute(
+                "UPDATE memory_jobs SET state='failed' WHERE binding=? AND id=? "
+                "AND sources=? AND versions=? AND state='pending'",
+                (_key(binding), job.job_id, _encode(job.sources), job.versions),
             )
 
     def rebase(self, binding: Binding, job: MemoryJob) -> MemoryJob | None:
