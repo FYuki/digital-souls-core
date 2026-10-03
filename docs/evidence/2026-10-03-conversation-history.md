@@ -105,3 +105,21 @@ commit前に観測した切断は保存を抑止します。実ネットワー�
 同一とは限らず、commit後の配送失敗ではreceiptを維持します。この場合の同request再試行も
 stream/非streamで確認しました。証跡追加は文書のみで、最終headのCIはPR checksで確認します。
 epic/main mergeおよびCodeRabbitへの依頼は行っていません。
+
+## 所有権移譲前のrequest cancelへの追補
+
+親の再レビュー対象 `7d0d886d3062053a304343ee25335e3e24884b79` で、watcher cleanupをawaitする前に
+handoff済みと判断していたため、外側request taskのcancel時にprefetch済みstreamが残る問題を
+locked環境の実ASGI taskで再現しました（修正前 **2 failed / 2 passed**）。
+
+検証コードrevision: `9c442abeae3016af871762ed316f9bbbda6e649c`。
+候補responseの所有権は子taskのcleanup完了までhelperに残し、awaitのないreturnで移譲します。
+AnyIOのscope cancelと直接のTask.cancelを別々にshieldし、cleanupを必ずjoinします。
+外側cancelを観測した場合は未移譲upstreamのclose完了後にCancelledErrorを再送出します。
+上流close待機中の再cancelでもcleanupを中断せず、通常handoffを早期closeしません。
+
+両HTTP経路で正常handoff・watcher cleanup中の実request cancel・close中の再cancelを検証。
+対象3ファイルは **55 passed**、最終独立レビューは追加blockerなしで、reviewerの切断テストは
+**10 passed**。全必須ゲートも再実行し、lint/format/mypy、UT **28 passed**、IT1 **184 passed**、
+Node文書 **23 passed**、文書検査、sdist/wheel、独立locked install/importがPASSです。
+公開差分のcredential/private artifact検査もPASS。既知の依存警告は前記と同じです。
