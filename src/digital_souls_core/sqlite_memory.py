@@ -193,12 +193,15 @@ class SQLiteMemory(SQLiteHistory):
     def search(self, binding: Binding, query: str, limit: int = 8) -> tuple[Memory, ...]:
         if not 0 < len(query) <= 256 or not 1 <= limit <= 16:
             raise CoreError(400, "memory_query_invalid", "Invalid memory query")
-        # Literal casefold substring, no query DSL, embeddings, persisted index or cache.
+        return tuple(m for m in self.candidates(binding) if query.casefold() in m.text.casefold())[
+            :limit
+        ]
+
+    def candidates(self, binding: Binding) -> tuple[Memory, ...]:
+        """Bounded current evidence in one exact scope, newest first; no history import."""
         with self._connection() as db:
             db.execute("BEGIN")
-            return tuple(
-                m for m in self._memories(db, binding) if query.casefold() in m.text.casefold()
-            )[:limit]
+            return self._memories(db, binding)
 
     def valid(self, binding: Binding, memories: tuple[Memory, ...]) -> bool:
         with self._connection() as db:
