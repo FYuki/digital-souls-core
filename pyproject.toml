@@ -42,7 +42,7 @@ select = ["E", "F", "I", "UP", "B", "ASYNC"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["src", "tests", "tools/evaluate-memory-search.py"]
+files = ["src", "tests", "experiments", "tools/evaluate-memory-search.py"]
 
 [[tool.mypy.overrides]]
 module = ["litellm.*"]
@@ -50,6 +50,7 @@ follow_imports = "skip"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 asyncio_mode = "auto"
 addopts = "--strict-markers --disable-socket --allow-unix-socket"
-markers = ["ut: isolated unit contracts", "it1: in-process integration with fake transport", "postgres: isolated PostgreSQL storage contracts with synthetic data"]
+markers = ["ut: isolated unit contracts", "it1: in-process integration with fake transport", "postgres: isolated PostgreSQL storage contracts with synthetic data", "pgvector: isolated pgvector PoC with synthetic data"]

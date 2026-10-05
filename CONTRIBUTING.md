@@ -129,3 +129,20 @@ CI の `postgres-storage` は全 PR と main / epic push で必須試験を実�
 ネットワーク無効化と明示的な Unix socket 接続で保証します。
 このテストの成功を実運用・実モデルの IT2 / ST の合格とは扱いません。
 設定・制約は [PostgreSQL の利用境界](docs/postgresql.md) を参照してください。
+
+
+## pgvector の独立合成 PoC
+
+`experiments/pgvector_memory` は配布wheelへ含めない独立実験です。変更時は次を実行します。
+
+```sh
+uv run --no-sync ruff check src tests experiments tools/evaluate-memory-search.py
+uv run --no-sync ruff format --check src tests experiments tools/evaluate-memory-search.py
+uv run --no-sync mypy
+bash tools/test-pgvector-poc.sh
+```
+
+専用の `pgvector` marker と CI `pgvector-poc` は、digest固定の公式pgvector imageを
+ネットワークなし・Unix socketのみの使い捨てDBとして起動します。0件・skipは失敗です。
+現行 `postgres-storage` の試験先・製品schema・通常起動を変更しません。
+比較方法と実モデル未検証の境界は [pgvector PoC](docs/pgvector-poc.md) を参照してください。

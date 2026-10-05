@@ -36,3 +36,6 @@ Stage3の明示的な記憶抽出・保存・参照検索と未検証範囲は[�
 
 PostgreSQL と意味検索を同時に使う trusted 起動側の構成・未実施の配備作業は
 [統合と配備の境界](docs/semantic-postgresql-integration.md)を参照してください。
+
+派生embeddingの永続化とSQL検索は、独立した合成データ用の
+[pgvector PoC](docs/pgvector-poc.md)で比較します。本番schemaや通常起動へは接続しません。

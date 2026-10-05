@@ -12,3 +12,4 @@ Acceptedにする際はレビューでの決定を参照してください。
 - [ADR 0010: 明示注入したプロセス内embeddingによる記憶検索](0010-in-process-memory-search.md)
 - [ADR 0011: 固定SDKによる明示的なローカルembedding接続](0011-local-memory-embedding.md)
 - [ADR 0012: 明示選択するPostgreSQL履歴・記憶backend](0012-postgresql-storage.md)
+- [ADR 0013: 独立したpgvector派生記憶indexのPoC](0013-pgvector-memory-poc.md)

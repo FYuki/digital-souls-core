@@ -1,0 +1,1283 @@
+{
+  "status": "PASS",
+  "mode": "synthetic_pgvector_exact_primitive_benchmark",
+  "model_quality_evidence": false,
+  "real_embedding_generation": "NOT RUN",
+  "hnsw": "NOT RUN",
+  "source": {
+    "git_head_base_revision": "2f4faaf749d022c688d13afd54a3296bba8dc74f",
+    "worktree_dirty": true,
+    "files_sha256": {
+      "experiments/pgvector_memory/benchmark.py": "d3374c90f248e92ed96a9e4e9e01e2b62f27d96230c5ef5f10c78aad0aaefa39",
+      "experiments/pgvector_memory/synthetic.py": "9c44ec4d3bc6fffad28da100bd4442d27e95a0bae3e491b94fe381b5a412b907",
+      "experiments/pgvector_memory/store.py": "58375c2d6ebf114ee8c35df2394a5584591c16633a8dc76bcd286de8589f8cb3",
+      "experiments/pgvector_memory/schema.py": "d89d29f6be67670d8b71f27e7d1321d4e9edfcccbc5899888619f12652703ff2",
+      "src/digital_souls_core/memory_ranking.py": "63f58317cdceeaafc6bdbe7bbc68507f0652ede0aa9d02f4fa850f9b0014b2e0",
+      "uv.lock": "54b0f10b8015c9ebdcc81351792741e60a7ee7ea02b14778258fab4807ca30ce"
+    }
+  },
+  "started_at": "2026-10-05T05:19:34.438123+00:00",
+  "finished_at": "2026-10-05T05:21:07.757442+00:00",
+  "python": "3.12.3",
+  "platform": "Linux-6.18.40.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "psycopg": "3.3.6",
+  "seed": 20261005,
+  "query_count": 8,
+  "warmup_rounds": 2,
+  "measured_rounds": 5,
+  "limit": 8,
+  "percentile_method": "linear interpolation at (n-1)*p; no confidence interval",
+  "trial_order": "alternate PostgreSQL and transfer+Python by query/repetition parity",
+  "resource_limits": {
+    "client_cpu_affinity": [
+      0,
+      1
+    ],
+    "client_address_space_limit_bytes": 1073741824
+  },
+  "client_peak_rss_kib": 268728,
+  "results": [
+    {
+      "status": "PASS",
+      "rows": 100,
+      "source_rows": 100,
+      "dimensions": 128,
+      "corpus_vectors_sha256": "99b7bdf28b3854110234afdeea68f8e68d8a60deda347f7b78300a15c5f4cfb0",
+      "source_distribution": "round-robin across min(rows,100) synthetic sources",
+      "memory_service_limit_exceeded": false,
+      "comparison_boundary": "rank_memories primitive, not MemoryService request latency",
+      "synthetic_generation_ms": 4.206119,
+      "schema_initialize_ms": 8.442583,
+      "source_registration_ms": 301.337668,
+      "vector_load_ms": 179.445605,
+      "analyze_ms": 5.293724,
+      "statistics_policy": "Explicit ANALYZE of five PoC tables before comparison; cold/fresh statistics and production autoanalyze are NOT RUN.",
+      "postgres_settings": {
+        "default_statistics_target": {
+          "setting": "100",
+          "unit": null
+        },
+        "effective_cache_size": {
+          "setting": "524288",
+          "unit": "8kB"
+        },
+        "jit": {
+          "setting": "on",
+          "unit": null
+        },
+        "jit_above_cost": {
+          "setting": "100000",
+          "unit": null
+        },
+        "max_parallel_workers_per_gather": {
+          "setting": "2",
+          "unit": null
+        },
+        "random_page_cost": {
+          "setting": "4",
+          "unit": null
+        },
+        "seq_page_cost": {
+          "setting": "1",
+          "unit": null
+        },
+        "shared_buffers": {
+          "setting": "8192",
+          "unit": "8kB"
+        },
+        "work_mem": {
+          "setting": "4096",
+          "unit": "kB"
+        }
+      },
+      "first_candidate_export_ms": 8.167984,
+      "latencies": {
+        "pg_exact_roundtrip": {
+          "samples": 40,
+          "min_ms": 4.80984,
+          "p50_ms": 5.330496999999999,
+          "p95_ms": 5.8160236,
+          "max_ms": 5.987407,
+          "mean_ms": 5.3361108999999995
+        },
+        "candidate_transfer_and_float32_decode": {
+          "samples": 40,
+          "min_ms": 7.63198,
+          "p50_ms": 8.0002605,
+          "p95_ms": 8.814727099999999,
+          "max_ms": 13.839365,
+          "mean_ms": 8.255776874999999
+        },
+        "python_rank_after_transfer": {
+          "samples": 40,
+          "min_ms": 2.452665,
+          "p50_ms": 2.5185705,
+          "p95_ms": 2.7167728999999996,
+          "max_ms": 3.133791,
+          "mean_ms": 2.568092225
+        },
+        "transfer_plus_python_rank": {
+          "samples": 40,
+          "min_ms": 10.155676,
+          "p50_ms": 10.556879499999999,
+          "p95_ms": 11.74790095,
+          "max_ms": 16.320343,
+          "mean_ms": 10.8238691
+        },
+        "python_rank_cached_candidates": {
+          "samples": 40,
+          "min_ms": 2.435491,
+          "p50_ms": 2.5384825,
+          "p95_ms": 2.6873968,
+          "max_ms": 2.748762,
+          "mean_ms": 2.5549872000000002
+        }
+      },
+      "server_explain_analyze": {
+        "execution": {
+          "samples": 8,
+          "min_ms": 0.768,
+          "p50_ms": 0.7925,
+          "p95_ms": 0.8468,
+          "max_ms": 0.865,
+          "mean_ms": 0.8
+        },
+        "planning": {
+          "samples": 8,
+          "min_ms": 0.81,
+          "p50_ms": 0.843,
+          "p95_ms": 0.9256500000000001,
+          "max_ms": 0.926,
+          "mean_ms": 0.86225
+        },
+        "instrumentation_overhead_included": true,
+        "repetitions_per_query": 1,
+        "plans": [
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 21.67,
+              "Shared Hit Blocks": 619,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 21.67,
+              "Shared Hit Blocks": 619,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 21.67,
+              "Shared Hit Blocks": 619,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 21.67,
+              "Shared Hit Blocks": 619,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 21.67,
+              "Shared Hit Blocks": 619,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 21.67,
+              "Shared Hit Blocks": 619,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 21.67,
+              "Shared Hit Blocks": 619,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 21.67,
+              "Shared Hit Blocks": 619,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          }
+        ]
+      },
+      "equivalence": {
+        "queries_verified_including_warmup": 56,
+        "absolute_score_tolerance": 1e-05,
+        "max_absolute_score_error": 5.606728517570936e-08,
+        "mismatches": []
+      },
+      "update_cycle": {
+        "operation": "put_memory+prepare+complete",
+        "samples": 5,
+        "min_ms": 10.927246,
+        "p50_ms": 11.709174,
+        "p95_ms": 12.104152,
+        "max_ms": 12.186297,
+        "mean_ms": 11.5823324
+      },
+      "storage_before_update": {
+        "postgres_version": "18.6 (Debian 18.6-1.pgdg12+2)",
+        "pgvector_version": "0.8.7",
+        "postmaster_start_time": "2026-10-05 05:08:21.365594+00",
+        "schema": "pgvector_poc_bench_848ae87b_100",
+        "dimensions": 128,
+        "space_generation": 1,
+        "memory_rows": 100,
+        "embedding_rows": 100,
+        "relation_bytes": 630784
+      },
+      "storage_after_update": {
+        "postgres_version": "18.6 (Debian 18.6-1.pgdg12+2)",
+        "pgvector_version": "0.8.7",
+        "postmaster_start_time": "2026-10-05 05:08:21.365594+00",
+        "schema": "pgvector_poc_bench_848ae87b_100",
+        "dimensions": 128,
+        "space_generation": 1,
+        "memory_rows": 100,
+        "embedding_rows": 100,
+        "relation_bytes": 638976
+      },
+      "filter_scenario": {
+        "status": "PASS",
+        "private_excluded_deleted_rows": 3,
+        "other_binding_rows": 10,
+        "eligible_rows": 100,
+        "hidden_rows_in_export_or_result": 0,
+        "roundtrip": {
+          "samples": 5,
+          "min_ms": 4.846189,
+          "p50_ms": 5.136161,
+          "p95_ms": 5.507068599999999,
+          "max_ms": 5.517319,
+          "mean_ms": 5.1634648
+        },
+        "note": "Synthetic eligibility projection only; not a production privacy boundary."
+      },
+      "postmaster_start_time": "2026-10-05 05:08:21.365594+00",
+      "postmaster_unchanged": true
+    },
+    {
+      "status": "PASS",
+      "rows": 1000,
+      "source_rows": 100,
+      "dimensions": 128,
+      "corpus_vectors_sha256": "8de7b6be82e86df8fea601d2f06e935fa20be69f390537ad021ee2472f35e7ae",
+      "source_distribution": "round-robin across min(rows,100) synthetic sources",
+      "memory_service_limit_exceeded": false,
+      "comparison_boundary": "rank_memories primitive, not MemoryService request latency",
+      "synthetic_generation_ms": 26.973207,
+      "schema_initialize_ms": 8.079559,
+      "source_registration_ms": 297.965313,
+      "vector_load_ms": 1869.580016,
+      "analyze_ms": 12.433988,
+      "statistics_policy": "Explicit ANALYZE of five PoC tables before comparison; cold/fresh statistics and production autoanalyze are NOT RUN.",
+      "postgres_settings": {
+        "default_statistics_target": {
+          "setting": "100",
+          "unit": null
+        },
+        "effective_cache_size": {
+          "setting": "524288",
+          "unit": "8kB"
+        },
+        "jit": {
+          "setting": "on",
+          "unit": null
+        },
+        "jit_above_cost": {
+          "setting": "100000",
+          "unit": null
+        },
+        "max_parallel_workers_per_gather": {
+          "setting": "2",
+          "unit": null
+        },
+        "random_page_cost": {
+          "setting": "4",
+          "unit": null
+        },
+        "seq_page_cost": {
+          "setting": "1",
+          "unit": null
+        },
+        "shared_buffers": {
+          "setting": "8192",
+          "unit": "8kB"
+        },
+        "work_mem": {
+          "setting": "4096",
+          "unit": "kB"
+        }
+      },
+      "first_candidate_export_ms": 50.635154,
+      "latencies": {
+        "pg_exact_roundtrip": {
+          "samples": 40,
+          "min_ms": 11.963692,
+          "p50_ms": 12.7086425,
+          "p95_ms": 13.435128249999998,
+          "max_ms": 23.577435,
+          "mean_ms": 13.047621150000001
+        },
+        "candidate_transfer_and_float32_decode": {
+          "samples": 40,
+          "min_ms": 44.908934,
+          "p50_ms": 46.189642,
+          "p95_ms": 53.182635499999996,
+          "max_ms": 54.162737,
+          "mean_ms": 47.01173825
+        },
+        "python_rank_after_transfer": {
+          "samples": 40,
+          "min_ms": 24.970802,
+          "p50_ms": 25.957827,
+          "p95_ms": 26.8576444,
+          "max_ms": 37.605692,
+          "mean_ms": 26.128158475
+        },
+        "transfer_plus_python_rank": {
+          "samples": 40,
+          "min_ms": 70.043288,
+          "p50_ms": 72.1854585,
+          "p95_ms": 79.50321594999998,
+          "max_ms": 84.681127,
+          "mean_ms": 73.139896725
+        },
+        "python_rank_cached_candidates": {
+          "samples": 40,
+          "min_ms": 24.37234,
+          "p50_ms": 25.643343,
+          "p95_ms": 26.35809745,
+          "max_ms": 46.800086,
+          "mean_ms": 26.091943325
+        }
+      },
+      "server_explain_analyze": {
+        "execution": {
+          "samples": 8,
+          "min_ms": 7.215,
+          "p50_ms": 7.436,
+          "p95_ms": 7.5471,
+          "max_ms": 7.573,
+          "mean_ms": 7.417625
+        },
+        "planning": {
+          "samples": 8,
+          "min_ms": 0.887,
+          "p50_ms": 0.924,
+          "p95_ms": 0.99305,
+          "max_ms": 1.006,
+          "mean_ms": 0.9337500000000001
+        },
+        "instrumentation_overhead_included": true,
+        "repetitions_per_query": 1,
+        "plans": [
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 155.71,
+              "Shared Hit Blocks": 6104,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 155.71,
+              "Shared Hit Blocks": 6104,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 155.71,
+              "Shared Hit Blocks": 6104,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 155.71,
+              "Shared Hit Blocks": 6104,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 155.71,
+              "Shared Hit Blocks": 6104,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 155.71,
+              "Shared Hit Blocks": 6104,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 155.71,
+              "Shared Hit Blocks": 6104,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 155.71,
+              "Shared Hit Blocks": 6104,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "jit": {}
+          }
+        ]
+      },
+      "equivalence": {
+        "queries_verified_including_warmup": 56,
+        "absolute_score_tolerance": 1e-05,
+        "max_absolute_score_error": 3.155231070861575e-08,
+        "mismatches": []
+      },
+      "update_cycle": {
+        "operation": "put_memory+prepare+complete",
+        "samples": 5,
+        "min_ms": 10.872292,
+        "p50_ms": 11.313947,
+        "p95_ms": 11.497758399999999,
+        "max_ms": 11.533195,
+        "mean_ms": 11.2401796
+      },
+      "storage_before_update": {
+        "postgres_version": "18.6 (Debian 18.6-1.pgdg12+2)",
+        "pgvector_version": "0.8.7",
+        "postmaster_start_time": "2026-10-05 05:08:21.365594+00",
+        "schema": "pgvector_poc_bench_848ae87b_1000",
+        "dimensions": 128,
+        "space_generation": 1,
+        "memory_rows": 1000,
+        "embedding_rows": 1000,
+        "relation_bytes": 2736128
+      },
+      "storage_after_update": {
+        "postgres_version": "18.6 (Debian 18.6-1.pgdg12+2)",
+        "pgvector_version": "0.8.7",
+        "postmaster_start_time": "2026-10-05 05:08:21.365594+00",
+        "schema": "pgvector_poc_bench_848ae87b_1000",
+        "dimensions": 128,
+        "space_generation": 1,
+        "memory_rows": 1000,
+        "embedding_rows": 1000,
+        "relation_bytes": 2744320
+      },
+      "filter_scenario": {
+        "status": "PASS",
+        "private_excluded_deleted_rows": 3,
+        "other_binding_rows": 10,
+        "eligible_rows": 1000,
+        "hidden_rows_in_export_or_result": 0,
+        "roundtrip": {
+          "samples": 5,
+          "min_ms": 11.463807,
+          "p50_ms": 11.777977,
+          "p95_ms": 12.689671,
+          "max_ms": 12.91585,
+          "mean_ms": 11.9165144
+        },
+        "note": "Synthetic eligibility projection only; not a production privacy boundary."
+      },
+      "postmaster_start_time": "2026-10-05 05:08:21.365594+00",
+      "postmaster_unchanged": true
+    },
+    {
+      "status": "PASS",
+      "rows": 10000,
+      "source_rows": 100,
+      "dimensions": 128,
+      "corpus_vectors_sha256": "73127a02ad8331d269ceff9d6522aa8cbf63a4a3221b91c94bfdb6cc5662dd88",
+      "source_distribution": "round-robin across min(rows,100) synthetic sources",
+      "memory_service_limit_exceeded": true,
+      "comparison_boundary": "rank_memories primitive, not MemoryService request latency",
+      "synthetic_generation_ms": 272.126741,
+      "schema_initialize_ms": 7.951967,
+      "source_registration_ms": 294.421026,
+      "vector_load_ms": 21948.000184,
+      "analyze_ms": 65.756285,
+      "statistics_policy": "Explicit ANALYZE of five PoC tables before comparison; cold/fresh statistics and production autoanalyze are NOT RUN.",
+      "postgres_settings": {
+        "default_statistics_target": {
+          "setting": "100",
+          "unit": null
+        },
+        "effective_cache_size": {
+          "setting": "524288",
+          "unit": "8kB"
+        },
+        "jit": {
+          "setting": "on",
+          "unit": null
+        },
+        "jit_above_cost": {
+          "setting": "100000",
+          "unit": null
+        },
+        "max_parallel_workers_per_gather": {
+          "setting": "2",
+          "unit": null
+        },
+        "random_page_cost": {
+          "setting": "4",
+          "unit": null
+        },
+        "seq_page_cost": {
+          "setting": "1",
+          "unit": null
+        },
+        "shared_buffers": {
+          "setting": "8192",
+          "unit": "8kB"
+        },
+        "work_mem": {
+          "setting": "4096",
+          "unit": "kB"
+        }
+      },
+      "first_candidate_export_ms": 475.578451,
+      "latencies": {
+        "pg_exact_roundtrip": {
+          "samples": 40,
+          "min_ms": 90.227157,
+          "p50_ms": 93.09965600000001,
+          "p95_ms": 98.1300418,
+          "max_ms": 100.762612,
+          "mean_ms": 93.38658445
+        },
+        "candidate_transfer_and_float32_decode": {
+          "samples": 40,
+          "min_ms": 451.272343,
+          "p50_ms": 464.7435825,
+          "p95_ms": 479.0248246,
+          "max_ms": 490.741324,
+          "mean_ms": 464.9666503
+        },
+        "python_rank_after_transfer": {
+          "samples": 40,
+          "min_ms": 258.329589,
+          "p50_ms": 271.684742,
+          "p95_ms": 288.51967755,
+          "max_ms": 293.001954,
+          "mean_ms": 272.546762
+        },
+        "transfer_plus_python_rank": {
+          "samples": 40,
+          "min_ms": 710.784253,
+          "p50_ms": 737.6877,
+          "p95_ms": 756.68037375,
+          "max_ms": 766.697673,
+          "mean_ms": 737.5134123
+        },
+        "python_rank_cached_candidates": {
+          "samples": 40,
+          "min_ms": 258.848935,
+          "p50_ms": 270.89995550000003,
+          "p95_ms": 287.99039524999995,
+          "max_ms": 311.423642,
+          "mean_ms": 273.403413
+        }
+      },
+      "server_explain_analyze": {
+        "execution": {
+          "samples": 8,
+          "min_ms": 91.519,
+          "p50_ms": 92.3,
+          "p95_ms": 110.83739999999999,
+          "max_ms": 119.25,
+          "mean_ms": 96.060125
+        },
+        "planning": {
+          "samples": 8,
+          "min_ms": 0.95,
+          "p50_ms": 1.0095,
+          "p95_ms": 1.06395,
+          "max_ms": 1.079,
+          "mean_ms": 1.005625
+        },
+        "instrumentation_overhead_included": true,
+        "repetitions_per_query": 1,
+        "plans": [
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 1503.73,
+              "Shared Hit Blocks": 70948,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 842
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 1503.73,
+              "Shared Hit Blocks": 70948,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 842
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 1503.73,
+              "Shared Hit Blocks": 70948,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 842
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 1503.73,
+              "Shared Hit Blocks": 70948,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 842
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 1503.73,
+              "Shared Hit Blocks": 70948,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 842
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 1503.73,
+              "Shared Hit Blocks": 70948,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 842
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 1503.73,
+              "Shared Hit Blocks": 70948,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 842
+            },
+            "jit": {}
+          },
+          {
+            "node_counts": {
+              "Limit": 1,
+              "Nested Loop": 2,
+              "Hash Join": 2,
+              "Seq Scan": 3,
+              "Hash": 2,
+              "Index Scan": 1,
+              "Index Only Scan": 1,
+              "Sort": 1,
+              "CTE Scan": 1
+            },
+            "relations": [
+              "embeddings",
+              "memories",
+              "source_refs",
+              "sources"
+            ],
+            "root": {
+              "Actual Rows": 8.0,
+              "Plan Rows": 1,
+              "Actual Loops": 1,
+              "Total Cost": 1503.73,
+              "Shared Hit Blocks": 70948,
+              "Shared Read Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 842
+            },
+            "jit": {}
+          }
+        ]
+      },
+      "equivalence": {
+        "queries_verified_including_warmup": 56,
+        "absolute_score_tolerance": 1e-05,
+        "max_absolute_score_error": 4.3478267042207364e-08,
+        "mismatches": []
+      },
+      "update_cycle": {
+        "operation": "put_memory+prepare+complete",
+        "samples": 5,
+        "min_ms": 11.824065,
+        "p50_ms": 12.820305,
+        "p95_ms": 13.675174,
+        "max_ms": 13.861043,
+        "mean_ms": 12.739604
+      },
+      "storage_before_update": {
+        "postgres_version": "18.6 (Debian 18.6-1.pgdg12+2)",
+        "pgvector_version": "0.8.7",
+        "postmaster_start_time": "2026-10-05 05:08:21.365594+00",
+        "schema": "pgvector_poc_bench_848ae87b_10000",
+        "dimensions": 128,
+        "space_generation": 1,
+        "memory_rows": 10000,
+        "embedding_rows": 10000,
+        "relation_bytes": 23863296
+      },
+      "storage_after_update": {
+        "postgres_version": "18.6 (Debian 18.6-1.pgdg12+2)",
+        "pgvector_version": "0.8.7",
+        "postmaster_start_time": "2026-10-05 05:08:21.365594+00",
+        "schema": "pgvector_poc_bench_848ae87b_10000",
+        "dimensions": 128,
+        "space_generation": 1,
+        "memory_rows": 10000,
+        "embedding_rows": 10000,
+        "relation_bytes": 23879680
+      },
+      "filter_scenario": {
+        "status": "PASS",
+        "private_excluded_deleted_rows": 3,
+        "other_binding_rows": 10,
+        "eligible_rows": 10000,
+        "hidden_rows_in_export_or_result": 0,
+        "roundtrip": {
+          "samples": 5,
+          "min_ms": 92.06867,
+          "p50_ms": 92.417244,
+          "p95_ms": 95.3151424,
+          "max_ms": 95.543909,
+          "mean_ms": 93.34583219999999
+        },
+        "note": "Synthetic eligibility projection only; not a production privacy boundary."
+      },
+      "postmaster_start_time": "2026-10-05 05:08:21.365594+00",
+      "postmaster_unchanged": true
+    }
+  ]
+}
