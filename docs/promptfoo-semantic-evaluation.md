@@ -131,6 +131,15 @@ SQLiteへ合成評価結果を保存して公式exportを利用します。正�
 `--no-cache` と共有無効化は維持し、結果の空配列を成功と見なす緩和は行いません。
 必要な隔離機能が使えない場合は失敗にし、通常networkへフォールバックしません。
 
+GitHub hosted Ubuntu 24.04では、一般ユーザーのUID map作成が拒否されるため、
+CIだけが明示的な専用起動方式を使います。GitHubの使い捨てVM上で固定system commandが
+network namespaceを作成し、元の非root UID/GIDへ戻し、補助group・capabilityを落として
+`no-new-privileges`を設定してからbuild・評価を実行します。
+rootで評価用のshell、Node、Pythonを実行せず、ホストのsysctlやAppArmor設定も変更しません。
+ローカルの既定動作は一般ユーザーによるnamespace作成のままで、sudoへの自動fallbackはありません。
+GitHubの[管理権限の仕様](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#administrative-privileges)と
+[setprivの仕様](https://man7.org/linux/man-pages/man1/setpriv.1.html)を確認しています。
+
 実モデルは既定で `NOT_RUN` です。利用可能なローカルembedding/chat endpointと資源を確認した
 別の実行で、絶対pathの明示profileと実行flagを与えます。
 

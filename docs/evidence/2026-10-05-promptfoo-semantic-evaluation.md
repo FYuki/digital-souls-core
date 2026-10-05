@@ -38,7 +38,7 @@ GPU利用タスクは権限制約により特定できなかった。実embeddin
 ## 合成データによる検証
 
 最終の[機械可読集計](2026-10-05-promptfoo-fixture.json)へ、入力・正解・provider・
-採点器・runner・lockfile・CIを含む26ファイルのSHA-256と結果を保存した。
+採点器・runner・lockfile・CIを含む29ファイルのSHA-256と結果を保存した。
 実行前後のhashはすべて一致し、並行編集中のsmokeとは区別している。
 
 | 検証 | 結果 |
@@ -49,9 +49,9 @@ GPU利用タスクは権限制約により特定できなかった。実embeddin
 | 境界・検索品質・回答品質の失敗 | 両suiteとも0 |
 | embedding / chat呼出し | 両suiteとも0 |
 | Node必須テスト | 92 PASS（gate 60、runner 9、既存文書23） |
-| Python UT | 312 PASS、skipなし |
+| Python UT | 335 PASS、skipなし |
 | Python IT1 | 746 PASS、skipなし |
-| ruff / format / mypy | PASS、84 source files |
+| ruff / format / mypy | PASS、86 source files |
 | build / locked install / import | PASS、空cwdからevals・experiments非混入を確認 |
 | 文書リンク / git diff --check / shell構文 | PASS |
 | 実モデル品質 | NOT_RUN、`quality_evidence: false` |
@@ -96,3 +96,21 @@ hash前提の限定patchが承認され実行された。拒否されたコピ�
 
 `src`、既存PoC、`uv.lock`は固定依存から無変更。使い捨てpgvector containerはrunner終了時に
 削除された。本番履歴の取込、GPU推論、新規モデルDL、稼働系設定変更、mainマージは行っていない。
+
+
+## GitHub runner固有の隔離起動
+
+初回head `539012ad072cd214bf467a87743047784647d37e` の
+[新評価CI](https://github.com/FYuki/digital-souls-core/actions/runs/37272750330)は、
+依存606 packageの取得後、`unshare` の `/proc/self/uid_map` 書込み拒否でFAILとなった。
+これはGitHub runnerのOS制約であり、自動承認レビューの拒否とは別である。
+同headのAPI・PostgreSQL・pgvector・文書CIはPASSだった。
+
+ホストの保護設定を緩めず、CIだけで固定system commandを使ってnetwork namespaceを作り、
+元の非root UID/GID・補助groupなし・capabilityなし・no-new-privilegesの状態へ戻してから
+build/評価を起動する方式を追加した。ローカルsudoは実行していない。
+通常のローカル実行は一般ユーザーのnamespaceを使い、失敗時の通信可能なfallbackはない。
+最終のGitHub CI結果はPRの最新headに紐づくcheckを確認する。
+
+CI専用helperのmock UTは23件PASS。修正後のローカルnative buildと40評価も、
+一般ユーザーのnetwork namespaceだけで再実行しPASSだった。実行前後のsource hashは一致した。

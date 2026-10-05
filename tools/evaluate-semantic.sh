@@ -10,15 +10,21 @@ mode=${1:-fixture}
 if (($#)); then shift; fi
 profile=''
 execute_real=false
+github_hosted_network=false
 while (($#)); do
   case "$1" in
     --profile)
       (($# >= 2)) || { printf '%s\n' 'Missing profile path.' >&2; exit 2; }
       profile=$2; shift 2 ;;
     --execute-local-model) execute_real=true; shift ;;
+    --github-hosted-network) github_hosted_network=true; shift ;;
     *) printf '%s\n' 'Unknown argument; no evaluation was started.' >&2; exit 2 ;;
   esac
 done
+if [[ $github_hosted_network == true && $mode != fixture ]]; then
+  printf '%s\n' 'The hosted-CI namespace option is restricted to fixture mode.' >&2
+  exit 2
+fi
 case "$mode" in
   --help)
     printf '%s\n' 'Usage: bash tools/evaluate-semantic.sh [fixture]' \
@@ -46,14 +52,24 @@ python="$repo/.venv/bin/python"
 [[ -f $eval_dir/node_modules/promptfoo/dist/src/main.js ]] || { printf '%s\n' 'Run npm ci --ignore-scripts in evals/semantic first.' >&2; exit 2; }
 [[ $(env -i "$node" -p 'require(process.argv[1]).version' "$eval_dir/node_modules/promptfoo/package.json") == 0.117.2 ]] || exit 2
 clean_path="$(dirname -- "$node"):$(dirname -- "$uv"):/usr/bin:/bin"
+namespace_args=()
+hosted_environment=()
+if [[ $github_hosted_network == true ]]; then
+  namespace_args=(--github-hosted)
+  hosted_environment=(CI="${CI:-}" GITHUB_ACTIONS="${GITHUB_ACTIONS:-}" \
+    RUNNER_ENVIRONMENT="${RUNNER_ENVIRONMENT:-}" RUNNER_OS="${RUNNER_OS:-}" ImageOS="${ImageOS:-}")
+  env -i PATH="$clean_path" "${hosted_environment[@]}" /usr/bin/python3 -I -B \
+    "$eval_dir/network_namespace.py" --check-github-hosted
+fi
 
 if [[ $mode == fixture || $mode == local-model ]]; then
   # Database startup remains outside the evaluation namespace; only a private Unix socket crosses it.
   namespace=$(readlink /proc/self/ns/net)
   if [[ $mode == fixture ]]; then
-    exec env -i PATH="$clean_path" DSC_SEMANTIC_PARENT_NETNS="$namespace" \
+    exec env -i PATH="$clean_path" DSC_SEMANTIC_PARENT_NETNS="$namespace" "${hosted_environment[@]}" \
       bash "$repo/tools/test-pgvector-poc.sh" -- \
-      unshare --user --map-current-user --net -- bash "$script" --fixture-child
+      /usr/bin/python3 -I -B "$eval_dir/network_namespace.py" "${namespace_args[@]}" -- \
+      /bin/bash "$script" --fixture-child
   fi
   env -i PATH="$clean_path" PYTHONPATH="$repo" LITELLM_LOCAL_MODEL_COST_MAP=True \
     "$python" -B "$eval_dir/profile_preflight.py" "$profile"

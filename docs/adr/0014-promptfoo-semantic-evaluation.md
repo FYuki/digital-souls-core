@@ -63,6 +63,9 @@ fixtureでは期待IDの順序を完全一致させ、実モデルでは関連ID
 
 Node/uv/lockfileを固定し、両suiteをcacheなし・concurrency 1で実行します。
 fixtureはネットワークなしの使い捨てDBと独立network namespaceを使います。
+GitHub hosted CIのみ、固定system commandでnamespaceを作成してから元の非root UID/GIDへ
+権限を落とす明示方式を使います。評価コードのroot実行やホストの保護設定変更は行わず、
+ローカルへsudo fallbackを追加しません。
 環境を清掃し、dotenv・資格情報・proxy・telemetry・共有を継承しません。
 promptfoo 0.117.2のPython呼出し方式とreport形式に合わせて検査し、
 最新版の文書だけから互換性を推定しません。

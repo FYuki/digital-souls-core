@@ -41,12 +41,12 @@ jobs:
             npm_config_userconfig="$npm_root/user.npmrc" npm_config_globalconfig="$npm_root/global.npmrc" \
             npm_config_audit=false npm_config_fund=false npm_config_update_notifier=false \
             npm ci --prefix evals/semantic --ignore-scripts --no-audit --no-fund
-          bash tools/build-semantic-sqlite.sh
+          bash tools/build-semantic-sqlite.sh --github-hosted-network
       - name: Required evaluation contracts (no model calls)
         run: |
           bash -n tools/evaluate-semantic.sh
           bash -n tools/build-semantic-sqlite.sh
           node --test --test-reporter=./tools/required-tests-reporter.mjs evals/semantic/*.test.mjs
-          uv run --no-sync pytest tests/test_semantic_provider.py tests/test_semantic_runner.py -m ut -q
+          uv run --no-sync pytest tests/test_semantic_provider.py tests/test_semantic_runner.py tests/test_semantic_network.py -m ut -q
       - name: Complete fixture suites in an isolated network namespace
-        run: bash tools/evaluate-semantic.sh fixture
+        run: bash tools/evaluate-semantic.sh fixture --github-hosted-network
