@@ -79,8 +79,10 @@ class LocalEmbedding:
             finding = scan(texts)
             if finding.secret or finding.failed:
                 raise ValueError
-            async with asyncio.timeout(profile.timeout_seconds):
-                async with local_openai_client(profile.api_base, profile.timeout_seconds) as client:
+            # Retire this deadline before transport cleanup. An outer service
+            # deadline must not race a still-armed inner timer while closing I/O.
+            async with local_openai_client(profile.api_base, profile.timeout_seconds) as client:
+                async with asyncio.timeout(profile.timeout_seconds):
                     response = await client.embeddings.with_raw_response.create(
                         model=profile.model, input=list(texts), encoding_format="float"
                     )

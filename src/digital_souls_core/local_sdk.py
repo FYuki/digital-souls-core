@@ -1,5 +1,6 @@
 """Request-owned official SDK client shared by verified local adapters."""
 
+import asyncio
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -41,4 +42,17 @@ async def local_openai_client(
         yield client
     finally:
         with anyio.CancelScope(shield=True):
-            await http.aclose()
+            closing = asyncio.create_task(http.aclose())
+            cancelled = False
+            while True:
+                try:
+                    await asyncio.shield(closing)
+                    break
+                except asyncio.CancelledError:
+                    if closing.cancelled():
+                        raise
+                    # Raw Task.cancel(), including another nested deadline, is
+                    # not blocked by AnyIO shields. Finish owned cleanup first.
+                    cancelled = True
+            if cancelled:
+                raise asyncio.CancelledError
