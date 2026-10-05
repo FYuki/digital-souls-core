@@ -29,3 +29,6 @@ localhostの単独利用者向けで、公開サービス用の認証・tool実�
 機微情報の明示的な検査・保存と送信の許可境界は[privacyガイド](docs/privacy.md)を参照してください。
 
 Stage3の明示的な記憶抽出・保存・参照検索と未検証範囲は[記憶API](docs/memory.md)を参照してください。
+
+保存先を明示選択する [PostgreSQL backend](docs/postgresql.md) は、空の専用 schema を初期化し、
+履歴・記憶の既存契約を保ちます。通常のアプリは保存無効のままで、SQLite からのデータ移送は行いません。

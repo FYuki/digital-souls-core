@@ -11,3 +11,4 @@ Acceptedにする際はレビューでの決定を参照してください。
 - [ADR 0009: モデル向け記憶contextの一時参照名](0009-memory-context-references.md)
 - [ADR 0010: 明示注入したプロセス内embeddingによる記憶検索](0010-in-process-memory-search.md)
 - [ADR 0011: 固定SDKによる明示的なローカルembedding接続](0011-local-memory-embedding.md)
+- [ADR 0012: 明示選択するPostgreSQL履歴・記憶backend](0012-postgresql-storage.md)
