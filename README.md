@@ -24,8 +24,15 @@ localhostの単独利用者向けで、公開サービス用の認証・tool実�
 
 既存APIはstatelessのままです。保存・復元・一覧・削除の専用経路と、既定拒否の保存policy境界を
 [会話履歴API](docs/history-api.md)に記載しています。ローカル分類器と明示的な記憶抽出・参照検索は実装済みです。
-意味検索は未実装で、実モデルの分類・抽出品質は未検証です。
+明示注入の意味検索とローカル embedding adapter も実装済みです。
+実モデルの分類・抽出・検索品質は未検証です。
 
 機微情報の明示的な検査・保存と送信の許可境界は[privacyガイド](docs/privacy.md)を参照してください。
 
 Stage3の明示的な記憶抽出・保存・参照検索と未検証範囲は[記憶API](docs/memory.md)を参照してください。
+
+保存先を明示選択する [PostgreSQL backend](docs/postgresql.md) は、空の専用 schema を初期化し、
+履歴・記憶の既存契約を保ちます。通常のアプリは保存無効のままで、SQLite からのデータ移送は行いません。
+
+PostgreSQL と意味検索を同時に使う trusted 起動側の構成・未実施の配備作業は
+[統合と配備の境界](docs/semantic-postgresql-integration.md)を参照してください。

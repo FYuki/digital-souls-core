@@ -1,0 +1,73 @@
+{
+  "dataset_type": "synthetic",
+  "version": "synthetic-retrieval-v1",
+  "dimensions": 4,
+  "documents": [
+    {
+      "id": "tea-ja",
+      "text": "[\"架空の人物アオは温かいお茶を好みます。\"]",
+      "source": {"conversation_id": "synthetic-ja", "turn_revision": 3, "message_index": 0, "epoch": 2},
+      "vector": [1, 0, 0, 0]
+    },
+    {
+      "id": "tea-en",
+      "text": "[\"The fictional character Aoi enjoys a warm cup of tea.\"]",
+      "source": {"conversation_id": "synthetic-en", "turn_revision": 2, "message_index": 0, "epoch": 1},
+      "vector": [0.8, 0.6, 0, 0]
+    },
+    {
+      "id": "garden-en",
+      "text": "[\"The fictional character Aoi grows mint in a small garden.\"]",
+      "source": {"conversation_id": "synthetic-en", "turn_revision": 4, "message_index": 1, "epoch": 0},
+      "vector": [0, 1, 0, 0]
+    },
+    {
+      "id": "excluded-placeholder",
+      "text": "[\"Synthetic exclusion marker; no private source content.\"]",
+      "source": {"conversation_id": "synthetic-excluded", "turn_revision": 1, "message_index": 0, "epoch": 1},
+      "vector": [1, 0, 0, 0]
+    }
+  ],
+  "queries": [
+    {
+      "id": "warm-drink-ja",
+      "text": "架空のアオが好きな温かい飲み物は？",
+      "candidate_ids": ["garden-en", "tea-en", "excluded-placeholder", "tea-ja"],
+      "relevant_ids": ["tea-ja", "tea-en"],
+      "excluded_ids": ["excluded-placeholder"],
+      "vector": [1, 0, 0, 0]
+    },
+    {
+      "id": "herb-en",
+      "text": "Which herb does the fictional Aoi grow?",
+      "candidate_ids": ["tea-ja", "garden-en", "tea-en"],
+      "relevant_ids": ["garden-en"],
+      "excluded_ids": [],
+      "vector": [0, 1, 0, 0]
+    },
+    {
+      "id": "unknown-space-ja",
+      "text": "架空のアオが訪れた惑星は？",
+      "candidate_ids": ["tea-ja", "tea-en", "garden-en", "excluded-placeholder"],
+      "relevant_ids": [],
+      "excluded_ids": ["excluded-placeholder"],
+      "vector": [0, 0, 1, 0]
+    },
+    {
+      "id": "excluded-only-en",
+      "text": "A synthetic question with all candidates excluded.",
+      "candidate_ids": ["excluded-placeholder"],
+      "relevant_ids": [],
+      "excluded_ids": ["excluded-placeholder"],
+      "vector": [0, 0, 0, 1]
+    },
+    {
+      "id": "empty-scope-ja",
+      "text": "空の合成候補範囲への質問。",
+      "candidate_ids": [],
+      "relevant_ids": [],
+      "excluded_ids": [],
+      "vector": [0, 0, 0, 1]
+    }
+  ]
+}

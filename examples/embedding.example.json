@@ -1,0 +1,9 @@
+{
+  "profile_id": "synthetic-embedding-disabled",
+  "model": "synthetic-embedding-model",
+  "model_digest": "synthetic-review-only",
+  "dimensions": 3,
+  "api_base": "http://127.0.0.1:18081/v1",
+  "timeout_seconds": 15.0,
+  "enabled": false
+}

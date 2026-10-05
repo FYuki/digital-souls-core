@@ -84,8 +84,8 @@ lint、format-check、静的型検査、UT、IT1、パッケージのbuild・ins
 
 ```sh
 uv sync --frozen
-uv run --no-sync ruff check src tests
-uv run --no-sync ruff format --check src tests
+uv run --no-sync ruff check src tests tools/evaluate-memory-search.py
+uv run --no-sync ruff format --check src tests tools/evaluate-memory-search.py
 uv run --no-sync mypy
 uv run --no-sync pytest -m ut -q
 uv run --no-sync pytest -m it1 -q
@@ -115,3 +115,17 @@ required checkの名前を安定させ、path条件や実行条件でpendingの�
 workflowをレビューした後、`docs-tooling`の必須化、PRレビューの必須化、
 mainへの直接pushの禁止を検討してください。保護を有効にする前に、
 bypass権限とforkでの挙動を確認します。今回、これらの設定は変更していません。
+
+
+## PostgreSQL adapter の合成契約テスト
+
+PostgreSQL を変更する場合は `bash tools/test-postgres.sh` も実行します。専用の
+`postgres` marker は実 DB プロセスを使うため、プロセス内の UT / IT1 と分離します。
+公式 PostgreSQL 18 イメージを digest 固定し、ネットワークなし・公開ポートなしの
+使い捨てコンテナへ Unix socket で接続します。取得時のみネットワークが必要です。
+DB は合成データだけで、実環境の認証情報やデータは使いません。実行後は削除します。
+CI の `postgres-storage` は全 PR と main / epic push で必須試験を実行し、0 件・skip は
+成功にしません。libpq の C 実装は pytest-socket の対象外なので、通信先の隔離はコンテナの
+ネットワーク無効化と明示的な Unix socket 接続で保証します。
+このテストの成功を実運用・実モデルの IT2 / ST の合格とは扱いません。
+設定・制約は [PostgreSQL の利用境界](docs/postgresql.md) を参照してください。

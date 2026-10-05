@@ -1,13 +1,16 @@
 """Explicit finite memory operations with current-policy and source authorization."""
 
+import asyncio
 import json
 from collections.abc import Callable
+from dataclasses import replace
 
 from .application import CoreError
 from .character import AccessScope, Character, GuardedContext
 from .history import Binding, SourceReference
 from .local_extractor import LocalExtractor
 from .memory_contracts import Memory, MemoryJob, MemoryStore, SourceVersion
+from .memory_ranking import EmbeddingSpace, MemoryEmbedding, rank_memories, validate_embedding_space
 from .privacy import PrivacyPolicy
 from .privacy_classifier import LocalClassifier
 from .privacy_scan import scan
@@ -22,13 +25,45 @@ class MemoryQueryUnavailable(CoreError):
 
 class MemoryService:
     def __init__(
-        self, store: MemoryStore, policy: PrivacyPolicy, extractor: LocalExtractor
+        self,
+        store: MemoryStore,
+        policy: PrivacyPolicy,
+        extractor: LocalExtractor,
+        *,
+        embedding: MemoryEmbedding | None = None,
     ) -> None:
         if not isinstance(policy.classifier, LocalClassifier):
             raise ValueError("memory requires managed local classification")
         self.store = store
         self.policy = policy
         self.extractor = extractor
+        self._embedding_generation = 0
+        self.embedding = embedding
+
+    @property
+    def embedding(self) -> MemoryEmbedding | None:
+        return self._embedding
+
+    @embedding.setter
+    def embedding(self, value: MemoryEmbedding | None) -> None:
+        # Trusted startup injection only. Even assigning the same instance retires
+        # outstanding ranking authorizations; no vector cache crosses generations.
+        self._embedding = value
+        self._embedding_generation += 1
+
+    def _retrieval_stamp(self) -> tuple[int, EmbeddingSpace | None]:
+        try:
+            space = None if self.embedding is None else self.embedding.space
+            if self.embedding is not None:
+                space = validate_embedding_space(space)
+                # Snapshot scalar metadata; even a trusted adapter bypassing the
+                # frozen dataclass cannot mutate a previously captured stamp.
+                space = replace(space)
+            return self._embedding_generation, space
+        except Exception:
+            raise CoreError(
+                502, "memory_embedding_failed", "Invalid memory embedding configuration"
+            ) from None
 
     def _versions(self) -> str:
         if not isinstance(self.policy.classifier, LocalClassifier):
@@ -114,30 +149,61 @@ class MemoryService:
         *,
         authorized: Callable[[], bool] = lambda: True,
     ) -> tuple[Memory, ...]:
-        policy, stamp, versions = self.policy, self.policy.stamp, self._versions()
-        if not authorized():
-            raise CoreError(403, "memory_denied", "Memory caller authorization changed")
-        query_allowed = await policy.authorize(binding, "memory", query)
         if (
-            not authorized()
-            or policy is not self.policy
-            or stamp != policy.stamp
-            or versions != self._versions()
+            not isinstance(query, str)
+            or not 0 < len(query) <= 256
+            or type(limit) is not int
+            or not 1 <= limit <= 16
         ):
-            raise CoreError(403, "memory_denied", "Memory policy changed")
+            raise CoreError(400, "memory_query_invalid", "Invalid memory query")
+        policy, stamp, versions = self.policy, self.policy.stamp, self._versions()
+        embedding, retrieval = self.embedding, self._retrieval_stamp()
+        memory_store = self.store
+
+        def check(memories: tuple[Memory, ...] = ()) -> None:
+            if (
+                not authorized()
+                or policy is not self.policy
+                or stamp != policy.stamp
+                or versions != self._versions()
+                or embedding is not self.embedding
+                or retrieval != self._retrieval_stamp()
+                or memory_store is not self.store
+                or (memories and not memory_store.valid(binding, memories))
+            ):
+                raise CoreError(403, "memory_denied", "Memory authorization changed")
+
+        check()
+        query_allowed = await policy.authorize(binding, "memory", query)
+        check()
         if not query_allowed:
             raise MemoryQueryUnavailable()
-        result = self.store.search(binding, query, limit)
+        if embedding is None:
+            result = memory_store.search(binding, query, limit)
+        else:
+            candidates = memory_store.candidates(binding)
+            # No persistent index: each operation ranks only currently eligible
+            # memories, and limits total text before classification or embedding.
+            if len(candidates) > 1000 or sum(len(m.text.encode()) for m in candidates) > 262144:
+                raise CoreError(413, "memory_limit", "Memory embedding scope exceeds limit")
+            check(candidates)
+            if not candidates:
+                return ()
+            if not await policy.authorize(binding, "memory", [m.text for m in candidates]):
+                raise CoreError(403, "memory_denied", "Memory candidates denied")
+            check(candidates)
+            try:
+                async with asyncio.timeout(15):
+                    vectors = await embedding.embed((query, *(m.text for m in candidates)))
+            except Exception:
+                raise CoreError(502, "memory_embedding_failed", "Memory embedding failed") from None
+            check(candidates)
+            space = retrieval[1]
+            assert space is not None
+            result = rank_memories(candidates, vectors, space, limit)
         if not await policy.authorize(binding, "memory", [m.text for m in result]):
             raise CoreError(403, "memory_denied", "Memory result denied")
-        if (
-            policy is not self.policy
-            or stamp != policy.stamp
-            or versions != self._versions()
-            or not self.store.valid(binding, result)
-            or not authorized()
-        ):
-            raise CoreError(403, "memory_denied", "Memory result changed")
+        check(candidates if embedding is not None else result)
         return result
 
     async def rebuild(self, binding: Binding, *, limit: int = 16) -> int:
@@ -187,6 +253,8 @@ class MemoryContext:
             self.service.policy.stamp,
             self.service._versions(),
         )
+        retrieval = self.service._retrieval_stamp()
+        memory_store = self.service.store
         memories: tuple[Memory, ...] = ()
         if user_text and policy.permits(binding, "memory"):
             try:
@@ -239,6 +307,8 @@ class MemoryContext:
                 and self.service.policy is policy
                 and policy.stamp == stamp
                 and self.service._versions() == versions
+                and self.service._retrieval_stamp() == retrieval
+                and self.service.store is memory_store
                 and (
                     not memories
                     or (
