@@ -78,23 +78,86 @@ DB transactionをLLM await中に保持しません。採用時にsource epoch・
 
 ## 検索と送信境界
 
-検索はcasefold後の部分文字列一致で、最新作成順です。意味検索・embedding・語彙展開・ランキング学習はありません。
+既定の検索はcasefold後の部分文字列一致で、最新作成順です。全質問文を部分一致queryにすると
+一致しにくいため、Python検索では特徴的な短い語句を明示します。語彙展開・ランキング学習はありません。
 queryは1〜256文字、limitは1〜16件、1 Bindingのactive memoryが1000件を超える場合は413で拒否します。
 各memoryの全sourceを照合するため、計算量は対象memory数と出典数に比例します。速度の実測保証はありません。
-全質問文を部分一致queryにすると一致しにくいため、Python検索では特徴的な短い語句を明示します。
 conversation自動contextは最新user文の先頭256文字をqueryにし、最大4件を既存context byte budget内で扱います。
 抽出は最大16 source（各2048文字）、最大8候補です。過大なcontextは切り捨てず既存のbudget errorにします。
 
+trusted起動コードが`MemoryService(..., embedding=trusted_embedder)`を明示すると、意味検索を使えます。
+`memory_ranking.py`の`MemoryEmbedding` Protocolを実装し、変更不可の
+`EmbeddingSpace(model, revision, dimensions)`で処理設定を示します。dimensionsは1〜4096です。
+任意の`configuration`は既定値`in-process`で、ローカルadapterでは通信設定も含めます。
+既存の接続例では引数を省略しているため、部分文字列検索を維持します。
+[ADR 0010](adr/0010-in-process-memory-search.md)のプロセス内portに加え、
+[ADR 0011](adr/0011-local-memory-embedding.md)で明示的なloopback通信adapterを提供します。
+モデルは同梱せず、任意の注入実装の通信をsandboxで制限する仕組みではありません。
+
+意味検索はquery認可後に、同じBindingで全sourceが現在も適格な候補を取得します。
+全候補本文のUTF-8合計が256 KiBを超える場合は、分類器・embeddingへ渡す前に拒否します。
+候補本文全体を現在のprivacyで認可し、全候補のsourceと設定を再照合してから、queryと全候補を
+1 batchでembeddingへ渡します。候補がない場合はembeddingを呼びません。embeddingのawaitは最大15秒で、
+検索操作全体の上限時間を示すものではありません。完了後にも全候補のsourceと設定を照合します。
+cosine類似度が正の候補だけを降順に並べ、同点は最新作成順にします。limit以内の結果を改めて
+privacy認可し、sourceと設定を照合して返します。不正vector、timeout、失敗は内容なしのエラー、
+cancelは伝播し、部分文字列検索へのfallbackはしません。実モデルの検索品質は未評価です。
+
+vectorは検索呼出し中だけの一時値で、永続index・共有cacheを作りません。返却するMemoryのID・本文・
+型・source refs/epochsと保存済み抽出provenanceは維持します。private化・指定発話除外・履歴削除・
+Binding分離は既存のsource境界を使い、archiveは検索対象を変えません。
+
 文字列化後もmemory ID・source refs/epochsを内部guardが保持します。現在のpolicy owner/generationとsourceを
-取得前・各await後・推論dispatch直前に照合します。通常ContextSourceや分類器のawait中のpolicy交換・
-source撤回では外部providerを呼びません。呼び出し開始済みの通信は回収できません。
-archiveは一覧表示だけで、memory検索の条件を変えません。
+取得前・各await後・推論dispatch直前に照合します。embeddingの差し替え世代とspaceも別のguardで保持し、
+空contextにも適用します。検索設定は抽出jobの`_versions()`に加えず、既存の抽出承認を変更しません。
+通常ContextSourceや分類器のawait中のpolicy交換・source撤回・embedding設定変更では古いcontextを
+providerへ送りません。呼び出し開始済みの処理や通信は回収できません。
+
+## ローカルembeddingの明示接続
+
+`LocalEmbeddingProfile`と`LocalEmbedding`は`digital_souls_core.local_embedding`にあります。
+[profile例](../examples/embedding.example.json)は`enabled=false`の合成設定で、実モデルや稼働portを
+確認した値ではありません。起動時に自動で読み込まれず、既存のhistory/dogfood設定を有効にしません。
+
+```python
+from pathlib import Path
+from digital_souls_core.local_embedding import LocalEmbedding, LocalEmbeddingProfile
+
+# trusted起動側が既存のstore・policy・extractorを構成済み。
+# profile例は無効。承認済みの接続先・alias・digest・次元へ別途設定する。
+profile = LocalEmbeddingProfile.model_validate_json(
+    Path("examples/embedding.example.json").read_text(encoding="utf-8")
+)
+if profile.enabled:
+    memory = MemoryService(store, policy, extractor, embedding=LocalEmbedding(profile))
+```
+
+`api_base`は数値port付きの`http://127.0.0.1:<port>/v1`だけを許可します。
+`model`は運用者が固定するembeddingモデルaliasで、返答のmodelも同じ値を要求します。
+`model_digest`は確認済みモデルの識別を運用者が固定する値であり、adapterが実ファイルを検証する機能ではありません。
+`dimensions`は1〜4096の応答次元数です。互換serverの次元縮約機能を前提にせず、requestには送りません。
+`timeout_seconds`は0より大きく15秒以下、`enabled`は既定falseです。無効なadapterを注入した場合も、
+部分文字列検索へfallbackせず送信を拒否します。
+
+既存lockの`openai==2.54.0`の`embeddings.with_raw_response.create`を使い、float形式のvectorを要求します。
+SDKによる型変換前のJSONを検証し、bool等がfloatへ変換されて受理されることを防ぎます。
+入力と応答の件数、model、indexの一意性と範囲、次元、非有限値・ゼロvectorを検証します。
+環境変数のproxy・認証情報・organization・projectを使わず、redirect・retry・外部fallbackを無効にします。
+`OPENAI_CUSTOM_HEADERS`が非空ならclient構築前に拒否し、環境headerによる認証情報・Hostの上書きを防ぎます。
+呼出しごとにclientを閉じ、cancel時もcloseを保護します。本文の意味分類とlocal/memory許可は
+`MemoryService`で行うため、adapter単体の呼出しを認可済み検索とは扱いません。
+
+正規化endpoint・profile ID・timeout・enabled・adapter/SDKの識別は`EmbeddingSpace.configuration`へ
+含め、検索中とdispatch前のguardに使います。抽出jobの保存済みprovenanceとは別で、DB migrationはありません。
+稼働済みの会話用モデルがembeddingへ対応する保証はありません。対応するモデルとpoolingを確認した後の
+実測手順は[意味検索評価](memory-evaluation.md)を参照してください。今回の実モデル呼出し・品質評価はNOT RUNです。
 
 ## 現在の範囲外
 
 私的input import、実モデル品質評価、正規化時刻、自由要約、過去発話への後付け除外/訂正API、
-memory単体の編集UI、vector検索、常駐job、tombstone自動掃除、ファイル/バックアップの物理消去保証は対象外です。
-合成fixtureとfake transportでの成功を、これらの完了や実品質の合格とは扱いません。
+memory単体の編集UI、モデル取得・GPUの操作・実embedding評価、PostgreSQL等へのDB変更、永続vector index、常駐job、
+tombstone自動掃除、ファイル/バックアップの物理消去保証は対象外です。
+合成fixture・fake transport・偽embeddingでの成功を、これらの完了や実品質の合格とは扱いません。
 
 
 記憶本文は人格systemメッセージへ結合せず、独立した user role の retrieved_memory_data として
@@ -113,7 +176,7 @@ queryの記憶利用が拒否された場合（機微判定・ABSTAIN・分類�
 検索前にpolicy/設定/呼び出しscopeが不変と確認できた場合だけ空contextへ戻します。
 専用の MemoryQueryUnavailable 型（code: memory_query_unavailable）で区別し、一般のCoreErrorは吸収しません。
 直接の記憶検索APIはこの拒否をエラーとして返します。結果の拒否、source撤回、設定不正、
-policy変更、storage障害、キャンセルは会話でもfail-closedです。
+policy変更、storage障害、embeddingの設定変更・不正出力・失敗・timeout、キャンセルは会話でもfail-closedです。
 空contextでも送信前まで呼び出しscope・policy世代・設定のguardを保持します。
 分類器の代入は単調増加する世代を更新し、交換後に元のobjectへ戻しても古い判定を再利用しません。
 

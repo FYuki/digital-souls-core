@@ -12,6 +12,7 @@ import openai
 
 from .application import CoreError
 from .character import Profile
+from .local_sdk import local_openai_client
 
 # Keep SDK import-time metadata access offline. No credentials are copied or logged.
 os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
@@ -116,20 +117,9 @@ class LiteLLMProvider:
         if profile.transport != "llamacpp_chat":
             yield None
             return
-        # Request-owned transport: never inherit environment proxies or SDK pools.
-        http = httpx.AsyncClient(trust_env=False, follow_redirects=False)
-        try:
-            client = openai.AsyncOpenAI(
-                base_url=profile.api_base,
-                api_key="local-no-auth",
-                http_client=http,
-                max_retries=0,
-                timeout=profile.timeout_seconds,
-            )
+        assert profile.api_base is not None
+        async with local_openai_client(profile.api_base, profile.timeout_seconds) as client:
             yield client
-        finally:
-            with anyio.CancelScope(shield=True):
-                await http.aclose()
 
     @staticmethod
     async def _call(
@@ -139,6 +129,10 @@ class LiteLLMProvider:
             raise CoreError(403, "external_send_denied", "Character export policy denies inference")
         provider_options: dict[str, Any] = {}
         if profile.transport == "llamacpp_chat":
+            # LiteLLM can override the injected SDK client's organization from
+            # its own global or alternate environment name. Do not forward it.
+            if litellm.organization or os.environ.get("OPENAI_ORGANIZATION"):
+                raise CoreError(403, "local_configuration_denied", "Local SDK configuration denied")
             # A public dummy value satisfies the SDK without forwarding cloud credentials.
             provider_options.update(api_base=profile.api_base, api_key="local-no-auth")
         if client is not None:

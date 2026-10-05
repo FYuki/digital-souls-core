@@ -1,0 +1,104 @@
+{
+  "fixture_version": "synthetic-retrieval-v1",
+  "mode": "fixture",
+  "quality_evidence": false,
+  "synthetic_only": true,
+  "backend_identity_verified": false,
+  "space": {
+    "model": "synthetic-fixture",
+    "revision": "synthetic-retrieval-v1",
+    "dimensions": 4,
+    "configuration": "in-process"
+  },
+  "k": 2,
+  "embedding_call_count": 3,
+  "query_count": 5,
+  "answerable_count": 2,
+  "unanswerable_count": 3,
+  "empty_result_count": 3,
+  "answerable_empty_result_count": 0,
+  "unanswerable_empty_result_count": 3,
+  "mean_recall_at_k": 1.0,
+  "mean_precision_at_k": 0.75,
+  "mrr_at_k": 1.0,
+  "unanswerable_empty_rate": 1.0,
+  "queries": [
+    {
+      "query_id": "warm-drink-ja",
+      "retrieved_ids": [
+        "tea-ja",
+        "tea-en"
+      ],
+      "relevant_ids": [
+        "tea-ja",
+        "tea-en"
+      ],
+      "excluded_ids": [
+        "excluded-placeholder"
+      ],
+      "candidate_count": 3,
+      "answerable": true,
+      "returned_empty": false,
+      "recall_at_k": 1.0,
+      "precision_at_k": 1.0,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "herb-en",
+      "retrieved_ids": [
+        "garden-en",
+        "tea-en"
+      ],
+      "relevant_ids": [
+        "garden-en"
+      ],
+      "excluded_ids": [],
+      "candidate_count": 3,
+      "answerable": true,
+      "returned_empty": false,
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.5,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query_id": "unknown-space-ja",
+      "retrieved_ids": [],
+      "relevant_ids": [],
+      "excluded_ids": [
+        "excluded-placeholder"
+      ],
+      "candidate_count": 3,
+      "answerable": false,
+      "returned_empty": true,
+      "recall_at_k": null,
+      "precision_at_k": null,
+      "reciprocal_rank": null
+    },
+    {
+      "query_id": "excluded-only-en",
+      "retrieved_ids": [],
+      "relevant_ids": [],
+      "excluded_ids": [
+        "excluded-placeholder"
+      ],
+      "candidate_count": 0,
+      "answerable": false,
+      "returned_empty": true,
+      "recall_at_k": null,
+      "precision_at_k": null,
+      "reciprocal_rank": null
+    },
+    {
+      "query_id": "empty-scope-ja",
+      "retrieved_ids": [],
+      "relevant_ids": [],
+      "excluded_ids": [],
+      "candidate_count": 0,
+      "answerable": false,
+      "returned_empty": true,
+      "recall_at_k": null,
+      "precision_at_k": null,
+      "reciprocal_rank": null
+    }
+  ]
+}
