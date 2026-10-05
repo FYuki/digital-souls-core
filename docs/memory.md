@@ -6,8 +6,10 @@
 
 ## 接続と操作
 
-trusted Python起動コードで、履歴と同じSQLiteファイルを使う`SQLiteMemory`、同じ`PrivacyPolicy`、
+trusted Python起動コードで、履歴と同じ保存先のMemoryStore、同じ`PrivacyPolicy`、
 検証済みlocal Profileを持つ`LocalClassifier`/`LocalExtractor`を構成します。
+保存先は`SQLiteMemory`、または明示選択の[PostgreSQL backend](postgresql.md)です。
+[意味検索との統合例](semantic-postgresql-integration.md)でも、接続と記憶抽出は明示操作です。
 memoryのHTTP操作やscope自己申告fieldは追加しません。利用者のsubject/client/audience/characterは
 `Binding`に固定されます。別Bindingのsource・job・memory・通知を照合できません。
 
@@ -155,7 +157,7 @@ SDKによる型変換前のJSONを検証し、bool等がfloatへ変換されて�
 ## 現在の範囲外
 
 私的input import、実モデル品質評価、正規化時刻、自由要約、過去発話への後付け除外/訂正API、
-memory単体の編集UI、モデル取得・GPUの操作・実embedding評価、PostgreSQL等へのDB変更、永続vector index、常駐job、
+memory単体の編集UI、モデル取得・GPUの操作・実embedding評価、稼働DBへの適用、永続vector index、常駐job、
 tombstone自動掃除、ファイル/バックアップの物理消去保証は対象外です。
 合成fixture・fake transport・偽embeddingでの成功を、これらの完了や実品質の合格とは扱いません。
 
