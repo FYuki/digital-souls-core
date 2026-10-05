@@ -32,6 +32,20 @@ def _job_key(binding: Binding, sources: tuple[SourceVersion, ...], versions: str
     ).hexdigest()
 
 
+def _evidence(ref: SourceReference, row: tuple[Any, ...] | None) -> Evidence:
+    if row is None or row[0] or row[2] or type(ref.message_index) is not int:
+        raise CoreError(409, "memory_source_invalid", "Memory source is unavailable")
+    messages = json.loads(row[4])
+    if not 0 <= ref.message_index < len(messages) or ref.message_index in json.loads(row[3]):
+        raise CoreError(409, "memory_source_invalid", "Memory source is unavailable")
+    message = messages[ref.message_index]
+    # Do not turn assistant proposals or tool output into user facts.
+    text = message.get("content")
+    if message["role"] != "user" or not isinstance(text, str) or not 0 < len(text) <= 2048:
+        raise CoreError(409, "memory_source_invalid", "Memory source is unavailable")
+    return Evidence(SourceVersion(ref, row[1]), text)
+
+
 class PostgresMemory(PostgresHistory):
     """Trusted storage port; use MemoryService for authorization and model boundaries."""
 
@@ -44,17 +58,7 @@ class PostgresMemory(PostgresHistory):
             "WHERE c.binding=%s AND c.id=%s AND t.revision=%s",
             (_key(binding), ref.conversation_id, ref.turn_revision),
         ).fetchone()
-        if row is None or row[0] or row[2] or type(ref.message_index) is not int:
-            raise CoreError(409, "memory_source_invalid", "Memory source is unavailable")
-        messages = json.loads(row[4])
-        if not 0 <= ref.message_index < len(messages) or ref.message_index in json.loads(row[3]):
-            raise CoreError(409, "memory_source_invalid", "Memory source is unavailable")
-        message = messages[ref.message_index]
-        # Do not turn assistant proposals or tool output into user facts.
-        text = message.get("content")
-        if message["role"] != "user" or not isinstance(text, str) or not 0 < len(text) <= 2048:
-            raise CoreError(409, "memory_source_invalid", "Memory source is unavailable")
-        return Evidence(SourceVersion(ref, row[1]), text)
+        return _evidence(ref, row)
 
     def sources(self, binding: Binding, refs: tuple[SourceReference, ...]) -> tuple[Evidence, ...]:
         if not 0 < len(refs) <= 16 or len(set(refs)) != len(refs):
@@ -62,15 +66,53 @@ class PostgresMemory(PostgresHistory):
         with self.database.transaction(binding) as db:
             return tuple(self._source(db, binding, ref) for ref in refs)
 
-    def _current(
-        self, db: Connection[tuple[Any, ...]], binding: Binding, sources: tuple[SourceVersion, ...]
+    def _source_rows(
+        self, db: Connection[tuple[Any, ...]], binding: Binding, refs: tuple[SourceReference, ...]
+    ) -> dict[tuple[str, int], tuple[Any, ...]]:
+        # Pair the arrays before joining: separate ANY predicates would also
+        # fetch unrelated conversation/revision combinations.
+        pairs = tuple(dict.fromkeys((ref.conversation_id, ref.turn_revision) for ref in refs))
+        if not pairs:
+            return {}
+        rows = db.execute(
+            "SELECT c.id,t.revision,c.private_mode,c.memory_epoch,"
+            "t.private_mode,t.memory_excluded,t.messages "
+            "FROM unnest(%s::text[], %s::bigint[]) AS requested(conversation,revision) "
+            "JOIN conversations c ON c.binding=%s AND c.id=requested.conversation "
+            "JOIN turns t ON t.binding=c.binding AND t.conversation=c.id "
+            "AND t.revision=requested.revision",
+            (
+                [conversation for conversation, _ in pairs],
+                [revision for _, revision in pairs],
+                _key(binding),
+            ),
+        ).fetchall()
+        return {(row[0], row[1]): row[2:] for row in rows}
+
+    def _current_rows(
+        self,
+        sources: tuple[SourceVersion, ...],
+        rows: dict[tuple[str, int], tuple[Any, ...]],
     ) -> bool:
         if not sources:
             return False
         try:
-            return all(self._source(db, binding, s.reference).source == s for s in sources)
+            return all(
+                _evidence(
+                    source.reference,
+                    rows.get((source.reference.conversation_id, source.reference.turn_revision)),
+                ).source
+                == source
+                for source in sources
+            )
         except CoreError:
             return False
+
+    def _current(
+        self, db: Connection[tuple[Any, ...]], binding: Binding, sources: tuple[SourceVersion, ...]
+    ) -> bool:
+        rows = self._source_rows(db, binding, tuple(source.reference for source in sources))
+        return self._current_rows(sources, rows)
 
     def current(self, binding: Binding, sources: tuple[SourceVersion, ...]) -> bool:
         with self.database.transaction(binding) as db:
@@ -180,17 +222,26 @@ class PostgresMemory(PostgresHistory):
         ).fetchall()
         if len(rows) > 1000:
             raise CoreError(413, "memory_limit", "Memory search scope exceeds limit")
+        if not rows:
+            return ()
+        grouped: dict[str, list[SourceVersion]] = {}
+        for identifier, conversation, revision, position, epoch in db.execute(
+            "SELECT memory,conversation,revision,position,epoch FROM memory_sources "
+            "WHERE binding=%s AND memory=ANY(%s::text[]) ORDER BY seq",
+            (_key(binding), [row[0] for row in rows]),
+        ):
+            grouped.setdefault(identifier, []).append(
+                SourceVersion(SourceReference(conversation, revision, position), epoch)
+            )
+        source_rows = self._source_rows(
+            db,
+            binding,
+            tuple(source.reference for sources in grouped.values() for source in sources),
+        )
         memories = []
         for identifier, kind, text in rows:
-            sources = tuple(
-                SourceVersion(SourceReference(c, r, p), e)
-                for c, r, p, e in db.execute(
-                    "SELECT conversation,revision,position,epoch FROM memory_sources "
-                    "WHERE binding=%s AND memory=%s ORDER BY seq",
-                    (_key(binding), identifier),
-                )
-            )
-            if self._current(db, binding, sources):
+            sources = tuple(grouped.get(identifier, ()))
+            if self._current_rows(sources, source_rows):
                 memories.append(Memory(identifier, kind, text, sources))
         return tuple(memories)
 
@@ -214,14 +265,23 @@ class PostgresMemory(PostgresHistory):
 
     def valid(self, binding: Binding, memories: tuple[Memory, ...]) -> bool:
         with self.database.transaction(binding) as db:
-            for memory in memories:
-                row = db.execute(
-                    "SELECT body,state FROM memories WHERE binding=%s AND id=%s",
-                    (_key(binding), memory.memory_id),
-                ).fetchone()
-                if row != (memory.text, "active") or not self._current(db, binding, memory.sources):
-                    return False
-            return True
+            if not memories:
+                return True
+            current = {
+                identifier: (text, state)
+                for identifier, text, state in db.execute(
+                    "SELECT id,body,state FROM memories WHERE binding=%s AND id=ANY(%s::text[])",
+                    (_key(binding), [memory.memory_id for memory in memories]),
+                )
+            }
+            if any(current.get(memory.memory_id) != (memory.text, "active") for memory in memories):
+                return False
+            rows = self._source_rows(
+                db,
+                binding,
+                tuple(source.reference for memory in memories for source in memory.sources),
+            )
+            return all(self._current_rows(memory.sources, rows) for memory in memories)
 
     def events(self, binding: Binding) -> tuple[str, ...]:
         with self.database.transaction(binding) as db:
