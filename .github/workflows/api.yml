@@ -29,8 +29,8 @@ jobs:
       - name: Lint, format and type contracts
         run: |
           bash -n tools/start-llamacpp.sh
-          uv run --no-sync ruff check src tests
-          uv run --no-sync ruff format --check src tests
+          uv run --no-sync ruff check src tests tools/evaluate-memory-search.py
+          uv run --no-sync ruff format --check src tests tools/evaluate-memory-search.py
           uv run --no-sync mypy
       - name: Required unit tests (no network)
         run: uv run --no-sync pytest -m ut -q

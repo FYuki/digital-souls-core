@@ -14,6 +14,26 @@ type SupportedParameter = Literal[
 ]
 
 
+def managed_loopback_endpoint(value: str) -> str:
+    """Normalize the fixed no-auth local SDK destination without resolving hostnames."""
+    if not isinstance(value, str) or any(ord(c) <= 32 or ord(c) == 127 for c in value):
+        raise ValueError("managed local endpoint required")
+    endpoint = urlsplit(value)
+    if (
+        endpoint.scheme != "http"
+        or endpoint.hostname != "127.0.0.1"
+        or endpoint.port is None
+        or endpoint.port == 0
+        or endpoint.username is not None
+        or endpoint.password is not None
+        or endpoint.path != "/v1"
+        or endpoint.query
+        or endpoint.fragment
+    ):
+        raise ValueError("managed local endpoint requires a loopback HTTP port and /v1 path")
+    return f"http://127.0.0.1:{endpoint.port}/v1"
+
+
 class Profile(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     profile_id: str = Field(pattern=r"^[a-zA-Z0-9_.-]{1,128}$")
@@ -35,19 +55,7 @@ class Profile(BaseModel):
                 raise ValueError(
                     "llamacpp_chat requires the verified gemma4-12b alias and api_base"
                 )
-            endpoint = urlsplit(self.api_base)
-            if (
-                endpoint.scheme != "http"
-                or endpoint.hostname != "127.0.0.1"
-                or endpoint.port is None
-                or endpoint.port == 0
-                or endpoint.username is not None
-                or endpoint.password is not None
-                or endpoint.path != "/v1"
-                or endpoint.query
-                or endpoint.fragment
-            ):
-                raise ValueError("llamacpp_chat requires a loopback HTTP port and /v1 path")
+            managed_loopback_endpoint(self.api_base)
         elif "api_base" in self.model_fields_set:
             raise ValueError("api_base is supported only for llamacpp_chat")
         return self
@@ -58,12 +66,11 @@ def local_destination_identity(profile: Profile) -> dict[str, str]:
     checked = Profile.model_validate(profile.model_dump(exclude_none=True))
     if checked.transport != "llamacpp_chat" or checked.api_base is None:
         raise ValueError("managed local destination required")
-    endpoint = urlsplit(checked.api_base)
     return {
         "destination_version": "managed-loopback-v1",
         "transport": checked.transport,
         "profile_id": checked.profile_id,
-        "endpoint": f"http://{endpoint.hostname}:{endpoint.port}/v1",
+        "endpoint": managed_loopback_endpoint(checked.api_base),
     }
 
 
