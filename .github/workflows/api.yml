@@ -28,7 +28,8 @@ jobs:
           uv sync --frozen
       - name: Lint, format and type contracts
         run: |
-          bash -n tools/start-llamacpp.sh tools/test-postgres.sh
+          bash -n tools/start-llamacpp.sh
+          bash -n tools/test-postgres.sh
           uv run --no-sync ruff check src tests tools/evaluate-memory-search.py
           uv run --no-sync ruff format --check src tests tools/evaluate-memory-search.py
           uv run --no-sync mypy
