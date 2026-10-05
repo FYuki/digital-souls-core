@@ -1,0 +1,13 @@
+{
+  "backend": "postgresql",
+  "postgres": {
+    "host": "127.0.0.1",
+    "port": 55432,
+    "database": "core_synthetic",
+    "user": "core_synthetic",
+    "schema_name": "digital_souls_synthetic",
+    "connect_timeout": 5,
+    "statement_timeout_ms": 5000,
+    "lock_timeout_ms": 3000
+  }
+}

@@ -14,6 +14,7 @@ dependencies = [
   "litellm==1.103.2",
   "openai==2.54.0",
   "pydantic==2.11.9",
+  "psycopg[binary]==3.3.6",
   "uvicorn==0.35.0",
 ]
 
@@ -51,4 +52,4 @@ follow_imports = "skip"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "--strict-markers --disable-socket --allow-unix-socket"
-markers = ["ut: isolated unit contracts", "it1: in-process integration with fake transport"]
+markers = ["ut: isolated unit contracts", "it1: in-process integration with fake transport", "postgres: isolated PostgreSQL storage contracts with synthetic data"]
