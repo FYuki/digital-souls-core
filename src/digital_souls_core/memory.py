@@ -3,6 +3,7 @@
 import asyncio
 import json
 from collections.abc import Callable
+from dataclasses import replace
 
 from .application import CoreError
 from .character import AccessScope, Character, GuardedContext
@@ -57,7 +58,7 @@ class MemoryService:
                 space = validate_embedding_space(space)
                 # Snapshot scalar metadata; even a trusted adapter bypassing the
                 # frozen dataclass cannot mutate a previously captured stamp.
-                space = EmbeddingSpace(space.model, space.revision, space.dimensions)
+                space = replace(space)
             return self._embedding_generation, space
         except Exception:
             raise CoreError(

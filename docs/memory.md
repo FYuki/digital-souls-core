@@ -88,10 +88,11 @@ conversation自動contextは最新user文の先頭256文字をqueryにし、最�
 trusted起動コードが`MemoryService(..., embedding=trusted_embedder)`を明示すると、意味検索を使えます。
 `memory_ranking.py`の`MemoryEmbedding` Protocolを実装し、変更不可の
 `EmbeddingSpace(model, revision, dimensions)`で処理設定を示します。dimensionsは1〜4096です。
+任意の`configuration`は既定値`in-process`で、ローカルadapterでは通信設定も含めます。
 既存の接続例では引数を省略しているため、部分文字列検索を維持します。
-実embedding adapterやモデルは同梱しません。注入実装はプロセス内処理のみというtrusted integrationの
-契約であり、任意のPython実装の通信をsandboxで制限する仕組みではありません。
-詳しくは[ADR 0010](adr/0010-in-process-memory-search.md)を参照してください。
+[ADR 0010](adr/0010-in-process-memory-search.md)のプロセス内portに加え、
+[ADR 0011](adr/0011-local-memory-embedding.md)で明示的なloopback通信adapterを提供します。
+モデルは同梱せず、任意の注入実装の通信をsandboxで制限する仕組みではありません。
 
 意味検索はquery認可後に、同じBindingで全sourceが現在も適格な候補を取得します。
 全候補本文のUTF-8合計が256 KiBを超える場合は、分類器・embeddingへ渡す前に拒否します。
@@ -112,10 +113,49 @@ Binding分離は既存のsource境界を使い、archiveは検索対象を変え
 通常ContextSourceや分類器のawait中のpolicy交換・source撤回・embedding設定変更では古いcontextを
 providerへ送りません。呼び出し開始済みの処理や通信は回収できません。
 
+## ローカルembeddingの明示接続
+
+`LocalEmbeddingProfile`と`LocalEmbedding`は`digital_souls_core.local_embedding`にあります。
+[profile例](../examples/embedding.example.json)は`enabled=false`の合成設定で、実モデルや稼働portを
+確認した値ではありません。起動時に自動で読み込まれず、既存のhistory/dogfood設定を有効にしません。
+
+```python
+from pathlib import Path
+from digital_souls_core.local_embedding import LocalEmbedding, LocalEmbeddingProfile
+
+# trusted起動側が既存のstore・policy・extractorを構成済み。
+# profile例は無効。承認済みの接続先・alias・digest・次元へ別途設定する。
+profile = LocalEmbeddingProfile.model_validate_json(
+    Path("examples/embedding.example.json").read_text(encoding="utf-8")
+)
+if profile.enabled:
+    memory = MemoryService(store, policy, extractor, embedding=LocalEmbedding(profile))
+```
+
+`api_base`は数値port付きの`http://127.0.0.1:<port>/v1`だけを許可します。
+`model`は運用者が固定するembeddingモデルaliasで、返答のmodelも同じ値を要求します。
+`model_digest`は確認済みモデルの識別を運用者が固定する値であり、adapterが実ファイルを検証する機能ではありません。
+`dimensions`は1〜4096の応答次元数です。互換serverの次元縮約機能を前提にせず、requestには送りません。
+`timeout_seconds`は0より大きく15秒以下、`enabled`は既定falseです。無効なadapterを注入した場合も、
+部分文字列検索へfallbackせず送信を拒否します。
+
+既存lockの`openai==2.54.0`の`embeddings.with_raw_response.create`を使い、float形式のvectorを要求します。
+SDKによる型変換前のJSONを検証し、bool等がfloatへ変換されて受理されることを防ぎます。
+入力と応答の件数、model、indexの一意性と範囲、次元、非有限値・ゼロvectorを検証します。
+環境変数のproxy・認証情報・organization・projectを使わず、redirect・retry・外部fallbackを無効にします。
+`OPENAI_CUSTOM_HEADERS`が非空ならclient構築前に拒否し、環境headerによる認証情報・Hostの上書きを防ぎます。
+呼出しごとにclientを閉じ、cancel時もcloseを保護します。本文の意味分類とlocal/memory許可は
+`MemoryService`で行うため、adapter単体の呼出しを認可済み検索とは扱いません。
+
+正規化endpoint・profile ID・timeout・enabled・adapter/SDKの識別は`EmbeddingSpace.configuration`へ
+含め、検索中とdispatch前のguardに使います。抽出jobの保存済みprovenanceとは別で、DB migrationはありません。
+稼働済みの会話用モデルがembeddingへ対応する保証はありません。対応するモデルとpoolingを確認した後の
+実測手順は[意味検索評価](memory-evaluation.md)を参照してください。今回の実モデル呼出し・品質評価はNOT RUNです。
+
 ## 現在の範囲外
 
 私的input import、実モデル品質評価、正規化時刻、自由要約、過去発話への後付け除外/訂正API、
-memory単体の編集UI、実embedding adapter・モデル/GPUの操作、永続vector index、常駐job、
+memory単体の編集UI、モデル取得・GPUの操作・実embedding評価、PostgreSQL等へのDB変更、永続vector index、常駐job、
 tombstone自動掃除、ファイル/バックアップの物理消去保証は対象外です。
 合成fixture・fake transport・偽embeddingでの成功を、これらの完了や実品質の合格とは扱いません。
 

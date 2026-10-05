@@ -14,6 +14,7 @@ class EmbeddingSpace:
     model: str = field(repr=False)
     revision: str = field(repr=False)
     dimensions: int
+    configuration: str = field(default="in-process", repr=False)
 
     def __post_init__(self) -> None:
         validate_embedding_space(self)
@@ -36,13 +37,22 @@ def validate_embedding_space(value: object) -> EmbeddingSpace:
                 raise ValueError
         if type(value.dimensions) is not int or not 1 <= value.dimensions <= 4096:
             raise ValueError
+        if (
+            type(value.configuration) is not str
+            or not 0 < len(value.configuration) <= 1024
+            or value.configuration != value.configuration.strip()
+        ):
+            raise ValueError
+        finding = scan(value.configuration)
+        if finding.secret or finding.failed:
+            raise ValueError
         return value
     except Exception:
         raise CoreError(502, "memory_embedding_failed", "Memory embedding failed") from None
 
 
 class MemoryEmbedding(Protocol):
-    """Trusted startup-injected in-process implementation; no transport adapter."""
+    """Trusted startup-injected embedding implementation with pinned configuration."""
 
     @property
     def space(self) -> EmbeddingSpace: ...
