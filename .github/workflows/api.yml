@@ -31,8 +31,8 @@ jobs:
           bash -n tools/start-llamacpp.sh
           bash -n tools/test-postgres.sh
           bash -n tools/test-pgvector-poc.sh
-          uv run --no-sync ruff check src tests experiments tools/evaluate-memory-search.py
-          uv run --no-sync ruff format --check src tests experiments tools/evaluate-memory-search.py
+          uv run --no-sync ruff check src tests experiments evals tools/evaluate-memory-search.py
+          uv run --no-sync ruff format --check src tests experiments evals tools/evaluate-memory-search.py
           uv run --no-sync mypy
       - name: Required unit tests (no network)
         run: uv run --no-sync pytest -m ut -q
@@ -48,7 +48,7 @@ jobs:
           package_python="$PWD/.package-check/bin/python"
           package_check_cwd=$(mktemp -d /tmp/core-wheel.XXXXXXXX)
           trap 'rmdir -- "$package_check_cwd"' EXIT
-          (cd -- "$package_check_cwd" && "$package_python" -I -B -c "import importlib.util; from digital_souls_core.api import create_app; assert create_app().title == 'Digital Souls Core'; assert importlib.util.find_spec('experiments') is None")
+          (cd -- "$package_check_cwd" && "$package_python" -I -B -c "import importlib.util; from digital_souls_core.api import create_app; assert create_app().title == 'Digital Souls Core'; assert importlib.util.find_spec('experiments') is None; assert importlib.util.find_spec('evals') is None")
 
   postgres-storage:
     runs-on: ubuntu-24.04

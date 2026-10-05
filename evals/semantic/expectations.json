@@ -1,0 +1,1041 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "synonym-warm-drink-ja",
+      "category": "synonym",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "tea-preference"
+      ],
+      "relevant_ids": [
+        "tea-preference"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [],
+      "expected_sources": {
+        "tea-preference": [
+          {
+            "source_id": "tea",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-tea",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ],
+        "mint-plant": [
+          {
+            "source_id": "plant",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-plant",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "tea-preference"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "紅茶"
+        ],
+        "forbidden_facts": [],
+        "required_citations": [
+          "tea-preference"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "paraphrase-weekend-ja",
+      "category": "paraphrase",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "weekend-cycle"
+      ],
+      "relevant_ids": [
+        "weekend-cycle"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [],
+      "expected_sources": {
+        "weekend-cycle": [
+          {
+            "source_id": "cycle",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-cycle",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ],
+        "evening-read": [
+          {
+            "source_id": "read",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-read",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "weekend-cycle"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "自転車"
+        ],
+        "forbidden_facts": [],
+        "required_citations": [
+          "weekend-cycle"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "cross-language-herb",
+      "category": "cross_language",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "windowsill-mint"
+      ],
+      "relevant_ids": [
+        "windowsill-mint"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [],
+      "expected_sources": {
+        "windowsill-mint": [
+          {
+            "source_id": "herb",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-herb",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ],
+        "garden-sunflower": [
+          {
+            "source_id": "flower",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-flower",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "windowsill-mint"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "ミント"
+        ],
+        "forbidden_facts": [],
+        "required_citations": [
+          "windowsill-mint"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "unrelated-observatory",
+      "category": "unrelated",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [],
+      "relevant_ids": [],
+      "min_recall": 1,
+      "forbidden_ids": [],
+      "expected_sources": {
+        "tea-only-memory": [
+          {
+            "source_id": "tea-only",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-tea-only",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ],
+        "music-only-memory": [
+          {
+            "source_id": "music-only",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-music-only",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": false,
+        "memory_ids": [],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "abstain",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "required_citations": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "negated-coffee-preference",
+      "category": "negation",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "coffee-dislike"
+      ],
+      "relevant_ids": [
+        "coffee-dislike"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [],
+      "expected_sources": {
+        "coffee-dislike": [
+          {
+            "source_id": "dislike-coffee",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-dislike-coffee",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ],
+        "tea-like": [
+          {
+            "source_id": "like-tea",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-like-tea",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "coffee-dislike"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "コーヒーが苦手",
+          "飲みません"
+        ],
+        "forbidden_facts": [],
+        "required_citations": [
+          "coffee-dislike"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "updated-morning-drink",
+      "category": "update",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "morning-drink"
+      ],
+      "relevant_ids": [
+        "morning-drink"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [],
+      "expected_sources": {
+        "morning-drink": [
+          {
+            "source_id": "morning",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-morning",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "morning-drink"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "ほうじ茶"
+        ],
+        "forbidden_facts": [
+          "緑茶を飲"
+        ],
+        "required_citations": [
+          "morning-drink"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "multisource-picnic",
+      "category": "multisource",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "picnic-items"
+      ],
+      "relevant_ids": [
+        "picnic-items"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [],
+      "expected_sources": {
+        "picnic-items": [
+          {
+            "source_id": "picnic-food",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "picnic-thread",
+            "turn_revision": 2,
+            "message_index": 2
+          },
+          {
+            "source_id": "picnic-drink",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "picnic-thread",
+            "turn_revision": 5,
+            "message_index": 4
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "picnic-items"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "サンドイッチ",
+          "麦茶"
+        ],
+        "forbidden_facts": [],
+        "required_citations": [
+          "picnic-items"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "multisource-partial-revocation",
+      "category": "multisource_revocation",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "remaining-food-only"
+      ],
+      "relevant_ids": [
+        "remaining-food-only"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [
+        "old-combined"
+      ],
+      "expected_sources": {
+        "remaining-food-only": [
+          {
+            "source_id": "remaining-food",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "partial-thread",
+            "turn_revision": 2,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "remaining-food-only"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "サンドイッチ"
+        ],
+        "forbidden_facts": [
+          "りんごジュース"
+        ],
+        "required_citations": [
+          "remaining-food-only"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "private-source",
+      "category": "private",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "private-source-visible"
+      ],
+      "relevant_ids": [
+        "private-source-visible"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [
+        "private-source-hidden"
+      ],
+      "expected_sources": {
+        "private-source-visible": [
+          {
+            "source_id": "private-source-safe",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-private-source-safe",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "private-source-visible"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "青"
+        ],
+        "forbidden_facts": [
+          "紫"
+        ],
+        "required_citations": [
+          "private-source-visible"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "excluded-source",
+      "category": "excluded",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "excluded-source-visible"
+      ],
+      "relevant_ids": [
+        "excluded-source-visible"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [
+        "excluded-source-hidden"
+      ],
+      "expected_sources": {
+        "excluded-source-visible": [
+          {
+            "source_id": "excluded-source-safe",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-excluded-source-safe",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "excluded-source-visible"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "青"
+        ],
+        "forbidden_facts": [
+          "紫"
+        ],
+        "required_citations": [
+          "excluded-source-visible"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "deleted-source",
+      "category": "deleted_source",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "deleted-source-visible"
+      ],
+      "relevant_ids": [
+        "deleted-source-visible"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [
+        "deleted-source-hidden"
+      ],
+      "expected_sources": {
+        "deleted-source-visible": [
+          {
+            "source_id": "deleted-source-safe",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-deleted-source-safe",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "deleted-source-visible"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "青"
+        ],
+        "forbidden_facts": [
+          "紫"
+        ],
+        "required_citations": [
+          "deleted-source-visible"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "deleted-memory",
+      "category": "deleted_memory",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "current-notebook"
+      ],
+      "relevant_ids": [
+        "current-notebook"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [
+        "removed-notebook"
+      ],
+      "expected_sources": {
+        "current-notebook": [
+          {
+            "source_id": "current-book",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-current-book",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "current-notebook"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "青"
+        ],
+        "forbidden_facts": [
+          "紫"
+        ],
+        "required_citations": [
+          "current-notebook"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "binding-character",
+      "category": "binding_character",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "binding-character-own"
+      ],
+      "relevant_ids": [
+        "binding-character-own"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [
+        "binding-character-other"
+      ],
+      "expected_sources": {
+        "binding-character-own": [
+          {
+            "source_id": "binding-character-local",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-binding-character-local",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "binding-character-own"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "りんご"
+        ],
+        "forbidden_facts": [
+          "ぶどう"
+        ],
+        "required_citations": [
+          "binding-character-own"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "binding-subject",
+      "category": "binding_subject",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "binding-subject-own"
+      ],
+      "relevant_ids": [
+        "binding-subject-own"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [
+        "binding-subject-other"
+      ],
+      "expected_sources": {
+        "binding-subject-own": [
+          {
+            "source_id": "binding-subject-local",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-binding-subject-local",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "binding-subject-own"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "りんご"
+        ],
+        "forbidden_facts": [
+          "ぶどう"
+        ],
+        "required_citations": [
+          "binding-subject-own"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "binding-client",
+      "category": "binding_client",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "binding-client-own"
+      ],
+      "relevant_ids": [
+        "binding-client-own"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [
+        "binding-client-other"
+      ],
+      "expected_sources": {
+        "binding-client-own": [
+          {
+            "source_id": "binding-client-local",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-binding-client-local",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "binding-client-own"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "りんご"
+        ],
+        "forbidden_facts": [
+          "ぶどう"
+        ],
+        "required_citations": [
+          "binding-client-own"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "unsupported-public-audience",
+      "category": "unsupported_audience",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "public",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [],
+      "relevant_ids": [],
+      "min_recall": 1,
+      "forbidden_ids": [],
+      "expected_sources": {},
+      "input_rejected": true,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": false,
+        "memory_ids": [],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "blocked",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "required_citations": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "long-text-explicit-detail",
+      "category": "long_text",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "long-note-memory"
+      ],
+      "relevant_ids": [
+        "long-note-memory"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [],
+      "expected_sources": {
+        "long-note-memory": [
+          {
+            "source_id": "long-note",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-long-note",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": true,
+        "memory_ids": [
+          "long-note-memory"
+        ],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "橙"
+        ],
+        "forbidden_facts": [],
+        "required_citations": [
+          "long-note-memory"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "post-search-revocation",
+      "category": "after_search",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "post-search-revocation-memory"
+      ],
+      "relevant_ids": [
+        "post-search-revocation-memory"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [],
+      "expected_sources": {
+        "post-search-revocation-memory": [
+          {
+            "source_id": "post-search-revocation-source",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-post-search-revocation-source",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": false,
+        "memory_ids": [],
+        "invalid_tokens": [
+          "post-search-revocation-memory"
+        ]
+      },
+      "answer": {
+        "behavior": "blocked",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "required_citations": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "post-answer-revocation",
+      "category": "after_answer",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [
+        "post-answer-revocation-memory"
+      ],
+      "relevant_ids": [
+        "post-answer-revocation-memory"
+      ],
+      "min_recall": 1,
+      "forbidden_ids": [],
+      "expected_sources": {
+        "post-answer-revocation-memory": [
+          {
+            "source_id": "post-answer-revocation-source",
+            "revision": 1,
+            "epoch": 0,
+            "conversation_id": "conversation-post-answer-revocation-source",
+            "turn_revision": 1,
+            "message_index": 0
+          }
+        ]
+      },
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": false,
+        "memory_ids": [],
+        "invalid_tokens": [
+          "post-answer-revocation-memory"
+        ]
+      },
+      "answer": {
+        "behavior": "blocked",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "required_citations": [],
+        "discarded": true
+      }
+    },
+    {
+      "id": "source-epoch-changed",
+      "category": "epoch_change",
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "expected_ids": [],
+      "relevant_ids": [],
+      "min_recall": 1,
+      "forbidden_ids": [
+        "old-epoch-memory"
+      ],
+      "expected_sources": {},
+      "input_rejected": false,
+      "rejected_memory_ids": [],
+      "dispatch": {
+        "allowed": false,
+        "memory_ids": [],
+        "invalid_tokens": []
+      },
+      "answer": {
+        "behavior": "abstain",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "required_citations": [],
+        "discarded": false
+      }
+    }
+  ]
+}

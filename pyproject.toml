@@ -42,7 +42,8 @@ select = ["E", "F", "I", "UP", "B", "ASYNC"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["src", "tests", "experiments", "tools/evaluate-memory-search.py"]
+files = ["src", "tests", "experiments", "evals", "tools/evaluate-memory-search.py"]
+exclude = ["(^|/)node_modules/"]
 
 [[tool.mypy.overrides]]
 module = ["litellm.*"]

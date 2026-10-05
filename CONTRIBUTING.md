@@ -146,3 +146,16 @@ bash tools/test-pgvector-poc.sh
 ネットワークなし・Unix socketのみの使い捨てDBとして起動します。0件・skipは失敗です。
 現行 `postgres-storage` の試験先・製品schema・通常起動を変更しません。
 比較方法と実モデル未検証の境界は [pgvector PoC](docs/pgvector-poc.md) を参照してください。
+
+## promptfooによる意味検索の評価
+
+[評価手順](docs/promptfoo-semantic-evaluation.md)では、独立した`evals/semantic`に
+promptfoo 0.117.2とlockfileを固定します。通常の製品セットアップには追加しません。
+CIは合成データ・fake embedding・回答fixtureで評価配線と必須の固定ゲートを検査します。
+実モデルの品質評価とは別の結果として扱い、未実行は`NOT_RUN`と記録してください。
+0件・欠落・重複・エラーを成功扱いにしません。private、公開範囲、撤回、削除の失敗を
+回答品質の平均点やLLM judgeで相殺しないでください。
+
+実モデルを使う場合は、明示されたローカルembedding/chat endpointと利用可能な資源を
+先に確認します。認証情報、有料API、私的ログ、正本の会話履歴を評価へ持ち込みません。
+新規モデルのダウンロードやサービス追加は、この評価実装に含まれる実行権限ではありません。

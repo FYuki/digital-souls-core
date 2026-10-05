@@ -39,3 +39,7 @@ PostgreSQL と意味検索を同時に使う trusted 起動側の構成・未実
 
 派生embeddingの永続化とSQL検索は、独立した合成データ用の
 [pgvector PoC](docs/pgvector-poc.md)で比較します。本番schemaや通常起動へは接続しません。
+
+意味検索と検索結果に基づく回答の評価は、合成ケースを使う
+[promptfoo評価](docs/promptfoo-semantic-evaluation.md)で分けて扱います。
+固定ゲートのCI結果は実モデルの品質合格を意味しません。

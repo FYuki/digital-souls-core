@@ -1,0 +1,1433 @@
+{
+  "schema_version": 1,
+  "dimensions": 4,
+  "cases": [
+    {
+      "id": "synonym-warm-drink-ja",
+      "category": "synonym",
+      "query": "架空のアオが好む温かい飲料は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "tea",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-tea",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "plant",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-plant",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "tea-preference",
+          "text": "架空のアオは、温かい紅茶を飲むのが好きです。",
+          "source_ids": [
+            "tea"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "mint-plant",
+          "text": "架空のアオは、窓辺の鉢でミントを育てています。",
+          "source_ids": [
+            "plant"
+          ],
+          "vector": [
+            0,
+            1,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [],
+      "limit": 1
+    },
+    {
+      "id": "paraphrase-weekend-ja",
+      "category": "paraphrase",
+      "query": "架空のアオは休日にどのように体を動かしますか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "cycle",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-cycle",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "read",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-read",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "weekend-cycle",
+          "text": "架空のアオは、週末になると自転車で川沿いを走ります。",
+          "source_ids": [
+            "cycle"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "evening-read",
+          "text": "架空のアオは、平日の夜に短編小説を読んでいます。",
+          "source_ids": [
+            "read"
+          ],
+          "vector": [
+            0,
+            1,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [],
+      "limit": 1
+    },
+    {
+      "id": "cross-language-herb",
+      "category": "cross_language",
+      "query": "Which herb does the fictional Aoi grow on the windowsill?",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "herb",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-herb",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "flower",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-flower",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "windowsill-mint",
+          "text": "架空のアオは、窓辺の鉢でミントを育てています。",
+          "source_ids": [
+            "herb"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "garden-sunflower",
+          "text": "架空のアオは、庭の花壇でヒマワリを育てています。",
+          "source_ids": [
+            "flower"
+          ],
+          "vector": [
+            0,
+            1,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [],
+      "limit": 1
+    },
+    {
+      "id": "unrelated-observatory",
+      "category": "unrelated",
+      "query": "架空のアオがこれまでに訪れた天文台の名前は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "tea-only",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-tea-only",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "music-only",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-music-only",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "tea-only-memory",
+          "text": "架空のアオは、朝に紅茶を飲みます。",
+          "source_ids": [
+            "tea-only"
+          ],
+          "vector": [
+            0,
+            1,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "music-only-memory",
+          "text": "架空のアオは、休日にピアノの音楽を聴きます。",
+          "source_ids": [
+            "music-only"
+          ],
+          "vector": [
+            0,
+            0,
+            1,
+            0
+          ]
+        }
+      ],
+      "mutations": [],
+      "limit": 1
+    },
+    {
+      "id": "negated-coffee-preference",
+      "category": "negation",
+      "query": "架空のアオが苦手で飲まない飲み物は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "dislike-coffee",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-dislike-coffee",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "like-tea",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-like-tea",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "coffee-dislike",
+          "text": "架空のアオは、コーヒーが苦手なので飲みません。",
+          "source_ids": [
+            "dislike-coffee"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "tea-like",
+          "text": "架空のアオは、紅茶を好んで飲みます。",
+          "source_ids": [
+            "like-tea"
+          ],
+          "vector": [
+            0,
+            1,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [],
+      "limit": 1
+    },
+    {
+      "id": "updated-morning-drink",
+      "category": "update",
+      "query": "架空のアオが今、朝に飲んでいるお茶は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "morning",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-morning",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "morning-drink",
+          "text": "架空のアオは、朝に緑茶を飲んでいます。",
+          "source_ids": [
+            "morning"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [
+        {
+          "phase": "before_search",
+          "op": "memory_update",
+          "memory_id": "morning-drink",
+          "text": "架空のアオは、今は朝にほうじ茶を飲んでいます。",
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "source_ids": [
+            "morning"
+          ]
+        }
+      ],
+      "limit": 1
+    },
+    {
+      "id": "multisource-picnic",
+      "category": "multisource",
+      "query": "架空のアオが公園へ持っていく食べ物と飲み物は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "picnic-food",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "picnic-thread",
+          "turn_revision": 2,
+          "message_index": 2,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "picnic-drink",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "picnic-thread",
+          "turn_revision": 5,
+          "message_index": 4,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "picnic-items",
+          "text": "架空のアオは、公園へサンドイッチを持っていきます。飲み物は麦茶です。",
+          "source_ids": [
+            "picnic-food",
+            "picnic-drink"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [],
+      "limit": 1
+    },
+    {
+      "id": "multisource-partial-revocation",
+      "category": "multisource_revocation",
+      "query": "架空のアオが公園へ持っていく食べ物は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "remaining-food",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "partial-thread",
+          "turn_revision": 2,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "withdrawn-drink",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "partial-thread",
+          "turn_revision": 3,
+          "message_index": 2,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "old-combined",
+          "text": "架空のアオは、公園へサンドイッチとりんごジュースを持っていきます。",
+          "source_ids": [
+            "remaining-food",
+            "withdrawn-drink"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "remaining-food-only",
+          "text": "架空のアオは、公園へサンドイッチを持っていきます。",
+          "source_ids": [
+            "remaining-food"
+          ],
+          "vector": [
+            0.9,
+            0.1,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [
+        {
+          "phase": "before_search",
+          "op": "source_replace",
+          "source_id": "withdrawn-drink",
+          "changes": {
+            "private": true,
+            "epoch": 1
+          }
+        }
+      ],
+      "limit": 1
+    },
+    {
+      "id": "private-source",
+      "category": "private",
+      "query": "架空のアオが公開範囲内で選んだメモ帳の色は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "private-source-source",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-private-source-source",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "private-source-safe",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-private-source-safe",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "private-source-hidden",
+          "text": "架空のアオの取り下げ対象のメモ帳は紫色です。",
+          "source_ids": [
+            "private-source-source"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "private-source-visible",
+          "text": "架空のアオの参照可能なメモ帳は青色です。",
+          "source_ids": [
+            "private-source-safe"
+          ],
+          "vector": [
+            0.9,
+            0.1,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [
+        {
+          "phase": "before_search",
+          "op": "source_replace",
+          "source_id": "private-source-source",
+          "changes": {
+            "private": true,
+            "epoch": 1
+          }
+        }
+      ],
+      "limit": 1
+    },
+    {
+      "id": "excluded-source",
+      "category": "excluded",
+      "query": "架空のアオが公開範囲内で選んだメモ帳の色は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "excluded-source-source",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-excluded-source-source",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "excluded-source-safe",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-excluded-source-safe",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "excluded-source-hidden",
+          "text": "架空のアオの取り下げ対象のメモ帳は紫色です。",
+          "source_ids": [
+            "excluded-source-source"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "excluded-source-visible",
+          "text": "架空のアオの参照可能なメモ帳は青色です。",
+          "source_ids": [
+            "excluded-source-safe"
+          ],
+          "vector": [
+            0.9,
+            0.1,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [
+        {
+          "phase": "before_search",
+          "op": "source_replace",
+          "source_id": "excluded-source-source",
+          "changes": {
+            "excluded": true,
+            "revision": 2
+          }
+        }
+      ],
+      "limit": 1
+    },
+    {
+      "id": "deleted-source",
+      "category": "deleted_source",
+      "query": "架空のアオが公開範囲内で選んだメモ帳の色は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "deleted-source-source",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-deleted-source-source",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "deleted-source-safe",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-deleted-source-safe",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "deleted-source-hidden",
+          "text": "架空のアオの取り下げ対象のメモ帳は紫色です。",
+          "source_ids": [
+            "deleted-source-source"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "deleted-source-visible",
+          "text": "架空のアオの参照可能なメモ帳は青色です。",
+          "source_ids": [
+            "deleted-source-safe"
+          ],
+          "vector": [
+            0.9,
+            0.1,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [
+        {
+          "phase": "before_search",
+          "op": "source_replace",
+          "source_id": "deleted-source-source",
+          "changes": {
+            "deleted": true,
+            "revision": 2
+          }
+        }
+      ],
+      "limit": 1
+    },
+    {
+      "id": "deleted-memory",
+      "category": "deleted_memory",
+      "query": "架空のアオが今使っているメモ帳の色は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "old-book",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-old-book",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "current-book",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-current-book",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "removed-notebook",
+          "text": "架空のアオの以前のメモ帳は紫色でした。",
+          "source_ids": [
+            "old-book"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "current-notebook",
+          "text": "架空のアオは、今は青色のメモ帳を使っています。",
+          "source_ids": [
+            "current-book"
+          ],
+          "vector": [
+            0.9,
+            0.1,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [
+        {
+          "phase": "before_search",
+          "op": "memory_delete",
+          "memory_id": "removed-notebook"
+        }
+      ],
+      "limit": 1
+    },
+    {
+      "id": "binding-character",
+      "category": "binding_character",
+      "query": "この範囲の架空のアオが好きな果物は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "binding-character-local",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-binding-character-local",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "binding-character-foreign",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-binding-character-foreign",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user",
+          "binding": {
+            "subject": "synthetic-operator",
+            "client": "promptfoo-evaluation",
+            "audience": "local-private",
+            "character_id": "synthetic-other-character"
+          }
+        }
+      ],
+      "memories": [
+        {
+          "id": "binding-character-own",
+          "text": "この範囲の架空のアオは、りんごが好きです。",
+          "source_ids": [
+            "binding-character-local"
+          ],
+          "vector": [
+            0.9,
+            0.1,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "binding-character-other",
+          "text": "別の範囲の架空の人物は、ぶどうが好きです。",
+          "source_ids": [
+            "binding-character-foreign"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "binding": {
+            "subject": "synthetic-operator",
+            "client": "promptfoo-evaluation",
+            "audience": "local-private",
+            "character_id": "synthetic-other-character"
+          }
+        }
+      ],
+      "mutations": [],
+      "limit": 1
+    },
+    {
+      "id": "binding-subject",
+      "category": "binding_subject",
+      "query": "この範囲の架空のアオが好きな果物は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "binding-subject-local",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-binding-subject-local",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "binding-subject-foreign",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-binding-subject-foreign",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user",
+          "binding": {
+            "subject": "synthetic-other-operator",
+            "client": "promptfoo-evaluation",
+            "audience": "local-private",
+            "character_id": "synthetic-aoi"
+          }
+        }
+      ],
+      "memories": [
+        {
+          "id": "binding-subject-own",
+          "text": "この範囲の架空のアオは、りんごが好きです。",
+          "source_ids": [
+            "binding-subject-local"
+          ],
+          "vector": [
+            0.9,
+            0.1,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "binding-subject-other",
+          "text": "別の範囲の架空の人物は、ぶどうが好きです。",
+          "source_ids": [
+            "binding-subject-foreign"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "binding": {
+            "subject": "synthetic-other-operator",
+            "client": "promptfoo-evaluation",
+            "audience": "local-private",
+            "character_id": "synthetic-aoi"
+          }
+        }
+      ],
+      "mutations": [],
+      "limit": 1
+    },
+    {
+      "id": "binding-client",
+      "category": "binding_client",
+      "query": "この範囲の架空のアオが好きな果物は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "binding-client-local",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-binding-client-local",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        },
+        {
+          "id": "binding-client-foreign",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-binding-client-foreign",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user",
+          "binding": {
+            "subject": "synthetic-operator",
+            "client": "synthetic-other-client",
+            "audience": "local-private",
+            "character_id": "synthetic-aoi"
+          }
+        }
+      ],
+      "memories": [
+        {
+          "id": "binding-client-own",
+          "text": "この範囲の架空のアオは、りんごが好きです。",
+          "source_ids": [
+            "binding-client-local"
+          ],
+          "vector": [
+            0.9,
+            0.1,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "binding-client-other",
+          "text": "別の範囲の架空の人物は、ぶどうが好きです。",
+          "source_ids": [
+            "binding-client-foreign"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "binding": {
+            "subject": "synthetic-operator",
+            "client": "synthetic-other-client",
+            "audience": "local-private",
+            "character_id": "synthetic-aoi"
+          }
+        }
+      ],
+      "mutations": [],
+      "limit": 1
+    },
+    {
+      "id": "unsupported-public-audience",
+      "category": "unsupported_audience",
+      "query": "架空のアオが好きな果物は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "public",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "public-attempt",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-public-attempt",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "public-attempt-memory",
+          "text": "架空のアオは、りんごが好きです。",
+          "source_ids": [
+            "public-attempt"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [],
+      "limit": 1
+    },
+    {
+      "id": "long-text-explicit-detail",
+      "category": "long_text",
+      "query": "架空のアオが小物入れにつけた目印の色は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "long-note",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-long-note",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "long-note-memory",
+          "text": "架空のアオの作業記録の第1項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第2項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第3項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第4項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第5項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第6項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第7項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第8項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第9項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第10項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第11項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第12項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第13項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第14項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第15項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第16項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第17項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオの作業記録の第18項は、机を片付けて道具を棚に戻したという日常の整理についてです。架空のアオは、小物入れの目印に橙色のリボンを結びました。補足1として、作業を終えたあとはノートに日付を記入し、照明を消して部屋を出ます。補足2として、作業を終えたあとはノートに日付を記入し、照明を消して部屋を出ます。補足3として、作業を終えたあとはノートに日付を記入し、照明を消して部屋を出ます。補足4として、作業を終えたあとはノートに日付を記入し、照明を消して部屋を出ます。補足5として、作業を終えたあとはノートに日付を記入し、照明を消して部屋を出ます。補足6として、作業を終えたあとはノートに日付を記入し、照明を消して部屋を出ます。補足7として、作業を終えたあとはノートに日付を記入し、照明を消して部屋を出ます。補足8として、作業を終えたあとはノートに日付を記入し、照明を消して部屋を出ます。補足9として、作業を終えたあとはノートに日付を記入し、照明を消して部屋を出ます。補足10として、作業を終えたあとはノートに日付を記入し、照明を消して部屋を出ます。補足11として、作業を終えたあとはノートに日付を記入し、照明を消して部屋を出ます。補足12として、作業を終えたあとはノートに日付を記入し、照明を消して部屋を出ます。",
+          "source_ids": [
+            "long-note"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [],
+      "limit": 1
+    },
+    {
+      "id": "post-search-revocation",
+      "category": "after_search",
+      "query": "架空のアオが好きな飲み物は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "post-search-revocation-source",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-post-search-revocation-source",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "post-search-revocation-memory",
+          "text": "架空のアオは、紅茶が好きです。",
+          "source_ids": [
+            "post-search-revocation-source"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [
+        {
+          "phase": "after_search",
+          "op": "source_replace",
+          "source_id": "post-search-revocation-source",
+          "changes": {
+            "private": true,
+            "epoch": 1
+          }
+        }
+      ],
+      "limit": 1
+    },
+    {
+      "id": "post-answer-revocation",
+      "category": "after_answer",
+      "query": "架空のアオが好きな飲み物は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "post-answer-revocation-source",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-post-answer-revocation-source",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "post-answer-revocation-memory",
+          "text": "架空のアオは、紅茶が好きです。",
+          "source_ids": [
+            "post-answer-revocation-source"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [
+        {
+          "phase": "after_answer",
+          "op": "source_replace",
+          "source_id": "post-answer-revocation-source",
+          "changes": {
+            "private": true,
+            "epoch": 1
+          }
+        }
+      ],
+      "limit": 1
+    },
+    {
+      "id": "source-epoch-changed",
+      "category": "epoch_change",
+      "query": "架空のアオが好きな飲み物は何ですか？",
+      "query_vector": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "binding": {
+        "subject": "synthetic-operator",
+        "client": "promptfoo-evaluation",
+        "audience": "local-private",
+        "character_id": "synthetic-aoi"
+      },
+      "sources": [
+        {
+          "id": "epoch-source",
+          "revision": 1,
+          "epoch": 0,
+          "conversation_id": "conversation-epoch-source",
+          "turn_revision": 1,
+          "message_index": 0,
+          "private": false,
+          "excluded": false,
+          "deleted": false,
+          "role": "user"
+        }
+      ],
+      "memories": [
+        {
+          "id": "old-epoch-memory",
+          "text": "架空のアオは、紅茶が好きです。",
+          "source_ids": [
+            "epoch-source"
+          ],
+          "vector": [
+            1,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "mutations": [
+        {
+          "phase": "before_search",
+          "op": "source_replace",
+          "source_id": "epoch-source",
+          "changes": {
+            "epoch": 1,
+            "revision": 2
+          }
+        }
+      ],
+      "limit": 1
+    }
+  ]
+}

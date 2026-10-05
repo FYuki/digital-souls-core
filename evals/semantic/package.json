@@ -1,0 +1,8 @@
+{
+  "name": "digital-souls-core-semantic-evals",
+  "version": "0.0.0",
+  "private": true,
+  "description": "合成データ専用の意味検索・回答評価。製品依存へ含めない。",
+  "engines": { "node": "24.19.0" },
+  "devDependencies": { "promptfoo": "0.117.2" }
+}
