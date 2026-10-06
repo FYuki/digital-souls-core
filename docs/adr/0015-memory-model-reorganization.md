@@ -58,7 +58,8 @@ PoCの要件書（[#340 Episodic Memory](https://github.com/FYuki/digital-souls/
 - [ADR 0006](0006-conversation-memory-controls.md)の操作表（指定発話の記憶除外、スレッド単位の
   プライベートモード、会話履歴削除で派生記憶も削除、アーカイブは記憶を維持）と、
   private化・複数sourceの一部撤回時の扱いを維持します。PoCの自然文による保存拒否の語彙は、
-  この明示APIを置き換えません（自然文の扱いは[SPEC](../../SPEC.md)の要決定事項）。
+  この明示APIを置き換えません。自然文は検出してプライベートモードへの切替を確認する契機に使います
+  （[ADR 0019](0019-memory-correction-invalidation.md)）。
 - 秘密値・直接識別値の扱い（[ADR 0005](0005-privacy-boundaries.md)の全文拒否）は維持します。
 
 AIが作成したCoreの次の判断は、本ADR群で置き換えます。
@@ -67,7 +68,7 @@ AIが作成したCoreの次の判断は、本ADR群で置き換えます。
 | --- | --- |
 | ADR 0005「PoC全体の移植はmemory schema・worker等への依存を増やすため行いません」 | 本ADRの移設原則 |
 | ADR 0007「抽出器は型とsource indexのみを返し、本文は選ばれたuser発話全体」「episodeは分類ラベルで正規化時間schemaは未実装」 | ADR 0016・0017の構造化記録（5W、日時、Fact、引用範囲） |
-| ADR 0007「自動履歴取り込み、常駐worker、schedulerは追加しない」 | ADR 0017の非同期形成（実行の起動方法は要決定） |
+| ADR 0007「自動履歴取り込み、常駐worker、schedulerは追加しない」 | ADR 0017の非同期形成（実行はPrivateAgent、Coreは予約とdrain API） |
 | ADR 0007/0010「SQLite内の語句検索」「正のcosine・最新作成順」 | ADR 0018の検索・順位 |
 | [CONTEXT](../../CONTEXT.md)旧版「worker、schedulerは現在のCoreの対象外」 | ADR 0017の形成責務と、ADR 0020の実行基盤の境界 |
 

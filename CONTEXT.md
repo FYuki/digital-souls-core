@@ -15,8 +15,9 @@ Coreの範囲は次のとおりです。
 - プロバイダーのadapterを交換できるLLM port。
 
 音声・STT・TTS、LiveKit、UIはCoreの対象外です。Coreは外部Agentのtool実行ループを持たず、
-通常チャットUIからも呼べます（[推論API](docs/api.md)）。記憶の形成jobの起動や会話外の活動を
-実行する基盤との分担は、[SPEC](SPEC.md)の要決定事項です。
+通常チャットUIからも呼べます（[推論API](docs/api.md)）。記憶の形成jobの起動や会話外の活動は
+PrivateAgentが実行し、キャラクターによる判断が必要な処理ではCoreのLLMをAPIとして呼びます。
+Coreは記憶の正本と検証、機微情報の流出防止ゲート、インジェクション対策を所有します。
 
 記憶モデルはPoC（公開`FYuki/digital-souls`）で採用済みの決定を移設したものです
 （[ADR 0015](docs/adr/0015-memory-model-reorganization.md)）。機能の実装状況と受入条件は[SPEC](SPEC.md)、

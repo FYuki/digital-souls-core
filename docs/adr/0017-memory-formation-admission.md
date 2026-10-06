@@ -82,11 +82,16 @@ policyのversionを独立して記録します。既存の[ADR 0005](0005-privac
   保存結果の対応で行います。生本文のhashを冪等keyに使いません。
 - 推論は会話を優先します。高負荷時は未処理を保持して形成を遅らせ、品質基準を下げません。
 
-形成jobの実行（いつ・どのプロセスでdrainするか）の起動方法は、PoCの
+形成jobの実行は、PoCの
 [Character Life §13](https://github.com/FYuki/digital-souls/blob/fce7382884d981c42be7fbd3ddaffe7469e27588/docs/decisions/character-life-memory-personality-autonomy-2026-09.md)
-に従い、orchestration・queue・schedulingを外部の実行基盤へ委譲できる設計にします。
-Coreは永続予約、有限のdrain処理、正本更新条件を所有します。常駐workerをCoreに含めるかは
-[SPEC](../../SPEC.md)の要決定事項とします。
+に従い外部の実行基盤へ委譲します。ユーザーの決定（2026-10-06）により、実行基盤はPrivateAgentとし、
+Coreに常駐workerを含めません。
+
+- Coreは、形成jobの永続予約、有限のdrain処理（API）、正本の更新条件と検証を所有します。
+- PrivateAgentは、drainの起動・スケジュール・再試行・待機と再開を担当します。
+- キャラクターによる判断が必要な処理（抽出、一般化、内省、人格評価など）は、PrivateAgentが
+  CoreのLLMをAPIとして呼び出します。Coreはそのpromptと人格文脈、保存前の検証を所有し、
+  PrivateAgentが正本を直接書き換える経路は作りません。
 
 ### 5. 同一スレッドのFact照合と更新
 

@@ -106,8 +106,9 @@ LLM等が生成し、privacy・根拠・schema・policyの検証前のデータ�
 
 - 保存schemaは、Episode・Fact・Episode–Fact参照・Fact統合関係・Semantic・Reflectionの各正本と、
   日時・版・出典の列を持つ形へ拡張します。具体的な表・列は実装Issueで決めます。
-- 既存の逐語本文の記憶は新形式と同一視しません。既存データの扱い（保持して旧契約で検索するか、
-  新形式で再抽出するか）は、dogfoodのPostgreSQLを含めて移行計画で決め、backup・検証・rollbackを必須にします。
+- 既存の逐語本文の記憶は、ユーザーの決定（2026-10-06）により新形式へ移行せず削除します。
+  dogfoodはCoreへの切替中で運用前のため、旧形式の互換・移送は要件にしません。会話履歴は保持します。
+  運用開始後のschema変更では、backup・移行・検証・rollbackを必須にします。
 - 物理schemaの変更前に、SQLiteとPostgreSQLの両adapterで同じ契約試験を用意します。
 
 ## 参照

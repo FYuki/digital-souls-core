@@ -76,18 +76,26 @@ Relationship Stateは人格と分離し、相手ごとに`affective_valence`と`
 
 ### 6. 会話外の活動との境界
 
-Coreには外部Agentのtool実行ループを持たない方針があります（ADR 0001）。PoCの自律活動の契約
-（Autonomy Target、外部送信直前のEgress Privacy Check、Minimum Disclosure、High Impact操作の確認、
-実行結果の状態）は、会話外の活動を実行する基盤に適用する契約として参照します。Coreがどこまで所有するかは
-[SPEC](../../SPEC.md)の要決定事項です。いずれの場合も、活動からの経験は本ADR群の形成・privacy・失効の
-契約を通して記憶へ入れます。
+Coreには外部Agentのtool実行ループを持たない方針があります（ADR 0001）。会話外の活動はPrivateAgentが実行します。
+ユーザーの決定（2026-10-06）により、Coreは次の2つを所有します。
+
+- **機微情報の流出防止ゲート**：外部へ送る直前の内容（tool引数、外部投稿等）を、Coreのscannerと意味分類で
+  再判定します。秘密値は常に止め、機微情報はMVPでは安全側に倒して止めます。承認済みの記憶から複数の情報を
+  組み合わせて機微情報を推論し得るため、保存時の判定とは別に送信直前に判定します（PoCのEgress Privacy Check、
+  Minimum Disclosure）。
+- **インジェクション対策**：外部の内容（Web、tool結果、他者の発言等）と記憶の本文を、命令ではなくデータとして
+  扱う境界です。記憶contextを人格の指示と分けて渡す既存の扱い（[ADR 0007](0007-memory-provenance-and-revocation.md)）を、
+  外部の内容と活動の判断にも適用します。promptは強制機構ではないため、権限・保存・送信の判断をpromptに依存させません。
+
+Autonomy Targetの管理、High Impact操作の確認、実行結果の状態などの実行時の契約はPrivateAgent側が所有します。
+活動からの経験は、本ADR群の形成・privacy・失効の契約を通して記憶へ入れます。
 
 ### 7. 優先順位と実行基盤
 
 処理の優先順位は「前景の会話 > ユーザーが依頼した活動 > 自律的な背景処理」とします。前景の会話開始時に
 背景処理を強制停止するかは、実測してから決めます。orchestration・queue・scheduling・待機と再開・
-checkpointは外部の実行基盤へ委譲でき、正本の更新条件・privacy・lineage・人格delta上限・活動の権限境界は
-Coreの共通契約として維持します。
+checkpointは実行基盤（PrivateAgent）へ委譲し、正本の更新条件・privacy・lineage・人格delta上限は
+Coreの共通契約として維持します。キャラクターによる判断はCoreのLLM APIを通します（[ADR 0017](0017-memory-formation-admission.md)）。
 
 ## 影響
 
