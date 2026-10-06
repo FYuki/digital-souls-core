@@ -22,11 +22,15 @@ from .history import (
     SourceDeletion,
     SourceReference,
     SourceState,
+    TurnDeletion,
+    TurnDeletionInput,
+    TurnDeletionResult,
     as_utc,
     current_utc,
 )
 from .memory_confirmation import blocked, decode, pending, resolve
-from .memory_sql import initialize, revoke
+from .memory_sql import initialize, revoke, revoke_turns
+from .turn_deletion import select_turns
 
 
 def default_history_path() -> Path:
@@ -57,7 +61,7 @@ class SQLiteHistory:
             # executescript would implicitly commit an existing transaction.
             db.execute("BEGIN IMMEDIATE")
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, 1, 2, 3, 4, 5):
+            if version not in (0, 1, 2, 3, 4, 5, 6):
                 raise ValueError("unsupported history schema")
             if version == 0:
                 if db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchone():
@@ -108,6 +112,19 @@ class SQLiteHistory:
                     "ALTER TABLE turns ADD COLUMN memory_confirmation TEXT NOT NULL DEFAULT '{}'"
                 )
                 db.execute("PRAGMA user_version=5")
+            if version in (0, 1, 2, 3, 4, 5):
+                db.execute("""CREATE TABLE turn_tombstones (
+                    binding TEXT NOT NULL, conversation TEXT NOT NULL,
+                    request TEXT NOT NULL, revision INTEGER NOT NULL,
+                    PRIMARY KEY(binding,conversation,request),
+                    FOREIGN KEY(binding,conversation) REFERENCES conversations(binding,id)
+                        ON DELETE CASCADE
+                )""")
+                db.execute("""CREATE TABLE turn_deletions (
+                    event TEXT PRIMARY KEY, binding TEXT NOT NULL,
+                    conversation TEXT NOT NULL, turn_revisions TEXT NOT NULL
+                )""")
+                db.execute("PRAGMA user_version=6")
 
     def _check_directory(self) -> None:
         info = self.path.parent.lstat()
@@ -211,6 +228,11 @@ class SQLiteHistory:
     def _receipt(
         self, db: sqlite3.Connection, binding: Binding, conversation_id: str, request_id: str
     ) -> Receipt | None:
+        if db.execute(
+            "SELECT 1 FROM turn_tombstones WHERE binding=? AND conversation=? AND request=?",
+            (_key(binding), conversation_id, request_id),
+        ).fetchone():
+            raise CoreError(409, "request_deleted", "Request was deleted")
         row = db.execute(
             "SELECT fingerprint, revision, messages, finish, memory_confirmation FROM turns "
             "WHERE binding=? AND conversation=? AND request=?",
@@ -331,6 +353,72 @@ class SQLiteHistory:
             db.execute(
                 "DELETE FROM conversations WHERE binding=? AND id=?",
                 (_key(binding), conversation_id),
+            )
+
+    def delete_turns(
+        self, binding: Binding, conversation_id: str, selection: TurnDeletionInput
+    ) -> TurnDeletionResult:
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            key = _key(binding)
+            row = db.execute(
+                "SELECT revision,memory_epoch FROM conversations WHERE binding=? AND id=?",
+                (key, conversation_id),
+            ).fetchone()
+            if row is None:
+                raise CoreError(404, "conversation_not_found", "Unknown conversation")
+            if row[0] != selection.expected_revision:
+                raise CoreError(409, "revision_conflict", "Conversation revision changed")
+            turns = {
+                revision: tuple(Message.model_validate(m) for m in json.loads(messages))
+                for revision, messages in db.execute(
+                    "SELECT revision,messages FROM turns WHERE binding=? AND conversation=?",
+                    (key, conversation_id),
+                )
+            }
+            if selection.turn_revision not in turns:
+                raise CoreError(409, "turn_deletion_conflict", "Turn is unavailable")
+            revisions = select_turns(turns, selection.turn_revision, selection.scope)
+            placeholders = ",".join("?" for _ in revisions)
+            db.execute(
+                "UPDATE conversations SET revision=revision+1 WHERE binding=? AND id=?",
+                (key, conversation_id),
+            )
+            db.execute(
+                "INSERT INTO turn_tombstones(binding,conversation,request,revision) "
+                "SELECT binding,conversation,request,revision FROM turns "
+                f"WHERE binding=? AND conversation=? AND revision IN ({placeholders})",
+                (key, conversation_id, *revisions),
+            )
+            revoke_turns(db, key, conversation_id, row[1], revisions)
+            db.execute(
+                "INSERT INTO turn_deletions(event,binding,conversation,turn_revisions) "
+                "VALUES (?,?,?,?)",
+                (str(uuid4()), key, conversation_id, json.dumps(revisions)),
+            )
+            db.execute(
+                "DELETE FROM turns WHERE binding=? AND conversation=? "
+                f"AND revision IN ({placeholders})",
+                (key, conversation_id, *revisions),
+            )
+            return TurnDeletionResult(conversation_id, row[0] + 1, revisions)
+
+    def turn_deletions(self, binding: Binding) -> tuple[TurnDeletion, ...]:
+        with self._connection() as db:
+            return tuple(
+                TurnDeletion(event, conversation, tuple(json.loads(revisions)))
+                for event, conversation, revisions in db.execute(
+                    "SELECT event,conversation,turn_revisions FROM turn_deletions "
+                    "WHERE binding=? ORDER BY rowid",
+                    (_key(binding),),
+                )
+            )
+
+    def acknowledge_turn_deletion(self, binding: Binding, event_id: str) -> None:
+        with self._connection() as db:
+            db.execute(
+                "DELETE FROM turn_deletions WHERE binding=? AND event=?",
+                (_key(binding), event_id),
             )
 
     def controls(

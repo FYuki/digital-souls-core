@@ -55,6 +55,19 @@ cancelは伝播し、未完jobを残して明示再試行できます。複数ca
 
 ## source失効と削除・再構成
 
+[往復単位の削除](history-api.md#往復単位の明示削除)では、最終的な削除対象のturn revisionを
+`memory_sources`のBinding・会話・revisionと照合し、該当出典を持つactive memoryだけを撤回します。
+旧本文のNULL化と内容なし`memory_events`の登録は履歴削除と同一transactionです。
+会話全体のmemory epochは進めず、他の往復だけを出典にする記憶は保持します。
+削除出典はturn行の不存在により、抽出・採用・検索・取得済みcontextの送信直前でも無効になります。
+同じPreparedや抽出taskが削除をまたいでも、旧出典の利用・採用を拒否します。
+
+既存consumerは複数出典の旧記憶を残る適格な出典だけで再構成します。旧本文や旧IDは復活させず、
+job作成後の追加削除も実行前・採用前に再検証します。再構成が失敗しても旧本文は消えたままです。
+対象外の後続往復と削除後に追加したuser往復は、既存のprivacy・private・明示除外・確認状態を
+満たせば新しく抽出できます。privateや保留の解除を削除操作から推測しません。
+往復通知のoutboxはSourceDeletionと別であり、記憶再構成の既存`memory_events` consumerへも接続します。
+
 SQLite schema v3へ原子的に移行し、v1/v2の履歴・receiptを保持します。
 private化はconversationのmemory epochを進め、履歴を保持しつつ派生memory本文を同一transactionでNULL化します。
 履歴削除も派生本文を同一transactionで消します。text index/cacheを別途保持しないため、そこからの復活はありません。

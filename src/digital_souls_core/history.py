@@ -65,6 +65,28 @@ class MemoryConfirmation(StrictModel):
     accept_private_mode: bool
 
 
+class TurnDeletionInput(StrictModel):
+    expected_revision: Annotated[int, Field(ge=0)]
+    turn_revision: Annotated[int, Field(gt=0)]
+    scope: Literal["selected", "following"]
+
+
+@dataclass(frozen=True)
+class TurnDeletionResult:
+    conversation_id: str
+    revision: int
+    turn_revisions: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class TurnDeletion:
+    """Content-free notification identifying exactly the removed turns."""
+
+    event_id: str
+    conversation_id: str
+    turn_revisions: tuple[int, ...]
+
+
 @dataclass(frozen=True)
 class SourceReference:
     """Immutable history address within a separately supplied trusted Binding."""
@@ -155,6 +177,14 @@ class HistoryStore(Protocol):
         memory_confirmation_indices: tuple[int, ...] = (),
     ) -> Receipt: ...
     def delete(self, binding: Binding, conversation_id: str) -> None: ...
+
+    def delete_turns(
+        self, binding: Binding, conversation_id: str, selection: TurnDeletionInput
+    ) -> TurnDeletionResult: ...
+
+    def turn_deletions(self, binding: Binding) -> tuple[TurnDeletion, ...]: ...
+
+    def acknowledge_turn_deletion(self, binding: Binding, event_id: str) -> None: ...
 
     def controls(
         self, binding: Binding, conversation_id: str, changes: ConversationControls

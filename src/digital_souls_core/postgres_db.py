@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from .application import CoreError
 from .history import Binding
-from .postgres_schema import CONSTRAINTS, TABLE_COLUMNS, create
+from .postgres_schema import CONSTRAINTS, TABLE_COLUMNS, TURN_DELETION_DDL, create
 
 
 class PostgresConfig(BaseModel):
@@ -122,7 +122,7 @@ class PostgresDatabase:
             ) from None
 
     def initialize(self) -> None:
-        """Create v3 or validate and migrate v1/v2 under the schema transaction lock."""
+        """Validate each supported schema before atomic migration to v4."""
         name = self.config.schema_name
         with self._connect() as db:
             db.execute("SELECT pg_advisory_xact_lock(%s)", (_lock_key("schema", name),))
@@ -146,9 +146,16 @@ class PostgresDatabase:
             if not relations:
                 create(db)
                 return
-            expected_relations = {(table, "r") for table in TABLE_COLUMNS}
-            expected_relations.update((table + "_pkey", "i") for table in TABLE_COLUMNS)
-            for table in TABLE_COLUMNS:
+            if ("schema_version", "r") not in relations:
+                raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
+            versions = db.execute("SELECT version FROM schema_version").fetchall()
+            if versions not in ([(1,)], [(2,)], [(3,)], [(4,)]):
+                raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
+            version = versions[0][0]
+            tables = self._tables(version)
+            expected_relations = {(table, "r") for table in tables}
+            expected_relations.update((table + "_pkey", "i") for table in tables)
+            for table in tables:
                 if table != "schema_version":
                     expected_relations.add((table + "_seq_seq", "S"))
                     expected_relations.add((table + "_seq_key", "i"))
@@ -157,10 +164,6 @@ class PostgresDatabase:
             )
             if set(relations) != expected_relations:
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
-            versions = db.execute("SELECT version FROM schema_version").fetchall()
-            if versions not in ([(1,)], [(2,)], [(3,)]):
-                raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
-            version = versions[0][0]
             self._validate_schema(db, version)
             if version == 1:
                 db.execute("ALTER TABLE turns ADD COLUMN stated_at TIMESTAMPTZ")
@@ -172,6 +175,19 @@ class PostgresDatabase:
                 )
                 db.execute("UPDATE schema_version SET version=3")
                 self._validate_schema(db, 3)
+            if version in (1, 2, 3):
+                for statement in TURN_DELETION_DDL:
+                    db.execute(statement)
+                db.execute("UPDATE schema_version SET version=4")
+                self._validate_schema(db, 4)
+
+    @staticmethod
+    def _tables(version: int) -> dict[str, tuple[str, ...]]:
+        return {
+            table: columns
+            for table, columns in TABLE_COLUMNS.items()
+            if version >= 4 or table not in {"turn_tombstones", "turn_deletions"}
+        }
 
     def _validate_schema(self, db: Connection[tuple[Any, ...]], version: int) -> None:
         name = self.config.schema_name
@@ -181,7 +197,8 @@ class PostgresDatabase:
             "WHERE table_schema=%s ORDER BY table_name,ordinal_position",
             (name,),
         ).fetchall()
-        for table, expected in TABLE_COLUMNS.items():
+        tables = self._tables(version)
+        for table, expected in tables.items():
             if version == 1 and table == "turns":
                 expected = tuple(column for column in expected if column != "stated_at")
             if version < 3 and table == "turns":
@@ -234,7 +251,12 @@ class PostgresDatabase:
             (table, constraint): definition
             for table, constraint, definition, _, _, _ in constraints
         }
-        if actual != CONSTRAINTS or any(
+        expected_constraints = {
+            address: definition
+            for address, definition in CONSTRAINTS.items()
+            if address[0] in tables
+        }
+        if actual != expected_constraints or any(
             not valid or deferred or deferrable
             for _, _, _, valid, deferrable, deferred in constraints
         ):

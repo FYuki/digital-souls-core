@@ -24,6 +24,7 @@ HistoryStoreと信頼されたHistoryPolicyを注入します。SQLite実装は
 | GET | prefix | このcharacter/scopeの`conversation_ids`を作成順に取得 |
 | GET | prefix/{conversation_id} | `conversation_id`・`revision`・順序付き`messages`を復元 |
 | DELETE | prefix/{conversation_id} | 会話と全turn/receiptを削除。存在しないIDにも204 |
+| POST | prefix/{conversation_id}/turn-deletions | 選択した往復だけ、または選択した往復以降を削除して200 |
 | POST | prefix/{conversation_id}/completions | 新規入力を追加して推論し、完了した往復を原子的保存 |
 
 completion本文の例（合成データ）:
@@ -113,7 +114,7 @@ scope違いの通知は取得・ackできません。通知のHTTP ackは公開�
 同じSQLite DBにある派生memory本文も同一transactionで消去します。再構成の完了とは別です。
 source参照自体は削除直後から無効です。
 
-SQLite schema v1/v2/v3/v4からv5へ段階的に原子的移行します。schemaとversionを同じtransactionで
+SQLite schema v1/v2/v3/v4/v5からv6へ段階的に原子的移行します。schemaとversionを同じtransactionで
 更新し、途中失敗はrollbackして再実行できます。履歴・receipt・fingerprintは保持し、旧turnの
 日時はNULLのままです。未知versionは引き続き拒否します。
 過去発話への後付け除外変更は未実装で、指定はcompletionの入力配列に対して行います。
@@ -188,3 +189,45 @@ SQLite v5 / PostgreSQL v3では独立したturnのmemory_confirmation列へ検�
 旧turnの確認状態は空で、過去本文を再走査しません。旧NULL日時、既知日時、履歴、receipt、
 fingerprintを保持します。同じrequestの再送では回答後も元receiptの信号を返し、
 再推論・再保留しません。回答の通信失敗後はGETで未回答一覧と現在revisionを確認してください。
+
+## 往復単位の明示削除
+
+GETの`memory_sources[].turn_revision`で保存済み往復を選び、
+`POST prefix/{conversation_id}/turn-deletions`へ次を渡します。
+
+```json
+{
+  "expected_revision": 3,
+  "turn_revision": 2,
+  "scope": "selected"
+}
+```
+
+`selected`は選択した往復だけ、`following`はその往復とそれ以降の保存済み往復を対象にします。
+会話全体の削除は既存DELETEです。自然文の検出から削除を実行しません。
+assistantの構造化`tool_calls[].id`とtool roleの`tool_call_id`の対応が往復をまたぐ場合は、
+call側・result側の両方向へ連鎖をたどり、対応する往復をまとめて削除します。
+`following`でも対応のために選択より前の往復を含む場合があります。本文やtool名の一致では拡張しません。
+
+成功は本文なしの`conversation_id`、更新後の`revision`、実際に削除した`turn_revisions`配列です。
+削除は会話revisionを1進めます。残す往復は再採番せず、日時・確認状態・private・明示除外・
+receiptを保持します。部分削除後も会話を継続でき、後続の適格な往復から記憶を形成できます。
+不正入力は400、未知・別Bindingの会話は404、revision不一致・存在しない／削除済み往復は409です。
+同意撤回後も既存DELETEと同じtrusted Bindingで削除できます。
+
+対象turn/receiptを物理削除し、`turn_tombstones`にはBinding・会話・request ID・元turn revisionだけを
+残します。本文・fingerprintは残しません。同じrequest IDは元入力の再送でも別入力での再利用でも
+`request_deleted`の409となり、再推論・保存しません。append内でも検査します。
+会話全体DELETEではこの印も消えます。削除前のsnapshotから進行中の推論をcommitしようとすると、
+JSON・streamとも既存のrevision検証で409となり、新receiptは保存しません。
+
+専用`turn_deletions` outboxは正確な対象revision集合を永続化します。
+trusted Python portの`turn_deletions(binding)`は`TurnDeletion(event_id, conversation_id, turn_revisions)`を返し、
+`acknowledge_turn_deletion(binding, event_id)`で処理後にackします。別Bindingから取得・ackできず、
+重複ackは無作用です。HTTPのackはありません。既存SourceDeletionの`through_revision`は会話全体の
+削除だけに使い、その形と意味を維持します。
+
+SQLite v6・PostgreSQL v4で削除済み印と往復通知表を追加します。PostgreSQL v1〜v3は版別に既存schemaを
+検証して移行します。DDL・version更新は原子的で、旧本文・日時（NULLを含む）・確認状態を変更しません。
+削除のrevision更新・印・対象派生本文のNULL化・通知・履歴DELETEも同一transactionです。
+SQLiteの`secure_delete`と保存先保護を維持します。途中失敗は全更新をrollbackし、再試行できます。
