@@ -263,23 +263,25 @@ class MemoryContext:
         authorized: Callable[[], bool],
     ) -> GuardedContext:
         binding = Binding(scope, character.config.character_id)
-        policy, stamp, versions = (
-            self.service.policy,
-            self.service.policy.stamp,
-            self.service._versions(),
-        )
-        retrieval = self.service._retrieval_stamp()
-        memory_store = self.service.store
+        policy = self.service.policy
+        stamp = policy.stamp
         memories: tuple[Memory, ...] = ()
-        if user_text and policy.permits(binding, "memory"):
-            try:
+        try:
+            versions = self.service._versions()
+            retrieval = self.service._retrieval_stamp()
+            memory_store = self.service.store
+            if user_text and policy.permits(binding, "memory"):
                 memories = await self.service.search(
                     binding, user_text[:256], authorized=authorized
                 )
-            except MemoryQueryUnavailable:
-                # Only pre-lookup query refusal is optional. Changed policy,
-                # invalid provenance, storage/result errors and cancellation propagate.
-                pass
+        except CoreError:
+            # Failed retrieval is optional, but conversation authorization remains
+            # pinned before lookup; discarded memory/configuration is not reused.
+            return GuardedContext(
+                "",
+                lambda: (authorized() and self.service.policy is policy and policy.stamp == stamp),
+                policy,
+            )
         # Opaque storage identifiers are not model evidence. Use request-local
         # references while retaining the real identities in the dispatch guard.
         conversation_refs: dict[str, str] = {}

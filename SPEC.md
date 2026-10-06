@@ -69,8 +69,8 @@ ADRの決定を機能単位に整理します。
 | 機能 | 状態 | 根拠 |
 | --- | --- | --- |
 | 部分文字列検索、明示注入のembeddingによる意味検索 | 実装済み | [ADR 0010](docs/adr/0010-in-process-memory-search.md)、[ADR 0011](docs/adr/0011-local-memory-embedding.md) |
-| 検索前のquery判定（機微なqueryで検索しない） | 一部（判定の失敗以外の検索失敗で会話が止まる） | [ADR 0018](docs/adr/0018-memory-retrieval-context.md) |
-| 検索障害時に記憶なしで会話を継続 | 未実装 | ADR 0018 |
+| 検索前のquery判定（機微なqueryで検索しない） | 実装済み | [ADR 0018](docs/adr/0018-memory-retrieval-context.md) |
+| 検索障害時に記憶なしで会話を継続 | 実装済み | ADR 0018 |
 | PoC互換の順位（候補20、閾値0.54、同等帯、最大5件） | 実装中（[PR #53](https://github.com/FYuki/digital-souls-core/pull/53)） | ADR 0018 |
 | last_user_mentioned_atとTOUCH | 未実装（PR #53は出典turnの保存順で代替） | ADR 0018 |
 | 期間検索（日時・季節）と一致種別の順位 | 未実装 | ADR 0018 |
