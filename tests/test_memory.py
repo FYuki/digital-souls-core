@@ -1036,7 +1036,7 @@ async def test_legacy_job_without_destination_is_not_implicitly_upgraded(tmp_pat
         await service.rebuild(BINDING)
     assert provider.calls == [] and service.store.pending(BINDING) == ()
     with sqlite3.connect(path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 4
         assert db.execute(
             "SELECT versions,state FROM memory_jobs WHERE id=?", (job.job_id,)
         ).fetchone() == (legacy_versions, "failed")

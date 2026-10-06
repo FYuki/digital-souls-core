@@ -21,6 +21,7 @@ def snapshot_body(snapshot: Snapshot) -> dict[str, Any]:
                 "turn_revision": state.reference.turn_revision,
                 "message_index": state.reference.message_index,
                 "eligible": state.eligible,
+                "stated_at": state.stated_at.isoformat() if state.stated_at is not None else None,
             }
             for state in snapshot.memory_sources
         ],
