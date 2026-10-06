@@ -1,36 +1,14 @@
-# 製品の背景と用語
+# 用語集
 
-## 製品の背景
+Coreで共有するドメインの語彙と概念モデルです。製品の範囲は[README](README.md)、
+機能の要件・実装状況・受入条件は[SPEC](SPEC.md)にあります。
 
-このリポジトリでは、小さく、プロバイダーに依存しないCoreを開発します。Coreは、キャラクターとの
-継続的な会話・記憶・人格を一つの境界で扱い、複数の入口（チャットUI、外部Agent等）から同じ人格を
-利用できるようにします。
-
-Coreの範囲は次のとおりです。
-
-- キャラクター定義と、対話に必要なコンテキスト。
-- プライバシー判断と、保存・検索・外部送信のポリシー。
-- 会話履歴と、記憶の形成・訂正・削除・検索。
-- 経験からの内省・人格・関係の更新（[ADR 0020](docs/adr/0020-reflection-personality-relationship.md)）。
-- プロバイダーのadapterを交換できるLLM port。
-
-音声・STT・TTS、LiveKit、UIはCoreの対象外です。Coreは外部Agentのtool実行ループを持たず、
-通常チャットUIからも呼べます（[推論API](docs/api.md)）。記憶の形成jobの起動や会話外の活動は
-PrivateAgentが実行し、キャラクターによる判断が必要な処理ではCoreのLLMをAPIとして呼びます。
-Coreは記憶の正本と検証、機微情報の流出防止ゲート、インジェクション対策を所有します。
-
-記憶モデルはPoC（公開`FYuki/digital-souls`）で採用済みの決定を移設したものです
-（[ADR 0015](docs/adr/0015-memory-model-reorganization.md)）。機能の実装状況と受入条件は[SPEC](SPEC.md)、
-現行の記憶APIは[記憶API](docs/memory.md)、開発規約は[CONTRIBUTING](CONTRIBUTING.md)で管理します。
-保存は既定拒否・明示注入のままで、私的な実会話を自動で取り込みません。
-分類・抽出・検索の実モデル品質は未評価です。
-
-## 用語
+## 読み方
 
 このリポジトリでの意味を記します。正式な判断はADR、現在の挙動はコード、進捗はIssueが正本です。
 「状態」は[SPEC](SPEC.md)と同じ基準（2026-10-06のmain）です。
 
-### 境界と会話
+## 境界と会話
 
 | 用語 | 意味・区別 | 状態・参照 |
 | --- | --- | --- |
@@ -38,9 +16,14 @@ Coreは記憶の正本と検証、機微情報の流出防止ゲート、イン�
 | Conversation / 会話、スレッド | 保存する会話のまとまり。作成・再開・アーカイブ・削除の単位。スレッドは記憶の増分抽出の枠でもあるが、知識の参照・訂正はBinding全体に及ぶ | 実装済み：[履歴API](docs/history-api.md) |
 | Source / 出典、source epoch | 記憶の根拠となる元発言（会話・turn revision・message index）と、private化等で進む撤回世代 | 実装済み：[ADR 0007](docs/adr/0007-memory-provenance-and-revocation.md) |
 | 指定発話の記憶除外、プライベートモード、アーカイブ | 履歴は残して記憶の対象から外す操作、スレッド単位で記憶の対象外にする操作、一覧から隠すだけの操作 | 実装済み：[ADR 0006](docs/adr/0006-conversation-memory-controls.md) |
+| 会話往復 / turn | user入力と、それに対するassistantの応答・tool往復のまとまり。履歴の削除をユーザーが選べる単位の一つ | 未実装（削除）：[ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
+| 保存への同意 | 長期記憶の登録を有効にした状態で会話したこと。候補ごとの確認は行わない | 決定：ADR 0019 |
+| 保存拒否の語 | 「覚えないで」「記録しないで」等。検出した発話は確認が取れるまで記憶形成の対象外とし、プライベートモードと削除機能を案内する。AIは履歴を削除しない | 一部（検出のみ）：ADR 0019 |
+| PrivateAgent | 記憶の形成jobや会話外の活動を実行する外部の実行基盤。キャラクターの判断が必要な処理はCoreのLLM APIを呼ぶ | 決定：[ADR 0017](docs/adr/0017-memory-formation-admission.md) |
+| 流出防止ゲート / インジェクション対策 | 外部へ送る直前の内容の再判定／外部の内容と記憶を命令ではなくデータとして扱う境界。どちらもCoreが所有する | 未実装：[ADR 0020](docs/adr/0020-reflection-personality-relationship.md) |
 | privacy permission | history・local・external・memoryの別許可。Binding単位でoperatorが明示する | 実装済み：[ADR 0005](docs/adr/0005-privacy-boundaries.md) |
 
-### 記憶
+## 記憶
 
 | 用語 | 意味・区別 | 状態・参照 |
 | --- | --- | --- |
@@ -62,7 +45,7 @@ Coreは記憶の正本と検証、機微情報の流出防止ゲート、イン�
 | Invalidation / 失効 | 根拠の訂正・削除・撤回で、依存する記憶・派生結果を即時に利用停止し、残る根拠から再評価する処理 | 一部：[ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
 | Forgetting / 忘却 | 記憶内容の削除ではなく、想起しにくくなること。必要性が確認できた段階で詳細化する | 概念のみ |
 
-### 人格と状態
+## 人格と状態
 
 | 用語 | 意味・区別 | 状態・参照 |
 | --- | --- | --- |
