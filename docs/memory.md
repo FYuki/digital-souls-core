@@ -118,7 +118,8 @@ Binding分離は既存のsource境界を使い、archiveは検索対象を変え
 
 文字列化後もmemory ID・source refs/epochsを内部guardが保持します。現在のpolicy owner/generationとsourceを
 取得前・各await後・推論dispatch直前に照合します。embeddingの差し替え世代とspaceも別のguardで保持し、
-空contextにも適用します。検索設定は抽出jobの`_versions()`に加えず、既存の抽出承認を変更しません。
+正常に検索して0件だった空contextにも適用します。検索障害で記憶を破棄した場合は、
+下記の会話認可guardを保持します。検索設定は抽出jobの`_versions()`に加えず、既存の抽出承認を変更しません。
 通常ContextSourceや分類器のawait中のpolicy交換・source撤回・embedding設定変更では古いcontextを
 providerへ送りません。呼び出し開始済みの処理や通信は回収できません。
 
@@ -181,12 +182,20 @@ privacy再判定・source guard・context byte budgetは、このframeを含む�
 ## 会話時の記憶なし継続
 
 会話contextでmemory許可がない場合、記憶storeを参照せず通常の推論認可へ進みます。
-queryの記憶利用が拒否された場合（機微判定・ABSTAIN・分類器の判定不能を含む）も、
-検索前にpolicy/設定/呼び出しscopeが不変と確認できた場合だけ空contextへ戻します。
-専用の MemoryQueryUnavailable 型（code: memory_query_unavailable）で区別し、一般のCoreErrorは吸収しません。
-直接の記憶検索APIはこの拒否をエラーとして返します。結果の拒否、source撤回、設定不正、
-policy変更、storage障害、embeddingの設定変更・不正出力・失敗・timeout、キャンセルは会話でもfail-closedです。
-空contextでも送信前まで呼び出しscope・policy世代・設定のguardを保持します。
+検索準備や検索が `CoreError` で失敗した場合は、記憶を破棄して空contextで会話を続けます。
+query拒否（機微判定・ABSTAIN・分類器の判定不能を含む）、結果拒否、検索中のsource撤回、
+設定不正、storage障害、embeddingの不正出力・失敗・timeoutもこの対象です。
+障害内容は保持・ログ出力せず、query・記憶本文・例外文字列を障害応答や後続例外へ転記しません。
+キャンセルと `CoreError` 以外の予期しない例外は従来どおり伝播します。
+直接の記憶検索は、query拒否の MemoryQueryUnavailable（code: memory_query_unavailable）を含め、
+従来どおりエラーを返します。部分文字列検索へのfallbackは行いません。
+
+障害時の空contextは、検索前のpolicy object・世代と呼び出しscope・context ownerの認可を
+送信直前まで保持します。失敗した検索設定や破棄したsourceを再検証して検索障害を再発させません。
+会話自体の認可が失効した場合は送信を拒否します。最終payloadのprivacy検査と、
+推論後の履歴保存認可・revision検証も維持します。
+正常な検索結果（0件を含む）は設定guardを保持し、記憶返却後のsource撤回は送信拒否になります。
+返却後の再検証失敗を空contextへ差し替えて送信することはありません。
 分類器の代入は単調増加する世代を更新し、交換後に元のobjectへ戻しても古い判定を再利用しません。
 
 
