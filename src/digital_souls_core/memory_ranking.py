@@ -1,4 +1,4 @@
-"""In-process embedding port and pure, content-free cosine ranking."""
+"""In-process embedding port and pure, content-free ranking matching the PoC RAG policy."""
 
 import math
 from dataclasses import dataclass, field
@@ -77,30 +77,84 @@ def _unit_vector(vector: object, dimensions: int) -> tuple[float, ...]:
     return tuple(component / norm for component in scaled)
 
 
+@dataclass(frozen=True)
+class RetrievalPolicy:
+    """digital-souls PoC `rag_service` values (memory_policy.json, 2026-09-semantic-v1)."""
+
+    max_retrieved_memories: int = 5
+    candidate_pool_size: int = 20
+    relevance_threshold: float = 0.54
+    equivalence_margin: float = 0.002
+
+    def __post_init__(self) -> None:
+        validate_retrieval_policy(self)
+
+
+def validate_retrieval_policy(value: object) -> "RetrievalPolicy":
+    if (
+        type(value) is not RetrievalPolicy
+        or type(value.max_retrieved_memories) is not int
+        or not 1 <= value.max_retrieved_memories <= 16
+        or type(value.candidate_pool_size) is not int
+        or not value.max_retrieved_memories <= value.candidate_pool_size <= 1000
+    ):
+        raise ValueError("invalid retrieval policy")
+    for number in (value.relevance_threshold, value.equivalence_margin):
+        if type(number) is not float or not 0.0 <= number <= 1.0:
+            raise ValueError("invalid retrieval policy")
+    return value
+
+
 def rank_memories(
     memories: tuple[Memory, ...],
     vectors: tuple[tuple[float, ...], ...],
     space: EmbeddingSpace,
-    limit: int,
+    policy: RetrievalPolicy,
 ) -> tuple[Memory, ...]:
-    """Rank positive cosine matches; query vector first, stable candidate-order ties."""
+    """Rank like the PoC: nearest pool, relevance threshold, then mention-ordered bands.
+
+    Candidates arrive newest first; the query vector precedes them.
+    """
     try:
         validate_embedding_space(space)
+        validate_retrieval_policy(policy)
         if (
             type(memories) is not tuple
             or any(type(memory) is not Memory for memory in memories)
+            or any(type(memory.mentioned) is not int for memory in memories)
             or type(vectors) is not tuple
             or len(vectors) != len(memories) + 1
-            or type(limit) is not int
-            or limit < 1
         ):
             raise ValueError
         query, *candidates = tuple(_unit_vector(vector, space.dimensions) for vector in vectors)
-        scored = [
-            (math.fsum(left * right for left, right in zip(query, vector, strict=True)), memory)
-            for memory, vector in zip(memories, candidates, strict=True)
+        # Squared L2 between unit vectors, as Chroma's default space in the PoC.
+        distances = [
+            math.fsum((left - right) ** 2 for left, right in zip(query, vector, strict=True))
+            for vector in candidates
         ]
-        scored.sort(key=lambda item: item[0], reverse=True)
-        return tuple(memory for score, memory in scored if score > 0)[:limit]
+        pool = sorted(range(len(memories)), key=lambda index: distances[index])
+        relevant = [
+            (1.0 / (1.0 + math.sqrt(distances[index])), index)
+            for index in pool[: policy.candidate_pool_size]
+        ]
+        relevant = [item for item in relevant if item[0] >= policy.relevance_threshold]
+        ranked: list[int] = []
+        band: list[int] = []
+        leader = 0.0
+        for relevance, index in relevant:
+            if band and leader - relevance > policy.equivalence_margin:
+                ranked.extend(sorted(band, key=lambda i: _tie_break(memories, i)))
+                band = []
+            if not band:
+                leader = relevance
+            band.append(index)
+        ranked.extend(sorted(band, key=lambda i: _tie_break(memories, i)))
+        return tuple(memories[index] for index in ranked[: policy.max_retrieved_memories])
     except Exception:
         raise CoreError(502, "memory_embedding_failed", "Memory embedding failed") from None
+
+
+def _tie_break(memories: tuple[Memory, ...], index: int) -> tuple[int, int, str]:
+    # Latest user mention, then newer creation (lower index), then ID.
+    memory = memories[index]
+    return (-memory.mentioned, index, memory.memory_id)

@@ -10,7 +10,14 @@ from .character import AccessScope, Character, GuardedContext
 from .history import Binding, SourceReference
 from .local_extractor import LocalExtractor
 from .memory_contracts import Memory, MemoryJob, MemoryStore, SourceVersion
-from .memory_ranking import EmbeddingSpace, MemoryEmbedding, rank_memories, validate_embedding_space
+from .memory_ranking import (
+    EmbeddingSpace,
+    MemoryEmbedding,
+    RetrievalPolicy,
+    rank_memories,
+    validate_embedding_space,
+    validate_retrieval_policy,
+)
 from .privacy import PrivacyPolicy
 from .privacy_classifier import LocalClassifier
 from .privacy_scan import scan
@@ -31,9 +38,11 @@ class MemoryService:
         extractor: LocalExtractor,
         *,
         embedding: MemoryEmbedding | None = None,
+        retrieval: RetrievalPolicy | None = None,
     ) -> None:
         if not isinstance(policy.classifier, LocalClassifier):
             raise ValueError("memory requires managed local classification")
+        self.retrieval = validate_retrieval_policy(retrieval or RetrievalPolicy())
         self.store = store
         self.policy = policy
         self.extractor = extractor
@@ -145,10 +154,14 @@ class MemoryService:
         self,
         binding: Binding,
         query: str,
-        limit: int = 8,
+        limit: int | None = None,
         *,
         authorized: Callable[[], bool] = lambda: True,
     ) -> tuple[Memory, ...]:
+        """Return at most the policy count; an explicit limit may only lower it."""
+        retrieval = self.retrieval
+        if limit is None:
+            limit = retrieval.max_retrieved_memories
         if (
             not isinstance(query, str)
             or not 0 < len(query) <= 256
@@ -156,8 +169,9 @@ class MemoryService:
             or not 1 <= limit <= 16
         ):
             raise CoreError(400, "memory_query_invalid", "Invalid memory query")
+        limit = min(limit, retrieval.max_retrieved_memories)
         policy, stamp, versions = self.policy, self.policy.stamp, self._versions()
-        embedding, retrieval = self.embedding, self._retrieval_stamp()
+        embedding, stamp_retrieval = self.embedding, self._retrieval_stamp()
         memory_store = self.store
 
         def check(memories: tuple[Memory, ...] = ()) -> None:
@@ -167,7 +181,8 @@ class MemoryService:
                 or stamp != policy.stamp
                 or versions != self._versions()
                 or embedding is not self.embedding
-                or retrieval != self._retrieval_stamp()
+                or stamp_retrieval != self._retrieval_stamp()
+                or retrieval is not self.retrieval
                 or memory_store is not self.store
                 or (memories and not memory_store.valid(binding, memories))
             ):
@@ -198,9 +213,9 @@ class MemoryService:
             except Exception:
                 raise CoreError(502, "memory_embedding_failed", "Memory embedding failed") from None
             check(candidates)
-            space = retrieval[1]
+            space = stamp_retrieval[1]
             assert space is not None
-            result = rank_memories(candidates, vectors, space, limit)
+            result = rank_memories(candidates, vectors, space, retrieval)[:limit]
         if not await policy.authorize(binding, "memory", [m.text for m in result]):
             raise CoreError(403, "memory_denied", "Memory result denied")
         check(candidates if embedding is not None else result)
@@ -259,7 +274,7 @@ class MemoryContext:
         if user_text and policy.permits(binding, "memory"):
             try:
                 memories = await self.service.search(
-                    binding, user_text[:256], limit=4, authorized=authorized
+                    binding, user_text[:256], authorized=authorized
                 )
             except MemoryQueryUnavailable:
                 # Only pre-lookup query refusal is optional. Changed policy,

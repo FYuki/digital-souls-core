@@ -238,11 +238,33 @@ class PostgresMemory(PostgresHistory):
             binding,
             tuple(source.reference for sources in grouped.values() for source in sources),
         )
+        # Latest user source turn in append order; stands in for PoC mention time.
+        pairs = tuple(
+            dict.fromkeys(
+                (s.reference.conversation_id, s.reference.turn_revision)
+                for sources in grouped.values()
+                for s in sources
+            )
+        )
+        turn_order = {
+            (conversation, revision): seq
+            for conversation, revision, seq in db.execute(
+                "SELECT t.conversation,t.revision,t.seq "
+                "FROM unnest(%s::text[], %s::bigint[]) AS requested(conversation,revision) "
+                "JOIN turns t ON t.binding=%s AND t.conversation=requested.conversation "
+                "AND t.revision=requested.revision",
+                ([c for c, _ in pairs], [r for _, r in pairs], _key(binding)),
+            )
+        }
         memories = []
         for identifier, kind, text in rows:
             sources = tuple(grouped.get(identifier, ()))
             if self._current_rows(sources, source_rows):
-                memories.append(Memory(identifier, kind, text, sources))
+                mentioned = max(
+                    turn_order[(s.reference.conversation_id, s.reference.turn_revision)]
+                    for s in sources
+                )
+                memories.append(Memory(identifier, kind, text, sources, mentioned))
         return tuple(memories)
 
     def results(self, binding: Binding, job_id: str) -> tuple[Memory, ...]:

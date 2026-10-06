@@ -58,6 +58,33 @@ async def test_opt_in_synonym_ranking_preserves_memory_and_source_provenance(
     assert len(encoder.calls) == 3  # Every call recomputes; reopening does not introduce an index.
 
 
+async def test_equal_relevance_prefers_latest_user_mention_over_newer_memory(
+    tmp_path: Path,
+) -> None:
+    # PoC rag ranking: within the equivalence band, last_user_mentioned_at wins
+    # over creation order. Core uses the source turn append order for that time.
+    service, conversation, _ = setup(tmp_path)
+    earlier = await source(conversation, "I like synthetic tea in the morning.")
+    later = await source(conversation, "I like synthetic tea after lunch.")
+    mentioned_later = await service.extract(BINDING, (later,))
+    created_later = await service.extract(BINDING, (earlier,))
+    service.embedding = SyntheticEmbedding()
+    assert await service.search(BINDING, "beverage") == (*mentioned_later, *created_later)
+    assert mentioned_later[0].mentioned > created_later[0].mentioned
+
+
+async def test_semantic_search_returns_at_most_poc_max_retrieved(tmp_path: Path) -> None:
+    service, conversation, _ = setup(tmp_path)
+    for index in range(7):
+        await service.extract(
+            BINDING, (await source(conversation, f"I like synthetic tea number {index}."),)
+        )
+    service.embedding = SyntheticEmbedding()
+    assert len(await service.search(BINDING, "beverage")) == 5
+    assert len(await service.search(BINDING, "beverage", limit=16)) == 5
+    assert len(await service.search(BINDING, "beverage", limit=2)) == 2
+
+
 @pytest.mark.parametrize("action", ["private", "delete"])
 async def test_revocation_and_rebuild_never_reembed_withdrawn_source(
     tmp_path: Path, action: str

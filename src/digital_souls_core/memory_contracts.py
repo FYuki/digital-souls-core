@@ -24,6 +24,9 @@ class Memory:
     kind: Literal["episode", "semantic"]
     text: str = field(repr=False)
     sources: tuple[SourceVersion, ...]
+    # Storage order of the latest user source turn (PoC last_user_mentioned_at).
+    # Ranking-only metadata; identity and dispatch validation ignore it.
+    mentioned: int = field(default=0, compare=False, repr=False)
 
 
 @dataclass(frozen=True)
