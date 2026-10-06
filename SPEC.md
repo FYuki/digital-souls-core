@@ -7,11 +7,11 @@ ADRの決定を機能単位に整理します。
 
 状態の意味は次のとおりです。
 
-- **実装済み**：mainに実装があり、合成データのUT/IT1で検証済み。実モデルでの受入は別。
+- **実装済み**：この文書と同じリビジョンに実装があり、合成データのUT/IT1で検証済み。実モデルでの受入は別。
 - **一部**：基盤や一部の経路だけが実装済み。
-- **未実装**：ADRで採用済みだが、mainに実装がない。
+- **未実装**：ADRで採用済みだが、この文書と同じリビジョンに実装がない。
 
-実装状況の照合基準は2026-10-06のmain（`b64e8e6`）です。
+実装状況は、この文書と同じリビジョンの実装を基準に照合します。
 
 ## 1. 前提
 
@@ -34,21 +34,22 @@ ADRの決定を機能単位に整理します。
 | 指定発話の記憶除外、スレッド単位のプライベートモード、アーカイブ | 実装済み | ADR 0006 |
 | 履歴削除・private化による派生記憶の削除、残る出典からの再構成 | 実装済み | [ADR 0007](docs/adr/0007-memory-provenance-and-revocation.md) |
 | 元発言の日時（stated_at）の保存 | 実装済み | [ADR 0016](docs/adr/0016-memory-kinds-and-records.md)、[履歴API](docs/history-api.md) |
-| 保存拒否の語の検出、確認までの形成保留、プライベートモードと削除機能の案内 | 一部（語の検出のみ） | [ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
-| 会話往復単位の削除（削除範囲をユーザーが選択） | 未実装 | ADR 0019 |
+| 保存拒否の語の検出、確認までの形成保留、プライベートモードと削除機能の案内 | 実装済み | [ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
+| 会話往復単位の削除（削除範囲をユーザーが選択） | 実装済み | ADR 0019 |
 
-Epic #56の#59作業では、現在userの拒否語に対するJSON・SSE確認信号、永続的な形成保留、
-revision排他付き回答APIを追加しています（main統合前）。受入はprivate化・派生記憶の削除を
+保存拒否では、現在userの拒否語に対するJSON・SSE確認信号、永続的な形成保留、
+revision排他付き回答APIを提供します。受入はprivate化・派生記憶の削除を
 原子的に行い、解除しても旧記憶・受入発話を復活させません。拒否は該当保留だけを解除し、
-明示除外を維持します。履歴の自動削除は行いません。再起動・同一request再送・旧schema移行の
-契約は[履歴API](docs/history-api.md#保存拒否の確認)に記載します。上表の状態はmain基準のままです。
+明示除外を維持します。プライベートモード・会話全体の削除・往復単位の削除を案内し、
+削除範囲はユーザーが選びます。履歴の自動削除は行いません。再起動・同一request再送・旧schema移行の
+契約は[履歴API](docs/history-api.md#保存拒否の確認)に記載します。
 
-Epic #56の#60作業では、明示APIによる「選択した往復だけ」「選択した往復以降すべて」の削除を
-SQLite・PostgreSQLへ追加しています（main統合前）。tool対応がまたがる往復をまとめて物理削除し、
+往復単位の削除では、明示APIによる「選択した往復だけ」「選択した往復以降すべて」の削除を
+SQLite・PostgreSQLで提供します。tool対応がまたがる往復をまとめて物理削除し、
 削除済みrequest IDの再送と旧revisionでの推論commitを拒否します。対象往復を出典に持つ記憶だけを
 撤回し、残る適格出典から再構成します。対象外の後続往復と新規往復は引き続き記憶形成に使えます。
 日時・確認状態と既存の会話全体削除・通知を維持します。詳細は
-[往復単位の明示削除](docs/history-api.md#往復単位の明示削除)に記載します。上表はmain基準のままです。
+[往復単位の明示削除](docs/history-api.md#往復単位の明示削除)に記載します。
 
 ### 2.2 記憶の記録
 
@@ -84,12 +85,12 @@ SQLite・PostgreSQLへ追加しています（main統合前）。tool対応が�
 | 部分文字列検索、明示注入のembeddingによる意味検索 | 実装済み | [ADR 0010](docs/adr/0010-in-process-memory-search.md)、[ADR 0011](docs/adr/0011-local-memory-embedding.md) |
 | 検索前のquery判定（機微なqueryで検索しない） | 実装済み | [ADR 0018](docs/adr/0018-memory-retrieval-context.md) |
 | 検索障害時に記憶なしで会話を継続 | 実装済み | ADR 0018 |
-| PoC互換の順位（候補20、閾値0.54、同等帯、最大5件） | 実装中（[PR #53](https://github.com/FYuki/digital-souls-core/pull/53)） | ADR 0018 |
-| last_user_mentioned_atとTOUCH | 未実装（PR #53は出典turnの保存順で代替） | ADR 0018 |
+| PoC互換の順位（候補20、閾値0.54、同等帯、最大5件） | 実装済み | ADR 0018 |
+| last_user_mentioned_atとTOUCH | 未実装（同等帯の並びには出典turnの保存順を暫定で使用） | ADR 0018 |
 | 期間検索（日時・季節）と一致種別の順位 | 未実装 | ADR 0018 |
 | 語彙による補完、自己申告の現在値補完、矛盾の注意 | 未実装 | ADR 0018 |
 | 有効期限・policy versionの互換による除外 | 未実装 | ADR 0018 |
-| 永続的な派生index | 未実装（[PR #49](https://github.com/FYuki/digital-souls-core/pull/49)でpgvectorを比較中） | ADR 0015 |
+| 永続的な派生index | 未実装 | ADR 0015 |
 | モデル向けcontextの一時参照名、送信直前の再検証 | 実装済み | [ADR 0009](docs/adr/0009-memory-context-references.md) |
 
 ### 2.5 訂正・削除・失効
@@ -176,7 +177,7 @@ Coreの実装Issueへ移して管理します。
 依存の少ない順に、Epic・Issueへ分解します。
 
 1. 既存の逐語記憶の削除、履歴へのstated_at追加とタイムゾーン設定（以後の日時の前提）
-2. 検索障害時の会話継続、PoC互換の順位（PR #53）、保存拒否の語の検出と確認の信号、会話往復単位の削除
+2. 検索障害時の会話継続、PoC互換の順位、保存拒否の語の検出と確認の信号、会話往復単位の削除
 3. Episode・Fact・Semanticの正本schemaと、SQLite・PostgreSQLの契約試験、既存データの移行計画
 4. 型付きの保存判定と、構造化Candidateの抽出・検証
 5. 形成jobの永続予約と非同期形成、同一スレッドのFact照合・更新

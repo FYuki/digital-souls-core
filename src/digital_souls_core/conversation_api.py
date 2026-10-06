@@ -113,6 +113,11 @@ def register_conversations(
                     "path": conversation_path + "/memory-confirmations",
                 },
                 "delete_history": {"method": "DELETE", "path": conversation_path},
+                "delete_turns": {
+                    "method": "POST",
+                    "path": conversation_path + "/turn-deletions",
+                    "scopes": ["selected", "following"],
+                },
             }
         if not body.stream:
             return data

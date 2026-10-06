@@ -153,6 +153,11 @@ assistantの引用・説明、tool結果、過去履歴は新しい確認の対�
     "delete_history": {
       "method": "DELETE",
       "path": "/v1/characters/synthetic/conversations/synthetic-id"
+    },
+    "delete_turns": {
+      "method": "POST",
+      "path": "/v1/characters/synthetic/conversations/synthetic-id/turn-deletions",
+      "scopes": ["selected", "following"]
     }
   }
 }
@@ -183,7 +188,11 @@ trueは既存private化を行い、epoch更新・そのスレッド由来のmemo
 回答と同じtransactionで確定します。private解除後も旧memoryと受入発話は復活しません。
 falseは対象発話の保留だけを解除します。明示除外・private状態・他の未回答は維持し、
 通常のprivacy審査を引き続き適用します。どちらも履歴本文・stated_at・source識別を変更しません。
-履歴削除は案内されたDELETEをユーザーが明示的に呼ぶ別操作です。
+履歴削除はユーザーが削除範囲を選び、案内されたAPIを明示的に呼ぶ別操作です。
+`delete_history`は会話全体のDELETE、`delete_turns`は往復単位のPOSTを案内します。
+`delete_turns.scopes`の`selected`は選択した往復だけ、`following`はその往復とそれ以降を
+対象にします。往復の選び方とtool対応による範囲の拡張は[往復単位の明示削除](#往復単位の明示削除)を
+参照してください。信号は案内だけで、AIやCoreが履歴を自動削除することはありません。
 
 SQLite v5 / PostgreSQL v3では独立したturnのmemory_confirmation列へ検出indexと回答を保存します。
 旧turnの確認状態は空で、過去本文を再走査しません。旧NULL日時、既知日時、履歴、receipt、
