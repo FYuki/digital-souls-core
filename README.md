@@ -1,12 +1,37 @@
 # Digital Souls Core
 
-プロバイダーに依存しない最小限のCoreを検討するための公開リポジトリです。
+プロバイダーに依存しない最小限のCoreを開発する公開リポジトリです。
 
-開発・検証は[CONTRIBUTING](CONTRIBUTING.md)、暫定的な製品の範囲は
-[CONTEXT](CONTEXT.md)を参照してください。エージェント向けの入口は
+開発・検証は[CONTRIBUTING](CONTRIBUTING.md)、用語は[CONTEXT](CONTEXT.md)、
+記憶・人格の仕様と実装状況は[SPEC](SPEC.md)を参照してください。エージェント向けの入口は
 [AGENTS](AGENTS.md)です。決定は[ADR](docs/adr/README.md)、進捗は
 [Issue](https://github.com/FYuki/digital-souls-core/issues)、検証結果は
 [日付付き証跡](docs/evidence/2026-10-02-bootstrap.md)で管理します。
+
+## 製品の範囲
+
+このリポジトリでは、小さく、プロバイダーに依存しないCoreを開発します。Coreは、キャラクターとの
+継続的な会話・記憶・人格を一つの境界で扱い、複数の入口（チャットUI、外部Agent等）から同じ人格を
+利用できるようにします。
+
+Coreの範囲は次のとおりです。
+
+- キャラクター定義と、対話に必要なコンテキスト。
+- プライバシー判断と、保存・検索・外部送信のポリシー。
+- 会話履歴と、記憶の形成・訂正・削除・検索。
+- 経験からの内省・人格・関係の更新（[ADR 0020](docs/adr/0020-reflection-personality-relationship.md)）。
+- プロバイダーのadapterを交換できるLLM port。
+
+音声・STT・TTS、LiveKit、UIはCoreの対象外です。Coreは外部Agentのtool実行ループを持たず、
+通常チャットUIからも呼べます（[推論API](docs/api.md)）。記憶の形成jobの起動や会話外の活動は
+PrivateAgentが実行し、キャラクターによる判断が必要な処理ではCoreのLLMをAPIとして呼びます。
+Coreは記憶の正本と検証、機微情報の流出防止ゲート、インジェクション対策を所有します。
+
+記憶モデルはPoC（公開`FYuki/digital-souls`）で採用済みの決定を移設したものです
+（[ADR 0015](docs/adr/0015-memory-model-reorganization.md)）。機能の実装状況と受入条件は[SPEC](SPEC.md)、
+現行の記憶APIは[記憶API](docs/memory.md)、開発規約は[CONTRIBUTING](CONTRIBUTING.md)で管理します。
+保存は既定拒否・明示注入のままで、私的な実会話を自動で取り込みません。
+分類・抽出・検索の実モデル品質は未評価です。
 
 最初の[キャラクター推論API](docs/api.md)をPython/FastAPI/LiteLLMで実装しています。
 通常チャットと外部Agentのtool call往復に対応する小範囲のChat Completions APIです。
