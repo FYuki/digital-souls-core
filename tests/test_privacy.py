@@ -187,7 +187,7 @@ async def test_natural_language_does_not_change_operation_scope(
 @pytest.mark.parametrize(
     "instruction", ["覚えないで", "do not remember", "保存しないで", "履歴に残さないで"]
 )
-async def test_natural_language_without_exclusion_keeps_source_eligible(
+async def test_natural_language_without_exclusion_holds_source_for_confirmation(
     tmp_path: Path, instruction: str
 ) -> None:
     service, _, _, _ = policy_setup(tmp_path)
@@ -199,8 +199,9 @@ async def test_natural_language_without_exclusion_keeps_source_eligible(
     assert snapshot.messages[0].content == instruction
     source = SourceReference(cid, 1, 0)
     assert snapshot.memory_sources[0].reference == source
-    assert snapshot.memory_sources[0].eligible
-    assert service.store.source_eligible(BINDING, source)
+    assert not snapshot.memory_sources[0].eligible
+    assert not service.store.source_eligible(BINDING, source)
+    assert not snapshot.private_mode
 
 
 async def test_local_external_memory_permissions_and_sensitive_history(tmp_path: Path) -> None:

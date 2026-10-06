@@ -113,7 +113,7 @@ scope違いの通知は取得・ackできません。通知のHTTP ackは公開�
 同じSQLite DBにある派生memory本文も同一transactionで消去します。再構成の完了とは別です。
 source参照自体は削除直後から無効です。
 
-SQLite schema v1/v2/v3からv4へ段階的に原子的移行します。schemaとversionを同じtransactionで
+SQLite schema v1/v2/v3/v4からv5へ段階的に原子的移行します。schemaとversionを同じtransactionで
 更新し、途中失敗はrollbackして再実行できます。履歴・receipt・fingerprintは保持し、旧turnの
 日時はNULLのままです。未知versionは引き続き拒否します。
 過去発話への後付け除外変更は未実装で、指定はcompletionの入力配列に対して行います。
@@ -132,3 +132,59 @@ private化は、そのthread由来の既存memoryを削除する製品仕様と�
 複数sourceの旧memoryは直ちに利用停止し、残る適格sourceのみから再構成が成功するまで返しません。
 解除による旧memoryの自動復活は行いません。PATCHはepoch更新・派生本文消去・別のmemory撤回通知を
 原子的に確定します。明示batch再構成と制約は[記憶API説明](memory.md)を参照してください。
+
+
+## 保存拒否の確認
+
+現在のuser発話のcontentだけを既存scannerのno_history・no_memoryで検査します。
+assistantの引用・説明、tool結果、過去履歴は新しい確認の対象にしません。
+検出だけでprivate化や履歴削除は行いません。非stream応答とSSE completedのdataに、
+検出時だけ次の内容なしの信号を追加します（合成例）。
+
+```json
+{
+  "memory_confirmation": {
+    "sources": [{"turn_revision": 1, "message_index": 0}],
+    "private_mode": {
+      "method": "POST",
+      "path": "/v1/characters/synthetic/conversations/synthetic-id/memory-confirmations"
+    },
+    "delete_history": {
+      "method": "DELETE",
+      "path": "/v1/characters/synthetic/conversations/synthetic-id"
+    }
+  }
+}
+```
+
+本文・検出語は信号へ含めません。モデルpayloadとrequest fingerprintにも確認metadataを
+加えません。GETおよび操作後snapshotのmemory_confirmations配列で未回答の参照を復元できます。
+未回答のsourceはeligible=falseで、実際の出典取得・形成・採用直前の再検証でも拒否します。
+未回答には期限がなく、再起動・再送で解除しません。保留に依存し得るassistant/toolも除外します。
+
+`POST prefix/{conversation_id}/memory-confirmations`へ次を渡します。
+
+```json
+{
+  "expected_revision": 1,
+  "turn_revision": 1,
+  "message_index": 0,
+  "accept_private_mode": false
+}
+```
+
+expected_revisionは現在の会話、turn_revisionは対象発話の保存revisionです。
+1回につき1発話へ回答し、成功で会話revisionを進めたsnapshotを返します。
+古いrevision、存在しない対象、回答済み対象は409で、部分更新しません。
+旧revisionで進行中の推論commitも拒否します。認可は既存controlsと同じpolicy・Bindingです。
+
+trueは既存private化を行い、epoch更新・そのスレッド由来のmemory本文消去・撤回通知を
+回答と同じtransactionで確定します。private解除後も旧memoryと受入発話は復活しません。
+falseは対象発話の保留だけを解除します。明示除外・private状態・他の未回答は維持し、
+通常のprivacy審査を引き続き適用します。どちらも履歴本文・stated_at・source識別を変更しません。
+履歴削除は案内されたDELETEをユーザーが明示的に呼ぶ別操作です。
+
+SQLite v5 / PostgreSQL v3では独立したturnのmemory_confirmation列へ検出indexと回答を保存します。
+旧turnの確認状態は空で、過去本文を再走査しません。旧NULL日時、既知日時、履歴、receipt、
+fingerprintを保持します。同じrequestの再送では回答後も元receiptの信号を返し、
+再推論・再保留しません。回答の通信失敗後はGETで未回答一覧と現在revisionを確認してください。

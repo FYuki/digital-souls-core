@@ -10,6 +10,7 @@ from psycopg import Connection
 
 from .application import CoreError
 from .history import Binding, SourceReference, as_utc
+from .memory_confirmation import blocked, decode
 from .memory_contracts import Candidate, Evidence, Memory, MemoryJob, SourceVersion
 from .postgres_db import key as _key
 from .postgres_history import PostgresHistory
@@ -36,7 +37,11 @@ def _evidence(ref: SourceReference, row: tuple[Any, ...] | None) -> Evidence:
     if row is None or row[0] or row[2] or type(ref.message_index) is not int:
         raise CoreError(409, "memory_source_invalid", "Memory source is unavailable")
     messages = json.loads(row[4])
-    if not 0 <= ref.message_index < len(messages) or ref.message_index in json.loads(row[3]):
+    if (
+        not 0 <= ref.message_index < len(messages)
+        or ref.message_index in json.loads(row[3])
+        or blocked(decode(row[6]), ref.message_index)
+    ):
         raise CoreError(409, "memory_source_invalid", "Memory source is unavailable")
     message = messages[ref.message_index]
     # Do not turn assistant proposals or tool output into user facts.
@@ -56,7 +61,7 @@ class PostgresMemory(PostgresHistory):
     ) -> Evidence:
         row = db.execute(
             "SELECT c.private_mode,c.memory_epoch,t.private_mode,t.memory_excluded,"
-            "t.messages,t.stated_at "
+            "t.messages,t.stated_at,t.memory_confirmation "
             "FROM conversations c JOIN turns t ON c.binding=t.binding AND c.id=t.conversation "
             "WHERE c.binding=%s AND c.id=%s AND t.revision=%s",
             (_key(binding), ref.conversation_id, ref.turn_revision),
@@ -79,7 +84,7 @@ class PostgresMemory(PostgresHistory):
             return {}
         rows = db.execute(
             "SELECT c.id,t.revision,c.private_mode,c.memory_epoch,"
-            "t.private_mode,t.memory_excluded,t.messages,t.stated_at "
+            "t.private_mode,t.memory_excluded,t.messages,t.stated_at,t.memory_confirmation "
             "FROM unnest(%s::text[], %s::bigint[]) AS requested(conversation,revision) "
             "JOIN conversations c ON c.binding=%s AND c.id=requested.conversation "
             "JOIN turns t ON t.binding=c.binding AND t.conversation=c.id "

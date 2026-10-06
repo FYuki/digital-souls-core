@@ -51,6 +51,12 @@ Stage3の最小抽出・保存・参照検索は[記憶API説明](memory.md)を�
 [ADR 0006](adr/0006-conversation-memory-controls.md)のユーザー操作仕様を優先します。
 「記録しないで（指定発話）」は履歴を残し、UI/Agentが`memory_excluded_indices`で指定した発話を
 memory対象外にします。自然語だけから期間や操作を推定しません。thread private/archiveは明示PATCHです。
+現在userの保存拒否の語は確認の契機とし、確認まで該当発話を形成対象外として永続保留します。
+非stream・SSE completedで本文なしのsource参照と操作案内を返します。assistant・tool・過去履歴は
+新しい確認を生成しません。回答APIの受入は既存private化と記憶撤回を原子的に実行し、解除でも
+旧記憶と受入発話を復活させません。拒否は対象の保留だけを解除し、明示除外・private・他の保留を
+維持します。未回答は再起動後も対象外です。自然文・回答から履歴削除を実行しません。
+revision排他、再送、移行とHTTP形式は[履歴API](history-api.md#保存拒否の確認)を参照してください。
 履歴を残さない操作は会話削除で、派生memory削除の通知を同時に作ります。
 Stage3では同じDBの派生本文を同時に消去し、明示batch consumerが残存sourceだけの再構成jobを扱います。
 secret検出時は引き続きturnを拒否します。stateless応答の事後マスク機能もありません。

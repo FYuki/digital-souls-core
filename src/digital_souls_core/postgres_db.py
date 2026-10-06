@@ -122,7 +122,7 @@ class PostgresDatabase:
             ) from None
 
     def initialize(self) -> None:
-        """Create v2 or validate and migrate v1 under the schema transaction lock."""
+        """Create v3 or validate and migrate v1/v2 under the schema transaction lock."""
         name = self.config.schema_name
         with self._connect() as db:
             db.execute("SELECT pg_advisory_xact_lock(%s)", (_lock_key("schema", name),))
@@ -158,7 +158,7 @@ class PostgresDatabase:
             if set(relations) != expected_relations:
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
             versions = db.execute("SELECT version FROM schema_version").fetchall()
-            if versions not in ([(1,)], [(2,)]):
+            if versions not in ([(1,)], [(2,)], [(3,)]):
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
             version = versions[0][0]
             self._validate_schema(db, version)
@@ -166,6 +166,12 @@ class PostgresDatabase:
                 db.execute("ALTER TABLE turns ADD COLUMN stated_at TIMESTAMPTZ")
                 db.execute("UPDATE schema_version SET version=2")
                 self._validate_schema(db, 2)
+            if version in (1, 2):
+                db.execute(
+                    "ALTER TABLE turns ADD COLUMN memory_confirmation TEXT NOT NULL DEFAULT '{}'"
+                )
+                db.execute("UPDATE schema_version SET version=3")
+                self._validate_schema(db, 3)
 
     def _validate_schema(self, db: Connection[tuple[Any, ...]], version: int) -> None:
         name = self.config.schema_name
@@ -178,6 +184,8 @@ class PostgresDatabase:
         for table, expected in TABLE_COLUMNS.items():
             if version == 1 and table == "turns":
                 expected = tuple(column for column in expected if column != "stated_at")
+            if version < 3 and table == "turns":
+                expected = tuple(column for column in expected if column != "memory_confirmation")
             owned = [row for row in columns if row[0] == table]
             if tuple(row[1] for row in owned) != expected:
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
@@ -204,6 +212,8 @@ class PostgresDatabase:
                     wanted_default = "0"
                 elif column == "memory_excluded":
                     wanted_default = "'[]'::text"
+                elif column == "memory_confirmation":
+                    wanted_default = "'{}'::text"
                 if (
                     kind != wanted_type
                     or nullable

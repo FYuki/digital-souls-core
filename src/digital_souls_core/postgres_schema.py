@@ -1,4 +1,4 @@
-"""Version-two PostgreSQL schema and atomic source revocation."""
+"""Version-three PostgreSQL schema and atomic source revocation."""
 
 from typing import Any
 from uuid import uuid4
@@ -28,6 +28,7 @@ TABLE_COLUMNS = {
         "memory_excluded",
         "private_mode",
         "stated_at",
+        "memory_confirmation",
     ),
     "source_deletions": ("seq", "event", "binding", "conversation", "through_revision"),
     "memory_events": ("seq", "id", "binding", "conversation", "epoch", "reason", "processed"),
@@ -91,6 +92,7 @@ DDL = (
         fingerprint TEXT NOT NULL, revision INTEGER NOT NULL, messages TEXT NOT NULL,
         finish TEXT NOT NULL, memory_excluded TEXT NOT NULL DEFAULT '[]',
         private_mode BOOLEAN NOT NULL DEFAULT false, stated_at TIMESTAMPTZ,
+        memory_confirmation TEXT NOT NULL DEFAULT '{}',
         PRIMARY KEY(binding,conversation,request), UNIQUE(binding,conversation,revision),
         FOREIGN KEY(binding,conversation) REFERENCES conversations(binding,id) ON DELETE CASCADE
     )""",
@@ -123,7 +125,7 @@ DDL = (
         FOREIGN KEY(binding,memory) REFERENCES memories(binding,id) ON DELETE CASCADE
     )""",
     "CREATE INDEX memory_source_lookup ON memory_sources(binding,conversation)",
-    "INSERT INTO schema_version(version) VALUES (2)",
+    "INSERT INTO schema_version(version) VALUES (3)",
 )
 
 
