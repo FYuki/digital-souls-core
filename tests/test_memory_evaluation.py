@@ -19,7 +19,7 @@ from digital_souls_core.memory_evaluation import (
     FixtureEmbedding,
     evaluate_memory_search,
 )
-from digital_souls_core.memory_ranking import EmbeddingSpace, rank_memories
+from digital_souls_core.memory_ranking import EmbeddingSpace, RetrievalPolicy, rank_memories
 
 FIXTURE = Path(__file__).parent / "fixtures/memory-retrieval-evaluation.json"
 CLI = Path(__file__).parents[1] / "tools/evaluate-memory-search.py"
@@ -61,7 +61,8 @@ async def test_synthetic_metrics_and_report_do_not_claim_model_quality() -> None
     assert result.mean_recall_at_k == 1 and result.mean_precision_at_k == 0.75
     assert result.mrr_at_k == 1 and result.unanswerable_empty_rate == 1
     assert result.queries[0].retrieved_ids == ("tea-ja", "tea-en")
-    assert result.queries[1].retrieved_ids == ("garden-en", "tea-en")
+    # tea-en has cosine 0.6 (PoC relevance 0.528), below the 0.54 threshold.
+    assert result.queries[1].retrieved_ids == ("garden-en",)
     assert result.queries[2].recall_at_k is None
     assert result.queries[2].precision_at_k is None
     assert result.queries[2].reciprocal_rank is None
@@ -84,9 +85,9 @@ async def test_exclusion_precedes_embedding_and_ranking_preserves_source_identit
         candidates: tuple[Memory, ...],
         vectors: tuple[tuple[float, ...], ...],
         space: EmbeddingSpace,
-        limit: int,
+        policy: RetrievalPolicy,
     ) -> tuple[Memory, ...]:
-        result = rank_memories(candidates, vectors, space, limit)
+        result = rank_memories(candidates, vectors, space, policy)
         observations.append((candidates, result))
         return result
 

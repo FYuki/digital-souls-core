@@ -12,6 +12,7 @@ from .memory_contracts import Memory, SourceVersion
 from .memory_ranking import (
     EmbeddingSpace,
     MemoryEmbedding,
+    RetrievalPolicy,
     rank_memories,
     validate_embedding_space,
 )
@@ -178,6 +179,8 @@ async def evaluate_memory_search(
     if mode == "local_model" and isinstance(embedding, FixtureEmbedding):
         raise ValueError("fixture vectors are not model-quality evidence")
     space = replace(validate_embedding_space(embedding.space))
+    # Product ranking policy; only the returned count follows the requested k.
+    policy = RetrievalPolicy(max_retrieved_memories=k, candidate_pool_size=max(k, 20))
     memories = {document.id: document.memory() for document in fixture.documents}
     rows: list[QueryEvaluation] = []
     embedding_calls = 0
@@ -193,7 +196,7 @@ async def evaluate_memory_search(
                     vectors = await embedding.embed((query.text, *(m.text for m in candidates)))
                 if replace(validate_embedding_space(embedding.space)) != space:
                     raise ValueError
-                ranked = rank_memories(candidates, vectors, space, k)
+                ranked = rank_memories(candidates, vectors, space, policy)
                 embedding_calls += 1
             except Exception:
                 raise CoreError(502, "memory_embedding_failed", "Memory embedding failed") from None

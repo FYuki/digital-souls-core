@@ -182,8 +182,24 @@ class SQLiteMemory(SQLiteHistory):
                 )
             )
             if self._current(db, binding, sources):
-                memories.append(Memory(identifier, kind, text, sources))
+                memories.append(
+                    Memory(identifier, kind, text, sources, self._mentioned(db, binding, sources))
+                )
         return tuple(memories)
+
+    def _mentioned(
+        self, db: sqlite3.Connection, binding: Binding, sources: tuple[SourceVersion, ...]
+    ) -> int:
+        """Latest user source turn in append order; stands in for PoC mention time."""
+        return max(
+            int(
+                db.execute(
+                    "SELECT rowid FROM turns WHERE binding=? AND conversation=? AND revision=?",
+                    (_key(binding), s.reference.conversation_id, s.reference.turn_revision),
+                ).fetchone()[0]
+            )
+            for s in sources
+        )
 
     def results(self, binding: Binding, job_id: str) -> tuple[Memory, ...]:
         with self._connection() as db:

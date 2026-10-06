@@ -83,8 +83,9 @@ DB transactionをLLM await中に保持しません。採用時にsource epoch・
 既定の検索はcasefold後の部分文字列一致で、最新作成順です。全質問文を部分一致queryにすると
 一致しにくいため、Python検索では特徴的な短い語句を明示します。語彙展開・ランキング学習はありません。
 queryは1〜256文字、limitは1〜16件、1 Bindingのactive memoryが1000件を超える場合は413で拒否します。
+limitを省略した場合と意味検索の上限は、下記`RetrievalPolicy`の最大取得件数（既定5件）です。
 各memoryの全sourceを照合するため、計算量は対象memory数と出典数に比例します。速度の実測保証はありません。
-conversation自動contextは最新user文の先頭256文字をqueryにし、最大4件を既存context byte budget内で扱います。
+conversation自動contextは最新user文の先頭256文字をqueryにし、最大取得件数（既定5件）を既存context byte budget内で扱います。
 抽出は最大16 source（各2048文字）、最大8候補です。過大なcontextは切り捨てず既存のbudget errorにします。
 
 trusted起動コードが`MemoryService(..., embedding=trusted_embedder)`を明示すると、意味検索を使えます。
@@ -101,7 +102,13 @@ trusted起動コードが`MemoryService(..., embedding=trusted_embedder)`を明�
 候補本文全体を現在のprivacyで認可し、全候補のsourceと設定を再照合してから、queryと全候補を
 1 batchでembeddingへ渡します。候補がない場合はembeddingを呼びません。embeddingのawaitは最大15秒で、
 検索操作全体の上限時間を示すものではありません。完了後にも全候補のsourceと設定を照合します。
-cosine類似度が正の候補だけを降順に並べ、同点は最新作成順にします。limit以内の結果を改めて
+順位付けはPoCの[RAG検索](https://github.com/FYuki/digital-souls/blob/fce7382884d981c42be7fbd3ddaffe7469e27588/backend/app/memory/ranking.py)と
+[policy値](https://github.com/FYuki/digital-souls/blob/fce7382884d981c42be7fbd3ddaffe7469e27588/backend/app/memory/memory_policy.json#L42-L48)に合わせた`RetrievalPolicy`で行います。
+単位vector間の二乗L2距離が近い順に候補20件へ絞り、relevance `1 / (1 + sqrt(距離))` が0.54以上の
+候補だけを残します。先頭とのrelevance差が0.002以内の候補は同等帯とし、帯の中はユーザーの
+最終言及が新しい順、作成が新しい順、memory ID順に並べ、最大5件を返します。
+最終言及は出典user発話を含むturnの保存順の最大値で、時刻列ではありません。PoCの
+`last_user_mentioned_at`と同じ順序を、schemaを変えずに表します。limit以内の結果を改めて
 privacy認可し、sourceと設定を照合して返します。不正vector、timeout、失敗は内容なしのエラー、
 cancelは伝播し、部分文字列検索へのfallbackはしません。実モデルの検索品質は未評価です。
 

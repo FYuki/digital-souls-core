@@ -64,7 +64,7 @@ fixtureはJSONで、`dataset_type`は`synthetic`、versionとdimensionsを持ち
 | `excluded_ids` | embeddingへ渡す前に候補から取り除くID |
 
 不明・重複IDや正解集合の不整合は拒否します。候補が0件ならembeddingを呼びません。
-同じquery内では既存のcosine順位付けを使い、正のscoreだけを返します。同点はfixtureの候補順です。
+同じquery内では製品と同じ`RetrievalPolicy`の順位付け（relevance 0.54以上、同等帯）を使い、返却件数だけkに合わせます。同等帯ではfixtureの候補順です。
 local modeではfixtureの偽vectorを品質値として使わず、実adapterから得たvectorを評価します。
 
 このハーネスは合成の候補・正解集合を直接扱います。`excluded_ids`の除去は評価入力の制御で、

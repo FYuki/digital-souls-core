@@ -106,6 +106,18 @@ async def test_nonliteral_ranking_preserves_postgres_provenance_and_positive_cos
     assert len(semantic.embedding.calls) == 2
 
 
+async def test_postgres_equal_relevance_prefers_latest_user_mention(
+    stores: Stores, semantic: Semantic
+) -> None:
+    earlier = seed(stores, "I like synthetic tea in the morning.")
+    later = seed(stores, "I like synthetic tea after lunch.")
+    mentioned_later = await semantic.service.extract(BINDING, (later,))
+    created_later = await semantic.service.extract(BINDING, (earlier,))
+    result = await semantic.service.search(BINDING, "beverage")
+    assert result == mentioned_later + created_later
+    assert result[0].mentioned > result[1].mentioned
+
+
 @pytest.mark.parametrize(
     "other",
     [
