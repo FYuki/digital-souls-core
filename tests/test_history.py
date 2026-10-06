@@ -156,13 +156,15 @@ SQLiteHistory(Path(sys.argv[1]))
     store = SQLiteHistory(path)
     assert store.create(BINDING).revision == 0
     with sqlite3.connect(path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 6
         assert {
             row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         } == {
             "conversations",
             "turns",
             "source_deletions",
+            "turn_tombstones",
+            "turn_deletions",
             "memory_events",
             "memory_jobs",
             "memories",

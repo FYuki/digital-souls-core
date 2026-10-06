@@ -45,3 +45,25 @@ def revoke(
         "(SELECT memory FROM memory_sources WHERE binding=? AND conversation=?)",
         (event, binding, binding, conversation),
     )
+
+
+def revoke_turns(
+    db: sqlite3.Connection,
+    binding: str,
+    conversation: str,
+    epoch: int,
+    revisions: tuple[int, ...],
+) -> None:
+    event = str(uuid4())
+    db.execute(
+        "INSERT INTO memory_events(id,binding,conversation,epoch,reason) VALUES (?,?,?,?,?)",
+        (event, binding, conversation, epoch, "turn_delete"),
+    )
+    placeholders = ",".join("?" for _ in revisions)
+    db.execute(
+        "UPDATE memories SET body=NULL,state='revoked',revoked_by=? "
+        "WHERE binding=? AND state='active' AND id IN "
+        "(SELECT memory FROM memory_sources WHERE binding=? AND conversation=? "
+        f"AND revision IN ({placeholders}))",
+        (event, binding, binding, conversation, *revisions),
+    )

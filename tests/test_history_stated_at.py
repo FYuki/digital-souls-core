@@ -149,7 +149,7 @@ def test_legacy_migration_preserves_null_receipt_fingerprint_and_evidence(
     legacy_sqlite(path, version)
     store = SQLiteMemory(path)
     with sqlite3.connect(path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 6
         assert db.execute("SELECT stated_at FROM turns").fetchall() == [(None,)]
     before = store.read(BINDING, CID)
     assert before.messages == MESSAGES and before.revision == 1
@@ -205,7 +205,7 @@ SQLiteHistory(Path(sys.argv[1]))
     restored = SQLiteHistory(path)
     assert restored.read(BINDING, CID).messages == MESSAGES
     with sqlite3.connect(path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 6
         assert db.execute("SELECT stated_at FROM turns").fetchall() == [(None,)]
 
 

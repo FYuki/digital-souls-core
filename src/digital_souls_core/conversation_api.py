@@ -7,7 +7,14 @@ from typing import Any
 from fastapi import FastAPI, Request, Response
 
 from .conversations import Conversations
-from .history import ConversationControls, MemoryConfirmation, Receipt, Snapshot, TurnInput
+from .history import (
+    ConversationControls,
+    MemoryConfirmation,
+    Receipt,
+    Snapshot,
+    TurnDeletionInput,
+    TurnInput,
+)
 
 
 def snapshot_body(snapshot: Snapshot) -> dict[str, Any]:
@@ -70,6 +77,17 @@ def register_conversations(
         character_id: str, conversation_id: str, body: MemoryConfirmation
     ) -> dict[str, Any]:
         return snapshot_body(service.confirm(character_id, conversation_id, body))
+
+    @app.post(path + "/{conversation_id}/turn-deletions")
+    async def delete_turns(
+        character_id: str, conversation_id: str, body: TurnDeletionInput
+    ) -> dict[str, Any]:
+        result = service.delete_turns(character_id, conversation_id, body)
+        return {
+            "conversation_id": result.conversation_id,
+            "revision": result.revision,
+            "turn_revisions": result.turn_revisions,
+        }
 
     @app.post(path + "/{conversation_id}/completions", response_model=None)
     async def complete(

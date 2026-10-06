@@ -19,13 +19,17 @@ from .history import (
     SourceDeletion,
     SourceReference,
     SourceState,
+    TurnDeletion,
+    TurnDeletionInput,
+    TurnDeletionResult,
     as_utc,
     current_utc,
 )
 from .memory_confirmation import blocked, decode, pending, resolve
 from .postgres_db import PostgresDatabase
 from .postgres_db import key as _key
-from .postgres_schema import revoke
+from .postgres_schema import revoke, revoke_turns
+from .turn_deletion import select_turns
 
 
 class PostgresHistory:
@@ -115,6 +119,11 @@ class PostgresHistory:
         conversation_id: str,
         request_id: str,
     ) -> Receipt | None:
+        if db.execute(
+            "SELECT 1 FROM turn_tombstones WHERE binding=%s AND conversation=%s AND request=%s",
+            (_key(binding), conversation_id, request_id),
+        ).fetchone():
+            raise CoreError(409, "request_deleted", "Request was deleted")
         row = db.execute(
             "SELECT fingerprint, revision, messages, finish, memory_confirmation FROM turns "
             "WHERE binding=%s AND conversation=%s AND request=%s",
@@ -238,6 +247,69 @@ class PostgresHistory:
             db.execute(
                 "DELETE FROM conversations WHERE binding=%s AND id=%s",
                 (_key(binding), conversation_id),
+            )
+
+    def delete_turns(
+        self, binding: Binding, conversation_id: str, selection: TurnDeletionInput
+    ) -> TurnDeletionResult:
+        with self._connection(binding) as db:
+            key = _key(binding)
+            row = db.execute(
+                "SELECT revision,memory_epoch FROM conversations WHERE binding=%s AND id=%s",
+                (key, conversation_id),
+            ).fetchone()
+            if row is None:
+                raise CoreError(404, "conversation_not_found", "Unknown conversation")
+            if row[0] != selection.expected_revision:
+                raise CoreError(409, "revision_conflict", "Conversation revision changed")
+            turns = {
+                revision: tuple(Message.model_validate(m) for m in json.loads(messages))
+                for revision, messages in db.execute(
+                    "SELECT revision,messages FROM turns WHERE binding=%s AND conversation=%s",
+                    (key, conversation_id),
+                )
+            }
+            if selection.turn_revision not in turns:
+                raise CoreError(409, "turn_deletion_conflict", "Turn is unavailable")
+            revisions = select_turns(turns, selection.turn_revision, selection.scope)
+            db.execute(
+                "UPDATE conversations SET revision=revision+1 WHERE binding=%s AND id=%s",
+                (key, conversation_id),
+            )
+            db.execute(
+                "INSERT INTO turn_tombstones(binding,conversation,request,revision) "
+                "SELECT binding,conversation,request,revision FROM turns "
+                "WHERE binding=%s AND conversation=%s AND revision=ANY(%s)",
+                (key, conversation_id, list(revisions)),
+            )
+            revoke_turns(db, key, conversation_id, row[1], revisions)
+            db.execute(
+                "INSERT INTO turn_deletions(event,binding,conversation,turn_revisions) "
+                "VALUES (%s,%s,%s,%s)",
+                (str(uuid4()), key, conversation_id, json.dumps(revisions)),
+            )
+            db.execute(
+                "DELETE FROM turns WHERE binding=%s AND conversation=%s AND revision=ANY(%s)",
+                (key, conversation_id, list(revisions)),
+            )
+            return TurnDeletionResult(conversation_id, row[0] + 1, revisions)
+
+    def turn_deletions(self, binding: Binding) -> tuple[TurnDeletion, ...]:
+        with self._connection(binding) as db:
+            return tuple(
+                TurnDeletion(event, conversation, tuple(json.loads(revisions)))
+                for event, conversation, revisions in db.execute(
+                    "SELECT event,conversation,turn_revisions FROM turn_deletions "
+                    "WHERE binding=%s ORDER BY seq",
+                    (_key(binding),),
+                )
+            )
+
+    def acknowledge_turn_deletion(self, binding: Binding, event_id: str) -> None:
+        with self._connection(binding) as db:
+            db.execute(
+                "DELETE FROM turn_deletions WHERE binding=%s AND event=%s",
+                (_key(binding), event_id),
             )
 
     def controls(

@@ -21,6 +21,8 @@ from .history import (
     Operation,
     Receipt,
     Snapshot,
+    TurnDeletionInput,
+    TurnDeletionResult,
     TurnInput,
 )
 from .privacy import PrivacyPolicy
@@ -116,6 +118,11 @@ class Conversations:
     def delete(self, character_id: str, conversation_id: str) -> None:
         """Delete scoped history even when storage consent has been revoked."""
         self.store.delete(self.binding(character_id), conversation_id)
+
+    def delete_turns(
+        self, character_id: str, conversation_id: str, selection: TurnDeletionInput
+    ) -> TurnDeletionResult:
+        return self.store.delete_turns(self.binding(character_id), conversation_id, selection)
 
     def controls(
         self, character_id: str, conversation_id: str, changes: ConversationControls
