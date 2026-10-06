@@ -1,0 +1,152 @@
+# 記憶・人格の仕様
+
+Coreが満たす記憶・人格の機能要件、受入条件、実装状況をまとめます。
+判断と理由は[ADR](docs/adr/README.md)、用語は[CONTEXT](CONTEXT.md)、作業単位と進捗は
+[Issue](https://github.com/FYuki/digital-souls-core/issues)が正本です。この文書で仕様を新設せず、
+ADRの決定を機能単位に整理します。
+
+状態の意味は次のとおりです。
+
+- **実装済み**：mainに実装があり、合成データのUT/IT1で検証済み。実モデルでの受入は別。
+- **一部**：基盤や一部の経路だけが実装済み。
+- **未実装**：ADRで採用済みだが、mainに実装がない。
+
+実装状況の照合基準は2026-10-06のmain（`b64e8e6`）です。
+
+## 1. 前提
+
+- 記憶モデルは、PoCで採用済みの記憶決定をCoreへ移設したものです（[ADR 0015](docs/adr/0015-memory-model-reorganization.md)）。
+- ユーザーがCoreで指定した操作仕様（[ADR 0006](docs/adr/0006-conversation-memory-controls.md)）を優先します。
+- 記憶・人格はBinding（subject・client・audience・character）で分離し、別Bindingの情報を混ぜません。
+- privacyはfail-closedです。判定できない場合は保存・検索・送信をしません。ただし記憶の障害で会話は止めません。
+
+## 2. 機能と実装状況
+
+### 2.1 会話履歴と記憶の操作
+
+| 機能 | 状態 | 根拠 |
+| --- | --- | --- |
+| 会話履歴の明示的な保存・復元・一覧・削除 | 実装済み | [ADR 0004](docs/adr/0004-conversation-history.md) |
+| 指定発話の記憶除外、スレッド単位のプライベートモード、アーカイブ | 実装済み | ADR 0006 |
+| 履歴削除・private化による派生記憶の削除、残る出典からの再構成 | 実装済み | [ADR 0007](docs/adr/0007-memory-provenance-and-revocation.md) |
+| 元発言の日時（stated_at）の保存 | 未実装 | [ADR 0016](docs/adr/0016-memory-kinds-and-records.md) |
+
+### 2.2 記憶の記録
+
+| 機能 | 状態 | 根拠 |
+| --- | --- | --- |
+| 選択したuser発話を逐語で保存する記憶（現行形式） | 実装済み（置き換え対象） | ADR 0007 |
+| Episode（経験の5W、経験日時、一続きの経験の単位） | 未実装 | ADR 0016 |
+| Fact（独立ID、対象の5W・日時、Episode–Fact参照、内容版） | 未実装 | ADR 0016 |
+| Semantic（DIRECT_EXTRACTION / EXPERIENCE_DERIVED、命題、適用時期） | 未実装 | ADR 0016 |
+| 引用範囲と元発言の版の対応、保存文の構造化値からの生成 | 未実装 | ADR 0016 |
+| タイムゾーン設定と相対日時の解釈、部分日時・精度 | 未実装 | ADR 0016 |
+| 既存の逐語記憶とdogfoodのPostgreSQLの移行 | 未実装 | ADR 0016 |
+
+### 2.3 形成と保存判定
+
+| 機能 | 状態 | 根拠 |
+| --- | --- | --- |
+| 決定論的scanner、ローカル意味分類器、permission | 実装済み | [ADR 0005](docs/adr/0005-privacy-boundaries.md) |
+| 型付きの保存判定（DENY_* / ABSTAIN / NOT_MEMORY_WORTHY / ALLOW_STRUCTURED） | 未実装 | [ADR 0017](docs/adr/0017-memory-formation-admission.md) |
+| 明示したsource集合からの有限batch抽出 | 実装済み | ADR 0007 |
+| 会話履歴の保存を起点とする形成jobの永続予約・集約・回復 | 未実装 | ADR 0017 |
+| スレッド範囲の抽出、長文分割、冪等な登録 | 未実装 | ADR 0017 |
+| 同一スレッドのFact照合、対象が明確な補足・訂正によるFact更新 | 未実装 | ADR 0017 |
+| Semanticの直接抽出 | 未実装 | ADR 0017 |
+| Episode群からの一般化（EXPERIENCE_DERIVED） | 未実装 | ADR 0017、[ADR 0020](docs/adr/0020-reflection-personality-relationship.md) |
+| 既存記憶の整理（consolidation） | 未実装 | ADR 0017 |
+| 別スレッドのFact統合 | 未実装（後続） | ADR 0017 |
+
+### 2.4 検索と会話での利用
+
+| 機能 | 状態 | 根拠 |
+| --- | --- | --- |
+| 部分文字列検索、明示注入のembeddingによる意味検索 | 実装済み | [ADR 0010](docs/adr/0010-in-process-memory-search.md)、[ADR 0011](docs/adr/0011-local-memory-embedding.md) |
+| 検索前のquery判定（機微なqueryで検索しない） | 一部（判定の失敗以外の検索失敗で会話が止まる） | [ADR 0018](docs/adr/0018-memory-retrieval-context.md) |
+| 検索障害時に記憶なしで会話を継続 | 未実装 | ADR 0018 |
+| PoC互換の順位（候補20、閾値0.54、同等帯、最大5件） | 実装中（[PR #53](https://github.com/FYuki/digital-souls-core/pull/53)） | ADR 0018 |
+| last_user_mentioned_atとTOUCH | 未実装（PR #53は出典turnの保存順で代替） | ADR 0018 |
+| 期間検索（日時・季節）と一致種別の順位 | 未実装 | ADR 0018 |
+| 語彙による補完、自己申告の現在値補完、矛盾の注意 | 未実装 | ADR 0018 |
+| 有効期限・policy versionの互換による除外 | 未実装 | ADR 0018 |
+| 永続的な派生index | 未実装（[PR #49](https://github.com/FYuki/digital-souls-core/pull/49)でpgvectorを比較中） | ADR 0015 |
+| モデル向けcontextの一時参照名、送信直前の再検証 | 実装済み | [ADR 0009](docs/adr/0009-memory-context-references.md) |
+
+### 2.5 訂正・削除・失効
+
+| 機能 | 状態 | 根拠 |
+| --- | --- | --- |
+| 明示訂正と時間変化の区別、旧状態の履歴 | 未実装 | [ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
+| 固定属性の矛盾保留、自己申告と一般化の共存 | 未実装 | ADR 0019 |
+| 管理操作による訂正（自己申告由来・Fact単位）と削除、再処理の防止 | 未実装 | ADR 0019 |
+| 根拠の訂正・削除時の依存結果の即時利用停止と再評価 | 一部（source撤回のみ） | ADR 0019 |
+
+### 2.6 内省・人格・関係
+
+| 機能 | 状態 | 根拠 |
+| --- | --- | --- |
+| Reflection（ACTIVE / SUPERSEDED / INACTIVE）と派生（Insight・Interest・Intention） | 未実装 | ADR 0020 |
+| Life State | 未実装 | ADR 0020 |
+| Big Five Aspects 10因子の人格と上限付き更新 | 未実装 | ADR 0020 |
+| Relationship State（2軸）とInterpersonal Skill | 未実装 | ADR 0020 |
+| Procedural Memory / Skillの学習 | 未実装 | [CONTEXT](CONTEXT.md) |
+
+## 3. 受入条件
+
+### 3.1 観測可能な振る舞い
+
+各機能の受入では、少なくとも次を確認します。詳細なシナリオはPoCの要件書
+（[#340](https://github.com/FYuki/digital-souls/blob/fce7382884d981c42be7fbd3ddaffe7469e27588/docs/epic-340-episodic-memory-requirements.md)、
+[#341](https://github.com/FYuki/digital-souls/blob/fce7382884d981c42be7fbd3ddaffe7469e27588/docs/epic-341-semantic-memory-requirements.md)）を
+Coreの実装Issueへ移して管理します。
+
+- 述語だけのEpisodeを保存でき、不明な5W・日時を補完しない。
+- 「話を聞いた」経験で、キャラクターを話題の出来事の参加者にしない。仮定・創作を実体験に読み替えない。
+- 5Wと文脈が一致する同一スレッドの再言及だけを統合し、unknown・日/月の包含・同名・別回・否定と予定を統合しない。
+- 「ごめん、そばだった」のような明確な訂正でFactが更新され、以後の会話で訂正後の内容を使う。
+- 単一の発言から知識を取得し、別のスレッドで想起できる。出来事や推測を知識に読み替えない。
+  キャラクター自身の発言だけを根拠にしない。
+- 明示訂正と時間変化を区別し、固定属性の食い違いを断定しない。一般化と自己申告が食い違うと自己申告を優先する。
+- 削除・private化・出典撤回の後、古いindex・統合履歴・再試行から削除済みの内容が復活しない。
+- 機微なqueryでは検索しない。検索障害では記憶なしで会話を続ける。
+- 同じ関連度の帯では最近言及された記憶を優先し、明確に関連度の低い記憶を繰り上げない。
+- 別Bindingの記憶が検索・形成・統合のどの段階にも混入しない。
+- 会話応答が記憶形成の完了を待たない。
+
+### 3.2 評価の基準
+
+- 評価ケースと期待値は、prompt調整の前にcommitで固定する。結果に合わせて期待値や閾値を緩めない。
+- 記憶判断のモデル評価は、PoCと同じく**cacheなしで3回実行し、各回・各分類で90%以上**、
+  **禁止情報の保存と別キャラクターの混入は0件**を合格とする。
+- 機微なケースがNOT_SENSITIVEになることを許容しない。SENSITIVE・ABSTAINは安全側として許容する。
+- privacy・Binding・出典・失効の必須ゲートは、平均点や他のケースで相殺しない。
+- enum等は決定論的に採点し、自由文の評価に独立したjudgeを使う場合は採点基準とjudgeを固定する。
+- mock・fixture・DBへの候補の直接投入だけの結果を、実モデルでの受入とみなさない。
+- 実接続の受入は、dev環境の専用データと合成シナリオで、通常の会話からの形成・保存・検索・応答での
+  利用までを確認する。訂正後の内容を使い、削除・無効化した内容を使わないことも確認する。
+  実行commit、モデル・設定、シナリオ、期待値、結果、未検証事項を記録する。
+
+## 4. 要決定事項
+
+| 論点 | 選択肢・現状 | 関連 |
+| --- | --- | --- |
+| 形成jobを実行する主体 | Coreに常駐workerを含める／Coreは永続予約と有限drainを提供し、起動は外部の実行基盤が行う | ADR 0017、ADR 0020 |
+| 自然文による保存拒否（「覚えないで」等） | PoCは語彙で判定。CoreはADR 0006の明示APIのみ。併用するか | ADR 0006、ADR 0015 |
+| 会話外の自律活動の契約をCoreがどこまで所有するか | Egress Privacy Check、High Impact判定等をCoreに置くか、実行基盤側に置くか | ADR 0020 |
+| 既存の逐語記憶の扱い | 旧契約のまま保持して検索する／新形式で再抽出する／削除する | ADR 0016 |
+| 意味検索の実モデル評価の合格基準 | 3.2の考え方を検索・回答の評価（[PR #51](https://github.com/FYuki/digital-souls-core/pull/51)）へどう適用するか | ADR 0018 |
+
+## 5. 実装の順序（案）
+
+依存の少ない順に、Epic・Issueへ分解します。
+
+1. 履歴へのstated_at追加とタイムゾーン設定（以後の日時の前提）
+2. 検索障害時の会話継続、PoC互換の順位（PR #53）
+3. Episode・Fact・Semanticの正本schemaと、SQLite・PostgreSQLの契約試験、既存データの移行計画
+4. 型付きの保存判定と、構造化Candidateの抽出・検証
+5. 形成jobの永続予約と非同期形成、同一スレッドのFact照合・更新
+6. TOUCHとlast_user_mentioned_at、期間検索、語彙・自己申告の補完、矛盾の注意
+7. 訂正・時間変化・矛盾・管理操作・依存結果の失効
+8. 一般化とReflection、Life State、人格・関係の更新
+9. consolidation、別スレッドのFact統合、永続的な派生index

@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+一部を[ADR 0015](0015-memory-model-reorganization.md)の記憶モデル再編で置き換えます（「PoC全体の移植は行わない」の判断）。
+
 日付: 2026-10-03
 
 ## 背景
