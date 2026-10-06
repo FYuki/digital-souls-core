@@ -1,6 +1,7 @@
 """Storage-independent memory values. Text is user evidence, never model reasoning."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Literal, Protocol
 
 from .history import Binding, SourceReference
@@ -16,6 +17,7 @@ class SourceVersion:
 class Evidence:
     source: SourceVersion
     text: str = field(repr=False)
+    stated_at: datetime | None
 
 
 @dataclass(frozen=True)

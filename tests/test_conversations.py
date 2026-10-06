@@ -1,6 +1,7 @@
 import asyncio
 import json
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -416,6 +417,9 @@ async def test_concurrent_retry_reauthorizes_actual_winner_receipt(
     tmp_path: Path, stream: bool
 ) -> None:
     service, _, policy = setup(tmp_path)
+    saved_at = datetime(2024, 2, 29, 12, 34, 56, tzinfo=UTC)
+    times = iter((saved_at, saved_at + timedelta(days=1)))
+    service.store = SQLiteHistory(tmp_path / "private" / "db", clock=lambda: next(times))
     cid = service.create("synthetic").conversation_id
     started = [asyncio.Event(), asyncio.Event()]
     released = [asyncio.Event(), asyncio.Event()]
@@ -467,6 +471,7 @@ async def test_concurrent_retry_reauthorizes_actual_winner_receipt(
     # Denial neither rewrites the winning receipt nor creates a second turn.
     snapshot = service.store.read(service.binding("synthetic"), cid)
     assert snapshot.revision == 1 and snapshot.messages[-1] == winner.message
+    assert [state.stated_at for state in snapshot.memory_sources] == [saved_at, saved_at]
     assert service.store.receipt(service.binding("synthetic"), cid, "r1") == winner
     service.policy = policy
     assert await service.complete("synthetic", cid, turn(stream=stream)) == winner

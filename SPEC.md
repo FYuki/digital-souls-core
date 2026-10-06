@@ -33,7 +33,7 @@ ADRの決定を機能単位に整理します。
 | 会話履歴の明示的な保存・復元・一覧・削除 | 実装済み | [ADR 0004](docs/adr/0004-conversation-history.md) |
 | 指定発話の記憶除外、スレッド単位のプライベートモード、アーカイブ | 実装済み | ADR 0006 |
 | 履歴削除・private化による派生記憶の削除、残る出典からの再構成 | 実装済み | [ADR 0007](docs/adr/0007-memory-provenance-and-revocation.md) |
-| 元発言の日時（stated_at）の保存 | 未実装 | [ADR 0016](docs/adr/0016-memory-kinds-and-records.md) |
+| 元発言の日時（stated_at）の保存 | 実装済み | [ADR 0016](docs/adr/0016-memory-kinds-and-records.md)、[履歴API](docs/history-api.md) |
 | 保存拒否の語の検出、確認までの形成保留、プライベートモードと削除機能の案内 | 一部（語の検出のみ） | [ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
 | 会話往復単位の削除（削除範囲をユーザーが選択） | 未実装 | ADR 0019 |
 

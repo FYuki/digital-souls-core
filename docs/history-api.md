@@ -99,18 +99,31 @@ private中は全sourceを利用不可にし、その間に保存したturnは解
 除外履歴に依存し得る後続assistant/toolも対象外です。新user発話は明示指定に従います。
 
 GETレスポンスには`private_mode`、`archived`、message順の`memory_sources`を追加します。
-各sourceは`turn_revision`、そのturn内の`message_index`、`eligible`を持ちます。
+各sourceは`turn_revision`、そのturn内の`message_index`、`eligible`、`stated_at`を持ちます。
+`stated_at`はturnを保存したUTC時刻のISO 8601文字列（例：`2024-02-29T12:34:56.123456+00:00`）です。
+同じturn内のuser・tool・assistant messageには同じ保存値を対応させます。移行前のturnは
+不明として`null`を返し、現在時刻で補完しません。GET・PATCHのsnapshotで同じ値を返します。
+Message本文やモデル向けmessagesの形式には日時を加えません。
 conversation IDとtrusted scope/characterと組み合わせて参照します。現在のconversation revisionと
 過去のturn revisionは異なり得ます。eligibleはsource条件だけで、privacyや候補採用の許可ではありません。
 
 DELETEは本文・receiptを消し、内容なしのsource削除通知を同じtransactionで残します。
 Stage3 consumer用Python portの`deletions(binding)`と`acknowledge_deletion(binding,event_id)`で処理します。
 scope違いの通知は取得・ackできません。通知のHTTP ackは公開しません。
-同じSQLite v3にある派生memory本文も同一transactionで消去します。再構成の完了とは別です。
+同じSQLite DBにある派生memory本文も同一transactionで消去します。再構成の完了とは別です。
 source参照自体は削除直後から無効です。
 
-schema v1/v2からv3へ原子的に移行します。履歴・receiptは保持し、未知versionは引き続き拒否します。
+SQLite schema v1/v2/v3からv4へ段階的に原子的移行します。schemaとversionを同じtransactionで
+更新し、途中失敗はrollbackして再実行できます。履歴・receipt・fingerprintは保持し、旧turnの
+日時はNULLのままです。未知versionは引き続き拒否します。
 過去発話への後付け除外変更は未実装で、指定はcompletionの入力配列に対して行います。
+
+trusted構築コードから`SQLiteHistory(path, clock=clock)`または
+`PostgresHistory(database, clock=clock)`へ、timezone付きdatetimeを返す時計を注入できます。
+既定は保存時の現在UTC時刻です。新規turnごとに一度取得してUTCへ正規化し、timezoneなしの値は
+拒否します。再送・read・thread操作では取り直しません。HTTP入力から時計や日時は指定できません。
+両Memory adapterも同じ構築引数を使い、`Evidence.stated_at`には抽出時刻ではなく元turnの保存日時
+または`None`を渡します。source参照・epoch・jobの識別には日時を含めません。
 
 
 ### Stage3の撤回処理

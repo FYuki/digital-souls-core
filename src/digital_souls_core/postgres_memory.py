@@ -9,7 +9,7 @@ from uuid import uuid4
 from psycopg import Connection
 
 from .application import CoreError
-from .history import Binding, SourceReference
+from .history import Binding, SourceReference, as_utc
 from .memory_contracts import Candidate, Evidence, Memory, MemoryJob, SourceVersion
 from .postgres_db import key as _key
 from .postgres_history import PostgresHistory
@@ -43,7 +43,9 @@ def _evidence(ref: SourceReference, row: tuple[Any, ...] | None) -> Evidence:
     text = message.get("content")
     if message["role"] != "user" or not isinstance(text, str) or not 0 < len(text) <= 2048:
         raise CoreError(409, "memory_source_invalid", "Memory source is unavailable")
-    return Evidence(SourceVersion(ref, row[1]), text)
+    return Evidence(
+        SourceVersion(ref, row[1]), text, as_utc(row[5]) if row[5] is not None else None
+    )
 
 
 class PostgresMemory(PostgresHistory):
@@ -53,7 +55,8 @@ class PostgresMemory(PostgresHistory):
         self, db: Connection[tuple[Any, ...]], binding: Binding, ref: SourceReference
     ) -> Evidence:
         row = db.execute(
-            "SELECT c.private_mode,c.memory_epoch,t.private_mode,t.memory_excluded,t.messages "
+            "SELECT c.private_mode,c.memory_epoch,t.private_mode,t.memory_excluded,"
+            "t.messages,t.stated_at "
             "FROM conversations c JOIN turns t ON c.binding=t.binding AND c.id=t.conversation "
             "WHERE c.binding=%s AND c.id=%s AND t.revision=%s",
             (_key(binding), ref.conversation_id, ref.turn_revision),
@@ -76,7 +79,7 @@ class PostgresMemory(PostgresHistory):
             return {}
         rows = db.execute(
             "SELECT c.id,t.revision,c.private_mode,c.memory_epoch,"
-            "t.private_mode,t.memory_excluded,t.messages "
+            "t.private_mode,t.memory_excluded,t.messages,t.stated_at "
             "FROM unnest(%s::text[], %s::bigint[]) AS requested(conversation,revision) "
             "JOIN conversations c ON c.binding=%s AND c.id=requested.conversation "
             "JOIN turns t ON t.binding=c.binding AND t.conversation=c.id "

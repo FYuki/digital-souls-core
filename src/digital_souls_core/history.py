@@ -1,12 +1,26 @@
 """Storage-independent conversation contracts and trusted authorization boundary."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Annotated, Literal, Protocol
 
 from pydantic import Field, model_validator
 
 from .character import AccessScope
 from .contracts import Message, Name, NamedToolChoice, StrictModel, Tool
+
+type Clock = Callable[[], datetime]
+
+
+def current_utc() -> datetime:
+    return datetime.now(UTC)
+
+
+def as_utc(value: datetime) -> datetime:
+    if value.utcoffset() is None:
+        raise ValueError("turn clock must return a timezone-aware datetime")
+    return value.astimezone(UTC)
 
 
 class TurnInput(StrictModel):
@@ -59,6 +73,7 @@ class SourceState:
 
     reference: SourceReference
     eligible: bool
+    stated_at: datetime | None
 
 
 @dataclass(frozen=True)

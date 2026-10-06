@@ -6,6 +6,7 @@ import sqlite3
 import stat
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -13,12 +14,15 @@ from .application import CoreError
 from .contracts import Message
 from .history import (
     Binding,
+    Clock,
     ConversationControls,
     Receipt,
     Snapshot,
     SourceDeletion,
     SourceReference,
     SourceState,
+    as_utc,
+    current_utc,
 )
 from .memory_sql import initialize, revoke
 
@@ -33,7 +37,8 @@ def _key(binding: Binding) -> str:
 
 
 class SQLiteHistory:
-    def __init__(self, path: Path | None = None) -> None:
+    def __init__(self, path: Path | None = None, *, clock: Clock = current_utc) -> None:
+        self._clock = clock
         self.path = (path or default_history_path()).absolute()
         # This release targets local Linux/WSL permissions, not Windows ACL emulation.
         if os.name != "posix":
@@ -50,7 +55,7 @@ class SQLiteHistory:
             # executescript would implicitly commit an existing transaction.
             db.execute("BEGIN IMMEDIATE")
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, 1, 2, 3):
+            if version not in (0, 1, 2, 3, 4):
                 raise ValueError("unsupported history schema")
             if version == 0:
                 if db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchone():
@@ -93,6 +98,9 @@ class SQLiteHistory:
                 db.execute("PRAGMA user_version=2")
             if version in (0, 1, 2):
                 initialize(db)
+            if version in (0, 1, 2, 3):
+                db.execute("ALTER TABLE turns ADD COLUMN stated_at TEXT")
+                db.execute("PRAGMA user_version=4")
 
     def _check_directory(self) -> None:
         info = self.path.parent.lstat()
@@ -152,7 +160,7 @@ class SQLiteHistory:
             messages: list[Message] = []
             sources: list[SourceState] = []
             for turn in db.execute(
-                "SELECT messages,revision,memory_excluded,private_mode FROM turns "
+                "SELECT messages,revision,memory_excluded,private_mode,stated_at FROM turns "
                 "WHERE binding=? AND conversation=? ORDER BY revision",
                 (_key(binding), conversation_id),
             ):
@@ -163,6 +171,9 @@ class SQLiteHistory:
                         SourceState(
                             SourceReference(conversation_id, turn[1], index),
                             not row[1] and not turn[3] and index not in excluded,
+                            as_utc(datetime.fromisoformat(turn[4]))
+                            if turn[4] is not None
+                            else None,
                         )
                     )
             return Snapshot(
@@ -236,8 +247,11 @@ class SQLiteHistory:
                     | {index for index, message in enumerate(messages) if message.role != "user"}
                 )
             encoded = json.dumps([m.model_dump(exclude_none=True) for m in messages])
+            stated_at = as_utc(self._clock())
             db.execute(
-                "INSERT INTO turns VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO turns (binding,conversation,request,fingerprint,revision,"
+                "messages,finish,memory_excluded,private_mode,stated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     _key(binding),
                     conversation_id,
@@ -248,6 +262,7 @@ class SQLiteHistory:
                     finish_reason,
                     json.dumps(excluded),
                     private,
+                    stated_at.isoformat(),
                 ),
             )
             return Receipt(fingerprint, expected_revision + 1, messages[-1], finish_reason)
