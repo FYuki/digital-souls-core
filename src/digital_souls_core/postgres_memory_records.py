@@ -169,7 +169,14 @@ class PostgresMemoryRecords:
                     if frozenset(c.source.reference for c in ec) != ev.sources:
                         raise rejected()
             all_citations = tuple(set((*citations, *evidence_citations)))
-            identity = _hash([key(binding), normalized(all_citations), formation_version])
+            identity_parts = [key(binding), normalized(all_citations), formation_version]
+            if batch.links:
+                # Content-free endpoint addresses distinguish link-only registrations.
+                endpoints = tuple(
+                    target for link in batch.links for target in (link.episode, link.fact)
+                )
+                identity_parts.append(normalized(endpoints))
+            identity = _hash(identity_parts)
             digest = _hash(normalized(batch))
             prior = db.execute(
                 (

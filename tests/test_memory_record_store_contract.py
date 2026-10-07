@@ -158,6 +158,100 @@ def test_atomic_roundtrip_and_active_binding_reads(
     assert port.register(BINDING, batch, "formation-v1") == result
 
 
+@pytest.fixture
+def link_pair(port: "MemoryRecordStore", stores: Stores) -> tuple[EpisodeFactLink, EpisodeFactLink]:
+    from digital_souls_core.memory_record_store import FactWrite, RecordBatch
+
+    e, e2 = episode(citation(stores)), episode(citation(stores), "e2")
+    f, f2 = fact(e.citations[0]), replace(fact(e2.citations[0]), fact_id="f2")
+    port.register(
+        BINDING,
+        RecordBatch(episodes=(e, e2), facts=(FactWrite(f), FactWrite(f2))),
+        "targets-v1",
+    )
+    links = tuple(
+        EpisodeFactLink(
+            link_id=identifier,
+            version=1,
+            binding=BINDING,
+            created_at=NOW,
+            state=RecordState.ACTIVE,
+            episode=reference(target_episode),
+            fact=reference(target_fact),
+        )
+        for identifier, target_episode, target_fact in (("l1", e, f), ("l2", e2, f2))
+    )
+    return links[0], links[1]
+
+
+@pytest.mark.parametrize("changed_endpoint", ["episode", "fact"])
+def test_link_only_registrations_distinguish_endpoints(
+    port: "MemoryRecordStore",
+    link_pair: tuple[EpisodeFactLink, EpisodeFactLink],
+    changed_endpoint: str,
+) -> None:
+    from digital_souls_core.memory_record_store import RecordBatch
+
+    first, second = link_pair
+    second = (
+        replace(second, fact=first.fact)
+        if changed_endpoint == "episode"
+        else replace(second, episode=first.episode)
+    )
+    for link in (first, second):
+        assert port.register(BINDING, RecordBatch(links=(link,)), "links-v1") == (reference(link),)
+    for link in (first, second):
+        assert port.get(BINDING, RecordKind.EPISODE_FACT_LINK, link.link_id) == link
+    assert set(port.list(BINDING, RecordKind.EPISODE_FACT_LINK)) == {first, second}
+
+
+def test_link_only_registration_retry_returns_existing_result(
+    port: "MemoryRecordStore", link_pair: tuple[EpisodeFactLink, EpisodeFactLink]
+) -> None:
+    from digital_souls_core.memory_record_store import RecordBatch
+
+    batch = RecordBatch(links=(link_pair[0],))
+    result = port.register(BINDING, batch, "links-v1")
+    assert port.register(BINDING, batch, "links-v1") == result == (reference(link_pair[0]),)
+    assert port.list(BINDING, RecordKind.EPISODE_FACT_LINK) == (link_pair[0],)
+
+
+def test_link_only_registration_normalizes_shared_endpoints_and_order(
+    port: "MemoryRecordStore", link_pair: tuple[EpisodeFactLink, EpisodeFactLink]
+) -> None:
+    from digital_souls_core.memory_record_store import RecordBatch
+
+    first, second = link_pair
+    second = replace(second, fact=first.fact)
+    result = port.register(BINDING, RecordBatch(links=(first, second)), "links-v1")
+    assert port.register(BINDING, RecordBatch(links=(second, first)), "links-v1") == result
+    assert set(result) == {reference(first), reference(second)}
+
+
+def test_link_only_registration_after_another_link_is_revoked(
+    port: "MemoryRecordStore",
+    stores: Stores,
+    link_pair: tuple[EpisodeFactLink, EpisodeFactLink],
+) -> None:
+    from digital_souls_core.memory_record_store import RecordBatch
+
+    first, second = link_pair
+    batch = RecordBatch(links=(first,))
+    port.register(BINDING, batch, "links-v1")
+    e = port.get(BINDING, RecordKind.EPISODE, first.episode.record_id)
+    assert isinstance(e, Episode)
+    stores.history.delete(BINDING, e.citations[0].source.reference.conversation_id)
+    head = port.head(BINDING, RecordKind.EPISODE_FACT_LINK, first.link_id)
+    assert head is not None and head.state is RecordState.SUSPENDED
+    with pytest.raises(CoreError) as error:
+        port.register(BINDING, batch, "links-v1")
+    assert error.value.status == 409
+    assert error.value.code == "memory_registration_conflict"
+    assert port.register(BINDING, RecordBatch(links=(second,)), "links-v1") == (reference(second),)
+    assert port.get(BINDING, RecordKind.EPISODE_FACT_LINK, first.link_id) is None
+    assert port.get(BINDING, RecordKind.EPISODE_FACT_LINK, second.link_id) == second
+
+
 def test_atomic_failure_after_valid_episode(port: "MemoryRecordStore", stores: Stores) -> None:
     from digital_souls_core.memory_record_store import RecordBatch
 

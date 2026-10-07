@@ -2,6 +2,8 @@
 
 Status: Accepted
 
+一部を[ADR 0021](0021-postgresql-only-storage.md)のPostgreSQL一本化で置き換えます（§2の読み替え表でSQLiteまたはPostgreSQLを保存backendの選択肢とする記述）。
+
 日付: 2026-10-06
 
 Accepted日: 2026-10-07
