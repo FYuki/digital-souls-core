@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "digital-souls-core"
 version = "0.1.0"
-description = "Character context provider with a bounded Chat Completions interface"
+description = "Provider-independent character core with conversation history, memory, and a bounded Chat Completions API"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "anyio==4.15.1",

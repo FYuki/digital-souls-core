@@ -12,7 +12,13 @@ Statusは次の方針で扱います。
 ADR 0001〜0012はレビューの機会がなかったため、Proposedのままです。
 ADR 0015〜0020は、2026-10-06のユーザー決定とPR #67のレビューを根拠に、2026-10-07にAcceptedとしました。
 
+- [ADR 0001: キャラクター文脈付き推論API](0001-character-inference-api.md)
+- [ADR 0002: Ollama native Chat経路の明示](0002-ollama-native-chat.md)
+- [ADR 0003: Coreのローカルllama.cpp Chat接続](0003-local-llamacpp-provider.md)
 - [ADR 0004: 明示的な会話履歴の永続化](0004-conversation-history.md)
+- [ADR 0005: 保存・推論送信・記憶形成の機微情報境界](0005-privacy-boundaries.md)
+- [ADR 0006: 履歴と長期記憶の明示的な操作境界](0006-conversation-memory-controls.md)
+- [ADR 0007: 出典を持つ最小記憶と撤回・再構成](0007-memory-provenance-and-revocation.md)
 - [ADR 0008: 管理された分類器・抽出器の構造化出力](0008-managed-structured-output.md)
 - [ADR 0009: モデル向け記憶contextの一時参照名](0009-memory-context-references.md)
 - [ADR 0010: 明示注入したプロセス内embeddingによる記憶検索](0010-in-process-memory-search.md)

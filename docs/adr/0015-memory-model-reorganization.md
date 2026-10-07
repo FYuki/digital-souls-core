@@ -4,6 +4,8 @@ Status: Accepted
 
 一部を[ADR 0021](0021-postgresql-only-storage.md)のPostgreSQL一本化で置き換えます（§2の読み替え表でSQLiteまたはPostgreSQLを保存backendの選択肢とする記述）。
 
+一部を[ADR 0016](0016-memory-kinds-and-records.md)で置き換えます（既存の保存済み記憶の移行計画。既存の逐語記憶は移行せず削除）。
+
 日付: 2026-10-06
 
 Accepted日: 2026-10-07

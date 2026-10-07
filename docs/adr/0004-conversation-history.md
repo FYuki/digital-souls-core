@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+一部を[ADR 0021](0021-postgresql-only-storage.md)のPostgreSQL一本化で置き換えます（SQLite adapter、既定保存先（`history.sqlite3`）、ファイル権限、journal/secure_deleteの設定。保存・復元・削除・scope・revision・policyの契約は維持）。
+
 日付: 2026-10-03
 
 ## 背景

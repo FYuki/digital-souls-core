@@ -4,6 +4,8 @@ Status: Proposed
 
 一部を[ADR 0015 §3「Coreの既存決定との優先関係」](0015-memory-model-reorganization.md#3-coreの既存決定との優先関係)の記憶モデル再編で置き換えます（記憶の保存形式、自動形成の扱い、語句検索。出典epochと撤回は維持）。
 
+一部を[ADR 0021](0021-postgresql-only-storage.md)のPostgreSQL一本化で置き換えます（保存先を既存SQLiteとする記述（SQLite v3、SQLite内の語句検索、SQLite schema versionを含む）。出典epochと撤回の原子性は維持）。
+
 日付: 2026-10-03
 
 ## 確定した要求と適用順序

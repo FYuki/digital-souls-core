@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+一部を[ADR 0021](0021-postgresql-only-storage.md)のPostgreSQL一本化で置き換えます（SQLite schemaへの言及。検索設定の識別と保存済みデータを変更しない方針は維持）。
+
 日付: 2026-10-05
 
 ## 背景
