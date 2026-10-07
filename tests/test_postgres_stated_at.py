@@ -100,7 +100,7 @@ def test_naive_clock_rolls_back_and_valid_retry_saves_timestamp(stores: Stores) 
     assert history.read(BINDING, created.conversation_id).memory_sources[0].stated_at == FIRST
 
 
-def test_new_schema_is_v4_and_default_clock_is_current_utc(stores: Stores) -> None:
+def test_new_schema_is_v5_and_default_clock_is_current_utc(stores: Stores) -> None:
     with stores.database.transaction(BINDING) as db:
         assert db.execute("SELECT version FROM schema_version").fetchall() == [(5,)]
     cid = stores.history.create(BINDING).conversation_id
