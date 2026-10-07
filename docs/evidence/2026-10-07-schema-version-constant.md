@@ -45,20 +45,13 @@ PostgreSQLは `tools/test-postgres.sh` のdigest固定PostgreSQL 18、network no
 全体の `--collect-only -q` のnode IDを、下表の改名だけ正規化してソート比較し、1461件で完全一致した。
 function数だけでなく各parameter付きnode IDが保存され、試験の削除・追加はない。
 過去の日付付き証跡内の旧試験名は、その証跡のrevisionを指すため変更していない。
+改名は現在版（v5）を名前に含む3件だけとした。移行元の版（v1〜v4）を名前に含む移行試験は、移行段階が固定で版を上げても変わらず、#86〜#88の対応表が参照するため、監督の判断で名前を維持した（実装担当が一度改名した8件を監督が元の名前へ戻した）。
 
 | 旧名 | 新名 |
 | --- | --- |
 | `test_new_schema_is_v5_and_default_clock_is_current_utc` | `test_default_clock_is_current_utc` |
-| `test_v1_migration_preserves_old_null_history_receipt_and_evidence` | `test_legacy_migration_preserves_old_null_history_receipt_and_evidence` |
-| `test_v1_migration_interruption_rolls_back_and_retries` | `test_legacy_timestamp_migration_interruption_rolls_back_and_retries` |
-| `test_malformed_v1_is_rejected_before_migration` | `test_malformed_legacy_schema_is_rejected_before_migration` |
-| `test_v4_migration_preserves_all_rows_and_reopens` | `test_legacy_record_migration_preserves_all_rows_and_reopens` |
-| `test_v4_migration_rolls_back_and_retries` | `test_legacy_record_migration_rolls_back_and_retries` |
 | `test_v5_schema_drift_rejected` | `test_record_schema_drift_rejected` |
 | `test_v5_rejects_nonnullable_registration_digest` | `test_record_schema_rejects_nonnullable_registration_digest` |
-| `test_v3_migration_preserves_stored_time_confirmation_and_receipt` | `test_legacy_deletion_migration_preserves_stored_time_confirmation_and_receipt` |
-| `test_v3_migration_interruption_rolls_back_and_allows_retry` | `test_legacy_deletion_migration_interruption_rolls_back_and_allows_retry` |
-| `test_postgres_v2_migration_keeps_old_dates_receipts_and_does_not_scan_history` | `test_legacy_confirmation_migration_keeps_old_dates_receipts_and_does_not_scan_history` |
 
 ## 版を6にした仮定の受入確認
 
@@ -76,7 +69,7 @@ function数だけでなく各parameter付きnode IDが保存され、試験の�
    deselectedの内訳は他marker935ケースと移行15ケースであり、除外15ケースをPASSには数えていない。
    日時・往復削除・確認保留・schema差異/未知版拒否・新規初期化と再起動・抽出job等が含まれる。
 4. 同じDB fixtureの隔離方法で、除外した移行試験のうち
-   `test_legacy_record_migration_rolls_back_and_retries[version]` を別実行した。
+   `test_v4_migration_rolls_back_and_retries[version]` を別実行した。
    **FAIL 1件**：`UPDATE schema_version SET version=5` による中断注入が、
    一時的な `version=6` と一致せず `DID NOT RAISE RuntimeError` になった。
    このFAILを製品版5の試験結果やPASSに混ぜていない。
@@ -84,13 +77,13 @@ function数だけでなく各parameter付きnode IDが保存され、試験の�
 
 除外したnode ID（各functionの全parameter）：
 
-- `tests/test_postgres_stated_at.py::test_legacy_migration_preserves_old_null_history_receipt_and_evidence`
-- `tests/test_postgres_stated_at.py::test_legacy_timestamp_migration_interruption_rolls_back_and_retries`
-- `tests/test_postgres_memory_record_schema.py::test_legacy_record_migration_preserves_all_rows_and_reopens`
-- `tests/test_postgres_memory_record_schema.py::test_legacy_record_migration_rolls_back_and_retries`
-- `tests/test_postgres_memory_confirmation.py::test_legacy_confirmation_migration_keeps_old_dates_receipts_and_does_not_scan_history`
-- `tests/test_postgres_turn_deletion_migration.py::test_legacy_deletion_migration_preserves_stored_time_confirmation_and_receipt`
-- `tests/test_postgres_turn_deletion_migration.py::test_legacy_deletion_migration_interruption_rolls_back_and_allows_retry`
+- `tests/test_postgres_stated_at.py::test_v1_migration_preserves_old_null_history_receipt_and_evidence`
+- `tests/test_postgres_stated_at.py::test_v1_migration_interruption_rolls_back_and_retries`
+- `tests/test_postgres_memory_record_schema.py::test_v4_migration_preserves_all_rows_and_reopens`
+- `tests/test_postgres_memory_record_schema.py::test_v4_migration_rolls_back_and_retries`
+- `tests/test_postgres_memory_confirmation.py::test_postgres_v2_migration_keeps_old_dates_receipts_and_does_not_scan_history`
+- `tests/test_postgres_turn_deletion_migration.py::test_v3_migration_preserves_stored_time_confirmation_and_receipt`
+- `tests/test_postgres_turn_deletion_migration.py::test_v3_migration_interruption_rolls_back_and_allows_retry`
 
 静的確認は次の検索と、全PostgreSQL試験およびschemaを扱う製品コードの目視照合を併用した。
 JSONの `memory-v1`、記憶recordの内容版、revision、日時、timeout、件数はPostgreSQL schema版ではないため区別した。

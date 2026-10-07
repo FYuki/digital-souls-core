@@ -95,7 +95,7 @@ def snapshot(stores: Stores) -> dict[str, list[tuple[Any, ...]]]:
         }
 
 
-def test_legacy_record_migration_preserves_all_rows_and_reopens(stores: Stores) -> None:
+def test_v4_migration_preserves_all_rows_and_reopens(stores: Stores) -> None:
     install_v4(stores)
     before = snapshot(stores)
     PostgresDatabase(stores.config).initialize()
@@ -107,7 +107,7 @@ def test_legacy_record_migration_preserves_all_rows_and_reopens(stores: Stores) 
 
 
 @pytest.mark.parametrize("after", ["table", "version"])
-def test_legacy_record_migration_rolls_back_and_retries(
+def test_v4_migration_rolls_back_and_retries(
     stores: Stores, monkeypatch: pytest.MonkeyPatch, after: str
 ) -> None:
     install_v4(stores)

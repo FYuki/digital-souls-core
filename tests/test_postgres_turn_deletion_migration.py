@@ -33,7 +33,7 @@ def install_v3(stores: Stores, timestamp: object, state: str) -> None:
 
 @pytest.mark.parametrize("timestamp", [None, FIRST])
 @pytest.mark.parametrize("state", ['{"0":null}', '{"0":false}', '{"0":true}'])
-def test_legacy_deletion_migration_preserves_stored_time_confirmation_and_receipt(
+def test_v3_migration_preserves_stored_time_confirmation_and_receipt(
     stores: Stores,
     timestamp: object,
     state: str,
@@ -60,7 +60,7 @@ def test_legacy_deletion_migration_preserves_stored_time_confirmation_and_receip
         assert h.conversation.read("synthetic", CID).messages == ()
 
 
-def test_legacy_deletion_migration_interruption_rolls_back_and_allows_retry(
+def test_v3_migration_interruption_rolls_back_and_allows_retry(
     stores: Stores,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

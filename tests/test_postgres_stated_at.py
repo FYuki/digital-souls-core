@@ -116,7 +116,7 @@ def test_default_clock_is_current_utc(stores: Stores) -> None:
     assert timestamp.utcoffset() == timedelta(0)
 
 
-def test_legacy_migration_preserves_old_null_history_receipt_and_evidence(stores: Stores) -> None:
+def test_v1_migration_preserves_old_null_history_receipt_and_evidence(stores: Stores) -> None:
     install_v1(stores)
     memory = PostgresMemory(PostgresDatabase(stores.config))
     with stores.database.transaction(BINDING) as db:
@@ -144,7 +144,7 @@ def test_legacy_migration_preserves_old_null_history_receipt_and_evidence(stores
 
 
 @pytest.mark.parametrize("after", ["column", "version"])
-def test_legacy_timestamp_migration_interruption_rolls_back_and_retries(
+def test_v1_migration_interruption_rolls_back_and_retries(
     stores: Stores,
     monkeypatch: pytest.MonkeyPatch,
     after: str,
@@ -214,7 +214,7 @@ def test_timestamp_schema_drift_is_rejected(stores: Stores, alteration: str) -> 
         assert db.execute("SELECT version FROM schema_version").fetchall() == [(SCHEMA_VERSION,)]
 
 
-def test_malformed_legacy_schema_is_rejected_before_migration(stores: Stores) -> None:
+def test_malformed_v1_is_rejected_before_migration(stores: Stores) -> None:
     install_v1(stores)
     with stores.database.transaction(BINDING) as db:
         db.execute("ALTER TABLE conversations ALTER COLUMN private_mode SET DEFAULT true")
