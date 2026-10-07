@@ -1,6 +1,8 @@
 # 明示選択するPostgreSQL backend
 
-履歴・記憶の保存先をtrusted起動コードでSQLiteまたはPostgreSQLへ切り替えます。
+履歴・記憶の保存先はPostgreSQLへ一本化します（[ADR 0021](adr/0021-postgresql-only-storage.md)）。
+SQLiteは廃止予定で、撤去までは既存adapterを現状維持とし、新機能を追加しません。
+PostgreSQLへの接続はtrusted起動コードで明示します。
 PostgreSQLは空の専用schemaを初期化して使います。既存のSQLiteからデータを移す機能はありません。
 通常の`create_app()`は保存無効のままで、設定ファイルを置いただけでは接続・保存・記憶抽出を始めません。
 設計は[ADR 0012](adr/0012-postgresql-storage.md)を参照してください。
@@ -26,9 +28,9 @@ stores = open_storage(config)
 # MemoryService(stores.memory, policy, extractor)
 ```
 
-`StorageConfig.backend`は必須です。`sqlite`では任意の`sqlite_path`、`postgresql`では`postgres`を
+現行実装では`StorageConfig.backend`は必須です。撤去前の`sqlite`では任意の`sqlite_path`、`postgresql`では`postgres`を
 指定します。型の暗黙変換や未知field、backendと整合しない設定は拒否します。
-SQLiteを選ぶ場合も、既存のGit外保存先・POSIX権限・symlink拒否等の条件を維持します。
+撤去前のSQLite adapterは、既存のGit外保存先・POSIX権限・symlink拒否等の条件を維持します。
 
 `StorageStores`は同じbackendのhistory/memory portをまとめて返します。historyとmemoryを別DBへ
 任意に分ける設定は提供しません。`open_storage`の明示呼出しにはDB初期化の副作用がありますが、

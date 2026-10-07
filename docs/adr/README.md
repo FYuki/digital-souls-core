@@ -28,3 +28,4 @@ ADR 0015〜0020は、2026-10-06のユーザー決定とPR #67のレビューを�
 - [ADR 0018: 記憶の検索と会話での利用](0018-memory-retrieval-context.md)
 - [ADR 0019: 記憶の訂正・時間変化・矛盾・削除と失効](0019-memory-correction-invalidation.md)
 - [ADR 0020: 内省・人格・関係・生活状態と記憶の接続](0020-reflection-personality-relationship.md)
+- [ADR 0021: SQLiteを廃止しPostgreSQLへ一本化する](0021-postgresql-only-storage.md)
