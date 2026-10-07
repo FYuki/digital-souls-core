@@ -4,6 +4,8 @@ Status: Proposed
 
 一部を[ADR 0015](0015-memory-model-reorganization.md)の記憶モデル再編で置き換えます（「PoC全体の移植は行わない」の判断）。
 
+一部を[ADR 0021](0021-postgresql-only-storage.md)のPostgreSQL一本化で置き換えます（SQLite transactionの記述。保存transaction中にclassifierを待たない原則は維持）。
+
 日付: 2026-10-03
 
 ## 背景
