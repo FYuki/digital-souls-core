@@ -240,3 +240,30 @@ consume/rebaseの適格性確認が_current/_sourceを通じてSQLite内の本�
 ## 管理された構造化出力
 
 分類器・抽出器は固定JSON Schemaをproviderへ渡し、返却値のstrict検証を維持します。未対応・不正出力は拒否し、制約なしの再試行は行いません。schema・対応契約・SDK versionも承認provenanceに含むため、旧承認は自動的に引き継ぎません。[ADR 0008](adr/0008-managed-structured-output.md)を参照してください。
+
+## 記憶の正本のdomain契約
+
+[記憶の種別・正本・日時](adr/0016-memory-kinds-and-records.md)に対応する保存非依存の値型を
+`digital_souls_core.memory_records` に定義します。既存の逐語記憶の型・挙動は維持します。
+`Episode` は経験の5W・日時・仮定/創作の文脈を持ち、`Fact` は呼出し側が採番した安定IDの内容一版です。
+`Episode` / `Fact` の各版は保存文と引用を独立して保持します。
+`EpisodeFactLink` は両者のID・版付き参照を持ち、保存文や最終言及日時を持ちません。
+`Semantic` は構造化命題と適用時期を持ち、直接抽出はuser引用を必須とします。
+経験からの形成は同一Episode IDの出典をまとめ、互いに素な `SourceReference` 集合を持つ
+Episodeが2件以上なければ拒否します。元発言のepochや引用範囲の違いは独立性を増やしません。
+
+`Citation` はBinding・既存の `SourceVersion`・話者・message内の半開文字範囲 `[start, end)` を
+結び付け、元の本文をコピーしません。5Wは述語を必須とし、不明な項目を補いません。
+`ExplicitReason` は明示された理由と引用を持ちます。`PartialDateTime` / `TemporalValue` は
+部分日時の精度、単一の点、同じ精度の端点の範囲、不明、解釈時のタイムゾーンを保持します。
+月精度で日を埋めず、未知の日時は `TemporalValue()` として明示します。
+
+全記録にID・1以上の整数版・Binding・tz-awareな登録日時・ACTIVE/SUSPENDEDの状態を持たせます。
+`Episode` / `Fact` / `Semantic` はさらに非空の保存文とtz-awareな最終言及日時（不明可）を持ちます。
+別Bindingの引用・参照や不正な値は生成時に拒否し、本文・構造化内容をreprに出しません。
+`RecordRef` と純粋関数
+`dependency_invalidated` は、現在の種別・ID・Binding・版・有効状態が一致する場合だけ依存先を
+有効と判定します。参照先が存在しない場合や版が一致しない場合も失効です。本文消去後も `RecordHead`（参照と状態だけの値）で判定できます。
+
+これらは構造の契約です。保存portでの出典の現在版・適格性の照合、引用範囲と履歴本文の対応、
+Episode出典集合の照合、旧版の保持、撤回時の本文消去、抽出・保存文の生成は後続の実装で扱います。
