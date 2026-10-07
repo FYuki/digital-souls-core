@@ -6,7 +6,7 @@ Coreで共有するドメインの語彙と概念モデルです。製品の範�
 ## 読み方
 
 このリポジトリでの意味を記します。正式な判断はADR、現在の挙動はコード、進捗はIssueが正本です。
-「状態」は[SPEC](SPEC.md)と同じ基準（2026-10-06のmain）です。
+「状態」は[SPEC](SPEC.md)と同じく、この文書と同じリビジョンの実装を基準に照合します。
 
 ## 境界と会話
 
@@ -16,9 +16,9 @@ Coreで共有するドメインの語彙と概念モデルです。製品の範�
 | Conversation / 会話、スレッド | 保存する会話のまとまり。作成・再開・アーカイブ・削除の単位。スレッドは記憶の増分抽出の枠でもあるが、知識の参照・訂正はBinding全体に及ぶ | 実装済み：[履歴API](docs/history-api.md) |
 | Source / 出典、source epoch | 記憶の根拠となる元発言（会話・turn revision・message index）と、private化等で進む撤回世代 | 実装済み：[ADR 0007](docs/adr/0007-memory-provenance-and-revocation.md) |
 | 指定発話の記憶除外、プライベートモード、アーカイブ | 履歴は残して記憶の対象から外す操作、スレッド単位で記憶の対象外にする操作、一覧から隠すだけの操作 | 実装済み：[ADR 0006](docs/adr/0006-conversation-memory-controls.md) |
-| 会話往復 / turn | user入力と、それに対するassistantの応答・tool往復のまとまり。履歴の削除をユーザーが選べる単位の一つ | 未実装（削除）：[ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
+| 会話往復 / turn | user入力と、それに対するassistantの応答・tool往復のまとまり。履歴の削除をユーザーが選べる単位の一つ | 実装済み（削除）：[ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
 | 保存への同意 | 長期記憶の登録を有効にした状態で会話したこと。候補ごとの確認は行わない | 決定：ADR 0019 |
-| 保存拒否の語 | 「覚えないで」「記録しないで」等。検出した発話は確認が取れるまで記憶形成の対象外とし、プライベートモードと削除機能を案内する。AIは履歴を削除しない | 一部（検出のみ）：ADR 0019 |
+| 保存拒否の語 | 「覚えないで」「記録しないで」等。検出した発話は確認が取れるまで記憶形成の対象外とし、プライベートモードと削除機能を案内する。AIは履歴を削除しない | 実装済み：ADR 0019 |
 | PrivateAgent | 記憶の形成jobや会話外の活動を実行する外部の実行基盤。キャラクターの判断が必要な処理はCoreのLLM APIを呼ぶ | 決定：[ADR 0017](docs/adr/0017-memory-formation-admission.md) |
 | 流出防止ゲート / インジェクション対策 | 外部へ送る直前の内容の再判定／外部の内容と記憶を命令ではなくデータとして扱う境界。どちらもCoreが所有する | 未実装：[ADR 0020](docs/adr/0020-reflection-personality-relationship.md) |
 | privacy permission | history・local・external・memoryの別許可。Binding単位でoperatorが明示する | 実装済み：[ADR 0005](docs/adr/0005-privacy-boundaries.md) |
@@ -38,11 +38,11 @@ Coreで共有するドメインの語彙と概念モデルです。製品の範�
 | Procedural Memory / Skill / 手続き記憶 | どう実行するかの記憶。実行・対話の結果から学習し、実行時に参照する | 未実装：ADR 0016 |
 | Candidate / 候補 | LLM等が生成し、privacy・根拠・schema・policyの検証前のデータ。検証を通ったものだけを自動で保存する | 概念：ADR 0016 |
 | 保存判定（admission） | 候補をDENY_SENSITIVE・DENY_USER_REQUEST・ABSTAIN_UNKNOWN・NOT_MEMORY_WORTHY・ALLOW_STRUCTUREDに決定論的に分類する処理 | 未実装：ADR 0017 |
-| stated_at / experienced_at / 対象日時 | 元発言の日時／キャラクターが経験を得た日時／話題の出来事の日時。互いに補完しない | 未実装：ADR 0016 |
+| stated_at / experienced_at / 対象日時 | 元発言の日時／キャラクターが経験を得た日時／話題の出来事の日時。互いに補完しない | 一部（stated_atは実装済み、experienced_at・対象日時は未実装）：ADR 0016 |
 | last_user_mentioned_at / TOUCH | ユーザーが最後に明示的に言及した日時／再言及時にこの日時だけを更新する処理。検索の同順位の並べ替えに使う | 未実装：[ADR 0018](docs/adr/0018-memory-retrieval-context.md) |
 | 派生index | 正本から再構築できる検索用の索引。現行は呼出し中だけの一時vector | 一部：[ADR 0010](docs/adr/0010-in-process-memory-search.md) |
 | Consolidation / 記憶整理 | 同種の既存記憶をKEEP・MERGE・SUPERSEDE等の型付き計画で整理する処理。一般化やFact統合とは別 | 未実装：ADR 0017 |
-| Invalidation / 失効 | 根拠の訂正・削除・撤回で、依存する記憶・派生結果を即時に利用停止し、残る根拠から再評価する処理 | 一部：[ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
+| Invalidation / 失効 | 根拠の訂正・削除・撤回で、依存する記憶・派生結果を即時に利用停止し、残る根拠から再評価する処理 | 一部（source撤回のみ）：[ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
 | Forgetting / 忘却 | 記憶内容の削除ではなく、想起しにくくなること。必要性が確認できた段階で詳細化する | 概念のみ |
 
 ## 人格と状態
