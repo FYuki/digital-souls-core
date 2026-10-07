@@ -199,7 +199,7 @@ SQLiteHistory(Path(sys.argv[1]))
     assert receipt and receipt.fingerprint == "original-fingerprint"
     assert store.source_eligible(BINDING, SourceReference("synthetic-cid", 1, 0))
     with sqlite3.connect(path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 6
 
 
 async def test_private_change_conflicts_with_inflight_inference(

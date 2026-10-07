@@ -17,7 +17,7 @@ from digital_souls_core.sqlite_memory import SQLiteMemory
 
 from .support import FakeProvider
 from .test_conversations import turn
-from .test_memory import selection, setup, source, store
+from .test_memory import assert_memoryless_turn, selection, setup, source, store
 from .test_privacy import BINDING
 
 pytestmark = pytest.mark.it1
@@ -56,6 +56,33 @@ async def test_opt_in_synonym_ranking_preserves_memory_and_source_provenance(
     service.store = SQLiteMemory(store(service).path)
     assert await service.search(BINDING, "beverage") == expected
     assert len(encoder.calls) == 3  # Every call recomputes; reopening does not introduce an index.
+
+
+async def test_equal_relevance_prefers_latest_user_mention_over_newer_memory(
+    tmp_path: Path,
+) -> None:
+    # PoC rag ranking: within the equivalence band, last_user_mentioned_at wins
+    # over creation order. Core uses the source turn append order for that time.
+    service, conversation, _ = setup(tmp_path)
+    earlier = await source(conversation, "I like synthetic tea in the morning.")
+    later = await source(conversation, "I like synthetic tea after lunch.")
+    mentioned_later = await service.extract(BINDING, (later,))
+    created_later = await service.extract(BINDING, (earlier,))
+    service.embedding = SyntheticEmbedding()
+    assert await service.search(BINDING, "beverage") == (*mentioned_later, *created_later)
+    assert mentioned_later[0].mentioned > created_later[0].mentioned
+
+
+async def test_semantic_search_returns_at_most_poc_max_retrieved(tmp_path: Path) -> None:
+    service, conversation, _ = setup(tmp_path)
+    for index in range(7):
+        await service.extract(
+            BINDING, (await source(conversation, f"I like synthetic tea number {index}."),)
+        )
+    service.embedding = SyntheticEmbedding()
+    assert len(await service.search(BINDING, "beverage")) == 5
+    assert len(await service.search(BINDING, "beverage", limit=16)) == 5
+    assert len(await service.search(BINDING, "beverage", limit=2)) == 2
 
 
 @pytest.mark.parametrize("action", ["private", "delete"])
@@ -256,14 +283,7 @@ async def test_embedding_failure_is_bounded_content_free_and_never_optional(
             return True
 
         monkeypatch.setattr(classifier, "safe", safe)
-    task = asyncio.create_task(
-        conversation.inference.prepare(
-            "synthetic",
-            CompletionInput(messages=[Message(role="user", content="beverage")]),
-            alias=False,
-            conversation_id=ref.conversation_id,
-        )
-    )
+    task = asyncio.create_task(service.search(BINDING, "beverage"))
     await entered.wait()
     if failure == "cancel":
         task.cancel()
@@ -274,6 +294,91 @@ async def test_embedding_failure_is_bounded_content_free_and_never_optional(
             await task
         assert caught.value.code == "memory_embedding_failed"
         assert "SYNTHETIC_CONTENT" not in str(caught.value)
+
+
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("failure", ["error", "timeout", "bad_vectors", "metadata"])
+async def test_embedding_failure_allows_memoryless_conversation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    failure: str,
+    stream: bool,
+) -> None:
+    service, conversation, _ = setup(tmp_path)
+    ref = await source(conversation, "SYNTHETIC_EVIDENCE_MARKER tea")
+    await service.extract(BINDING, (ref,))
+    encoder = SyntheticEmbedding()
+    service.embedding = encoder
+
+    async def fail(texts: tuple[str, ...]) -> tuple[tuple[float, ...], ...]:
+        if failure == "error":
+            raise RuntimeError("SYNTHETIC_ERROR_MARKER " + " ".join(texts))
+        if failure == "bad_vectors":
+            return ()
+        await asyncio.Event().wait()
+        return ()
+
+    monkeypatch.setattr(encoder, "embed", fail)
+    if failure == "timeout":
+        real_timeout = asyncio.timeout
+
+        def immediate_embedding_timeout(delay: float | None) -> asyncio.Timeout:
+            return real_timeout(0 if delay == 15 else delay)
+
+        monkeypatch.setattr(asyncio, "timeout", immediate_embedding_timeout)
+    elif failure == "metadata":
+
+        class BrokenEmbedding:
+            @property
+            def space(self) -> EmbeddingSpace:
+                raise RuntimeError("SYNTHETIC_ERROR_MARKER")
+
+            async def embed(self, texts: tuple[str, ...]) -> tuple[tuple[float, ...], ...]:
+                raise AssertionError("must not embed invalid metadata")
+
+        service.embedding = BrokenEmbedding()
+    caplog.set_level("DEBUG")
+    caplog.clear()
+    await assert_memoryless_turn(conversation, "SYNTHETIC_QUERY_MARKER beverage", stream)
+    for marker in ("synthetic_query_marker", "synthetic_evidence_marker", "synthetic_error_marker"):
+        assert marker not in caplog.text.casefold()
+
+
+async def test_conversation_cancel_during_embedding_propagates_without_append(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service, conversation, _ = setup(tmp_path)
+    await service.extract(BINDING, (await source(conversation),))
+    encoder = SyntheticEmbedding()
+    service.embedding = encoder
+    entered, closed = asyncio.Event(), asyncio.Event()
+
+    async def wait(texts: tuple[str, ...]) -> tuple[tuple[float, ...], ...]:
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            closed.set()
+        return ()
+
+    monkeypatch.setattr(encoder, "embed", wait)
+    provider = conversation.inference.provider
+    assert isinstance(provider, FakeProvider)
+    provider.calls.clear()
+    cid = conversation.create("synthetic").conversation_id
+    body = turn(messages=[{"role": "user", "content": "beverage"}])
+    task = asyncio.create_task(conversation.complete("synthetic", cid, body))
+    try:
+        await asyncio.wait_for(entered.wait(), 3)
+    finally:
+        task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert closed.is_set()
+    assert provider.calls == []
+    assert conversation.read("synthetic", cid).revision == 0
+    assert conversation.store.receipt(BINDING, cid, body.request_id) is None
 
 
 @pytest.mark.parametrize(

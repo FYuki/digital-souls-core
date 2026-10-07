@@ -57,7 +57,11 @@ async def test_fixed_schema_over_actual_sdk_and_fail_closed(
     else:
         extractor = LocalExtractor(LiteLLMProvider(), local_profile(), model_digest="synthetic")
         evidence = (
-            Evidence(SourceVersion(SourceReference("synthetic", 1, 0), 0), "Synthetic tea"),
+            Evidence(
+                SourceVersion(SourceReference("synthetic", 1, 0), 0),
+                "Synthetic tea",
+                stated_at=None,
+            ),
         )
         if mode == "valid":
             assert len(await extractor.extract(evidence)) == 1

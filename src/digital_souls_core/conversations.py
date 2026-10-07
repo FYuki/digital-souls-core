@@ -17,12 +17,16 @@ from .history import (
     ConversationControls,
     HistoryPolicy,
     HistoryStore,
+    MemoryConfirmation,
     Operation,
     Receipt,
     Snapshot,
+    TurnDeletionInput,
+    TurnDeletionResult,
     TurnInput,
 )
 from .privacy import PrivacyPolicy
+from .privacy_scan import scan
 
 MAX_BYTES = 1024 * 1024
 
@@ -115,6 +119,11 @@ class Conversations:
         """Delete scoped history even when storage consent has been revoked."""
         self.store.delete(self.binding(character_id), conversation_id)
 
+    def delete_turns(
+        self, character_id: str, conversation_id: str, selection: TurnDeletionInput
+    ) -> TurnDeletionResult:
+        return self.store.delete_turns(self.binding(character_id), conversation_id, selection)
+
     def controls(
         self, character_id: str, conversation_id: str, changes: ConversationControls
     ) -> Snapshot:
@@ -123,6 +132,16 @@ class Conversations:
         self.authorize("store", binding)
         self.read(character_id, conversation_id)
         snapshot = self.store.controls(binding, conversation_id, changes)
+        self.authorize("read", binding, snapshot.messages)
+        return snapshot
+
+    def confirm(
+        self, character_id: str, conversation_id: str, answer: MemoryConfirmation
+    ) -> Snapshot:
+        binding = self.binding(character_id)
+        self.authorize("store", binding)
+        self.read(character_id, conversation_id)
+        snapshot = self.store.confirm(binding, conversation_id, answer)
         self.authorize("read", binding, snapshot.messages)
         return snapshot
 
@@ -145,6 +164,14 @@ class Conversations:
             return prior
         if snapshot.revision != body.expected_revision:
             raise CoreError(409, "revision_conflict", "Conversation revision changed")
+        confirmation_indices = []
+        for index, item in enumerate(incoming):
+            if item.role == "user":
+                finding = scan(item.content)
+                if finding.failed:
+                    raise CoreError(403, "history_policy_denied", "Refusal screening failed")
+                if finding.no_history or finding.no_memory:
+                    confirmation_indices.append(index)
         all_input = (*snapshot.messages, *incoming)
         if len(all_input) > 256:
             raise CoreError(413, "history_limit", "Conversation message limit exceeded")
@@ -201,6 +228,11 @@ class Conversations:
             snapshot.revision,
             stored,
             finish,
+            **(
+                {"memory_confirmation_indices": tuple(confirmation_indices)}
+                if confirmation_indices
+                else {}
+            ),
             **(
                 {"memory_excluded_indices": tuple(body.memory_excluded_indices)}
                 if body.memory_excluded_indices

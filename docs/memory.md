@@ -55,7 +55,23 @@ cancelは伝播し、未完jobを残して明示再試行できます。複数ca
 
 ## source失効と削除・再構成
 
-SQLite schema v3へ原子的に移行し、v1/v2の履歴・receiptを保持します。
+[往復単位の削除](history-api.md#往復単位の明示削除)では、最終的な削除対象のturn revisionを
+`memory_sources`のBinding・会話・revisionと照合し、該当出典を持つactive memoryだけを撤回します。
+旧本文のNULL化と内容なし`memory_events`の登録は履歴削除と同一transactionです。
+会話全体のmemory epochは進めず、他の往復だけを出典にする記憶は保持します。
+削除出典はturn行の不存在により、抽出・採用・検索・取得済みcontextの送信直前でも無効になります。
+同じPreparedや抽出taskが削除をまたいでも、旧出典の利用・採用を拒否します。
+
+既存consumerは複数出典の旧記憶を残る適格な出典だけで再構成します。旧本文や旧IDは復活させず、
+job作成後の追加削除も実行前・採用前に再検証します。再構成が失敗しても旧本文は消えたままです。
+対象外の後続往復と削除後に追加したuser往復は、既存のprivacy・private・明示除外・確認状態を
+満たせば新しく抽出できます。privateや保留の解除を削除操作から推測しません。
+往復通知のoutboxはSourceDeletionと別であり、記憶再構成の既存`memory_events` consumerへも接続します。
+
+SQLiteの`user_version`は、既存v1〜v5から必要な段階を経てv6へ同一transactionで原子的に移行し、履歴・receiptを保持します。
+v2でprivate・除外・archiveと`source_deletions`、v3でmemory epoch・記憶tableを追加します。
+v4で`turns.stated_at`、v5で`turns.memory_confirmation`（既定値`{}`）、
+v6で`turn_tombstones`・`turn_deletions`を追加します。v3以前の旧turnの`stated_at`はNULLのまま補完しません。
 private化はconversationのmemory epochを進め、履歴を保持しつつ派生memory本文を同一transactionでNULL化します。
 履歴削除も派生本文を同一transactionで消します。text index/cacheを別途保持しないため、そこからの復活はありません。
 ID・source refs・epoch・versionの最小tombstoneは残り、旧IDをactiveへ戻しません。
@@ -83,8 +99,9 @@ DB transactionをLLM await中に保持しません。採用時にsource epoch・
 既定の検索はcasefold後の部分文字列一致で、最新作成順です。全質問文を部分一致queryにすると
 一致しにくいため、Python検索では特徴的な短い語句を明示します。語彙展開・ランキング学習はありません。
 queryは1〜256文字、limitは1〜16件、1 Bindingのactive memoryが1000件を超える場合は413で拒否します。
+limitを省略した場合と意味検索の上限は、下記`RetrievalPolicy`の最大取得件数（既定5件）です。
 各memoryの全sourceを照合するため、計算量は対象memory数と出典数に比例します。速度の実測保証はありません。
-conversation自動contextは最新user文の先頭256文字をqueryにし、最大4件を既存context byte budget内で扱います。
+conversation自動contextは最新user文の先頭256文字をqueryにし、最大取得件数（既定5件）を既存context byte budget内で扱います。
 抽出は最大16 source（各2048文字）、最大8候補です。過大なcontextは切り捨てず既存のbudget errorにします。
 
 trusted起動コードが`MemoryService(..., embedding=trusted_embedder)`を明示すると、意味検索を使えます。
@@ -101,7 +118,13 @@ trusted起動コードが`MemoryService(..., embedding=trusted_embedder)`を明�
 候補本文全体を現在のprivacyで認可し、全候補のsourceと設定を再照合してから、queryと全候補を
 1 batchでembeddingへ渡します。候補がない場合はembeddingを呼びません。embeddingのawaitは最大15秒で、
 検索操作全体の上限時間を示すものではありません。完了後にも全候補のsourceと設定を照合します。
-cosine類似度が正の候補だけを降順に並べ、同点は最新作成順にします。limit以内の結果を改めて
+順位付けはPoCの[RAG検索](https://github.com/FYuki/digital-souls/blob/fce7382884d981c42be7fbd3ddaffe7469e27588/backend/app/memory/ranking.py)と
+[policy値](https://github.com/FYuki/digital-souls/blob/fce7382884d981c42be7fbd3ddaffe7469e27588/backend/app/memory/memory_policy.json#L42-L48)に合わせた`RetrievalPolicy`で行います。
+単位vector間の二乗L2距離が近い順に候補20件へ絞り、relevance `1 / (1 + sqrt(距離))` が0.54以上の
+候補だけを残します。先頭とのrelevance差が0.002以内の候補は同等帯とし、帯の中はユーザーの
+最終言及が新しい順、作成が新しい順、memory ID順に並べ、最大5件を返します。
+最終言及は出典user発話を含むturnの保存順の最大値で、時刻列ではありません。PoCの
+`last_user_mentioned_at`と同じ順序を、schemaを変えずに表します。limit以内の結果を改めて
 privacy認可し、sourceと設定を照合して返します。不正vector、timeout、失敗は内容なしのエラー、
 cancelは伝播し、部分文字列検索へのfallbackはしません。実モデルの検索品質は未評価です。
 
@@ -111,7 +134,8 @@ Binding分離は既存のsource境界を使い、archiveは検索対象を変え
 
 文字列化後もmemory ID・source refs/epochsを内部guardが保持します。現在のpolicy owner/generationとsourceを
 取得前・各await後・推論dispatch直前に照合します。embeddingの差し替え世代とspaceも別のguardで保持し、
-空contextにも適用します。検索設定は抽出jobの`_versions()`に加えず、既存の抽出承認を変更しません。
+正常に検索して0件だった空contextにも適用します。検索障害で記憶を破棄した場合は、
+下記の会話認可guardを保持します。検索設定は抽出jobの`_versions()`に加えず、既存の抽出承認を変更しません。
 通常ContextSourceや分類器のawait中のpolicy交換・source撤回・embedding設定変更では古いcontextを
 providerへ送りません。呼び出し開始済みの処理や通信は回収できません。
 
@@ -174,12 +198,20 @@ privacy再判定・source guard・context byte budgetは、このframeを含む�
 ## 会話時の記憶なし継続
 
 会話contextでmemory許可がない場合、記憶storeを参照せず通常の推論認可へ進みます。
-queryの記憶利用が拒否された場合（機微判定・ABSTAIN・分類器の判定不能を含む）も、
-検索前にpolicy/設定/呼び出しscopeが不変と確認できた場合だけ空contextへ戻します。
-専用の MemoryQueryUnavailable 型（code: memory_query_unavailable）で区別し、一般のCoreErrorは吸収しません。
-直接の記憶検索APIはこの拒否をエラーとして返します。結果の拒否、source撤回、設定不正、
-policy変更、storage障害、embeddingの設定変更・不正出力・失敗・timeout、キャンセルは会話でもfail-closedです。
-空contextでも送信前まで呼び出しscope・policy世代・設定のguardを保持します。
+検索準備や検索が `CoreError` で失敗した場合は、記憶を破棄して空contextで会話を続けます。
+query拒否（機微判定・ABSTAIN・分類器の判定不能を含む）、結果拒否、検索中のsource撤回、
+設定不正、storage障害、embeddingの不正出力・失敗・timeoutもこの対象です。
+障害内容は保持・ログ出力せず、query・記憶本文・例外文字列を障害応答や後続例外へ転記しません。
+キャンセルと `CoreError` 以外の予期しない例外は従来どおり伝播します。
+直接の記憶検索は、query拒否の MemoryQueryUnavailable（code: memory_query_unavailable）を含め、
+従来どおりエラーを返します。部分文字列検索へのfallbackは行いません。
+
+障害時の空contextは、検索前のpolicy object・世代と呼び出しscope・context ownerの認可を
+送信直前まで保持します。失敗した検索設定や破棄したsourceを再検証して検索障害を再発させません。
+会話自体の認可が失効した場合は送信を拒否します。最終payloadのprivacy検査と、
+推論後の履歴保存認可・revision検証も維持します。
+正常な検索結果（0件を含む）は設定guardを保持し、記憶返却後のsource撤回は送信拒否になります。
+返却後の再検証失敗を空contextへ差し替えて送信することはありません。
 分類器の代入は単調増加する世代を更新し、交換後に元のobjectへ戻しても古い判定を再利用しません。
 
 
@@ -192,12 +224,13 @@ profile IDだけの変更も別の承認先と扱います。token/key/headerは
 userinfo/query/fragmentを含むURLは既存のProfile検証で拒否します。
 これは運用者が固定した設定の識別であり、endpoint背後の実プロセスやmodel digestの真正性保証ではありません。
 
-既存SQLite v3のversions JSONを拡張するため、DDL migrationや旧行の書き換えはありません。
+送信先識別は既存SQLiteのversions JSONを拡張するため、追加のDDL migrationや旧行の書き換えはありません。
 送信先識別を欠く旧jobは新設定と一致せず、再構築時にはclassifier/extractorへ送信する前に拒否され、
 既存のfailed終端化・後続処理へ進みます。現在のendpointを旧承認へ補完しません。
 旧active memoryの出典検証・検索と履歴データは維持しますが、再構築・抽出jobを再利用する際には
 現在のsource適格性とprivacyを満たす明示extractが必要です。
-既存v1/v2→v3 migrationとoutboxの原子性は変更せず、crash回帰も継続します。
+送信先識別の拡張ではschema migrationやoutboxの原子性は変更せず、crash回帰も継続します。
+現在のschemaは、上記の段階的migrationでv6へ移行します。
 
 
 再構築全体での本文取得前拒否は保証しません。runの設定比較より先に、

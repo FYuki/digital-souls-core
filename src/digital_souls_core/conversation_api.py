@@ -7,7 +7,14 @@ from typing import Any
 from fastapi import FastAPI, Request, Response
 
 from .conversations import Conversations
-from .history import ConversationControls, Receipt, Snapshot, TurnInput
+from .history import (
+    ConversationControls,
+    MemoryConfirmation,
+    Receipt,
+    Snapshot,
+    TurnDeletionInput,
+    TurnInput,
+)
 
 
 def snapshot_body(snapshot: Snapshot) -> dict[str, Any]:
@@ -16,11 +23,16 @@ def snapshot_body(snapshot: Snapshot) -> dict[str, Any]:
         "revision": snapshot.revision,
         "private_mode": snapshot.private_mode,
         "archived": snapshot.archived,
+        "memory_confirmations": [
+            {"turn_revision": ref.turn_revision, "message_index": ref.message_index}
+            for ref in snapshot.memory_confirmations
+        ],
         "memory_sources": [
             {
                 "turn_revision": state.reference.turn_revision,
                 "message_index": state.reference.message_index,
                 "eligible": state.eligible,
+                "stated_at": state.stated_at.isoformat() if state.stated_at is not None else None,
             }
             for state in snapshot.memory_sources
         ],
@@ -60,6 +72,23 @@ def register_conversations(
         service.delete(character_id, conversation_id)
         return Response(status_code=204)
 
+    @app.post(path + "/{conversation_id}/memory-confirmations")
+    async def confirm(
+        character_id: str, conversation_id: str, body: MemoryConfirmation
+    ) -> dict[str, Any]:
+        return snapshot_body(service.confirm(character_id, conversation_id, body))
+
+    @app.post(path + "/{conversation_id}/turn-deletions")
+    async def delete_turns(
+        character_id: str, conversation_id: str, body: TurnDeletionInput
+    ) -> dict[str, Any]:
+        result = service.delete_turns(character_id, conversation_id, body)
+        return {
+            "conversation_id": result.conversation_id,
+            "revision": result.revision,
+            "turn_revisions": result.turn_revisions,
+        }
+
     @app.post(path + "/{conversation_id}/completions", response_model=None)
     async def complete(
         character_id: str, conversation_id: str, body: TurnInput, request: Request
@@ -72,6 +101,24 @@ def register_conversations(
             "message": receipt.message.model_dump(exclude_none=True),
             "finish_reason": receipt.finish_reason,
         }
+        if receipt.memory_confirmation_indices:
+            conversation_path = f"/v1/characters/{character_id}/conversations/{conversation_id}"
+            data["memory_confirmation"] = {
+                "sources": [
+                    {"turn_revision": receipt.revision, "message_index": index}
+                    for index in receipt.memory_confirmation_indices
+                ],
+                "private_mode": {
+                    "method": "POST",
+                    "path": conversation_path + "/memory-confirmations",
+                },
+                "delete_history": {"method": "DELETE", "path": conversation_path},
+                "delete_turns": {
+                    "method": "POST",
+                    "path": conversation_path + "/turn-deletions",
+                    "scopes": ["selected", "following"],
+                },
+            }
         if not body.stream:
             return data
         return Response(

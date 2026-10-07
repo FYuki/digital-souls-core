@@ -1,4 +1,4 @@
-"""Version-one PostgreSQL schema and atomic source revocation."""
+"""Version-four PostgreSQL schema and atomic source revocation."""
 
 from typing import Any
 from uuid import uuid4
@@ -27,12 +27,16 @@ TABLE_COLUMNS = {
         "finish",
         "memory_excluded",
         "private_mode",
+        "stated_at",
+        "memory_confirmation",
     ),
     "source_deletions": ("seq", "event", "binding", "conversation", "through_revision"),
     "memory_events": ("seq", "id", "binding", "conversation", "epoch", "reason", "processed"),
     "memory_jobs": ("seq", "id", "binding", "sources", "versions", "state"),
     "memories": ("seq", "id", "binding", "job", "kind", "body", "state", "revoked_by"),
     "memory_sources": ("seq", "binding", "memory", "conversation", "revision", "position", "epoch"),
+    "turn_tombstones": ("seq", "binding", "conversation", "request", "revision"),
+    "turn_deletions": ("seq", "event", "binding", "conversation", "turn_revisions"),
 }
 
 # These are the keys and referential actions on which receipt and deletion guarantees rely.
@@ -67,6 +71,12 @@ CONSTRAINTS = {
         "memory_sources",
         "memory_sources_binding_memory_fkey",
     ): "FOREIGN KEY (binding, memory) REFERENCES memories(binding, id) ON DELETE CASCADE",
+    ("turn_tombstones", "turn_tombstones_pkey"): "PRIMARY KEY (binding, conversation, request)",
+    ("turn_tombstones", "turn_tombstones_binding_conversation_fkey"): (
+        "FOREIGN KEY (binding, conversation) REFERENCES conversations(binding, id) "
+        "ON DELETE CASCADE"
+    ),
+    ("turn_deletions", "turn_deletions_pkey"): "PRIMARY KEY (event)",
 }
 CONSTRAINTS.update(
     {
@@ -74,6 +84,20 @@ CONSTRAINTS.update(
         for table in TABLE_COLUMNS
         if table != "schema_version"
     }
+)
+
+TURN_DELETION_DDL = (
+    """CREATE TABLE turn_tombstones (
+        seq BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE,
+        binding TEXT NOT NULL, conversation TEXT NOT NULL, request TEXT NOT NULL,
+        revision INTEGER NOT NULL, PRIMARY KEY(binding,conversation,request),
+        FOREIGN KEY(binding,conversation) REFERENCES conversations(binding,id) ON DELETE CASCADE
+    )""",
+    """CREATE TABLE turn_deletions (
+        seq BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE,
+        event TEXT PRIMARY KEY, binding TEXT NOT NULL, conversation TEXT NOT NULL,
+        turn_revisions TEXT NOT NULL
+    )""",
 )
 
 DDL = (
@@ -89,7 +113,8 @@ DDL = (
         binding TEXT NOT NULL, conversation TEXT NOT NULL, request TEXT NOT NULL,
         fingerprint TEXT NOT NULL, revision INTEGER NOT NULL, messages TEXT NOT NULL,
         finish TEXT NOT NULL, memory_excluded TEXT NOT NULL DEFAULT '[]',
-        private_mode BOOLEAN NOT NULL DEFAULT false,
+        private_mode BOOLEAN NOT NULL DEFAULT false, stated_at TIMESTAMPTZ,
+        memory_confirmation TEXT NOT NULL DEFAULT '{}',
         PRIMARY KEY(binding,conversation,request), UNIQUE(binding,conversation,revision),
         FOREIGN KEY(binding,conversation) REFERENCES conversations(binding,id) ON DELETE CASCADE
     )""",
@@ -122,7 +147,8 @@ DDL = (
         FOREIGN KEY(binding,memory) REFERENCES memories(binding,id) ON DELETE CASCADE
     )""",
     "CREATE INDEX memory_source_lookup ON memory_sources(binding,conversation)",
-    "INSERT INTO schema_version(version) VALUES (1)",
+    *TURN_DELETION_DDL,
+    "INSERT INTO schema_version(version) VALUES (4)",
 )
 
 
@@ -148,4 +174,25 @@ def revoke(
         "WHERE binding=%s AND state='active' AND id IN "
         "(SELECT memory FROM memory_sources WHERE binding=%s AND conversation=%s)",
         (event, binding, binding, conversation),
+    )
+
+
+def revoke_turns(
+    db: Connection[tuple[Any, ...]],
+    binding: str,
+    conversation: str,
+    epoch: int,
+    revisions: tuple[int, ...],
+) -> None:
+    event = str(uuid4())
+    db.execute(
+        "INSERT INTO memory_events(id,binding,conversation,epoch,reason) VALUES (%s,%s,%s,%s,%s)",
+        (event, binding, conversation, epoch, "turn_delete"),
+    )
+    db.execute(
+        "UPDATE memories SET body=NULL,state='revoked',revoked_by=%s "
+        "WHERE binding=%s AND state='active' AND id IN "
+        "(SELECT memory FROM memory_sources WHERE binding=%s AND conversation=%s "
+        "AND revision=ANY(%s))",
+        (event, binding, binding, conversation, list(revisions)),
     )

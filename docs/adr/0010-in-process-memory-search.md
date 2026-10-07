@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+一部を[ADR 0015](0015-memory-model-reorganization.md)の記憶モデル再編で置き換えます（検索の順位と障害時の扱い。ADR 0018を参照）。
+
 日付: 2026-10-05
 
 ## 背景
@@ -37,8 +39,28 @@ queryは1〜256文字、limitは1〜16件とし、1 Bindingのactive memoryは�
 2. 同じBindingのactive memoryから、全sourceが現在も適格でepochが一致する候補を取得します。
 3. 候補本文全体を現在のpolicyで認可し、全候補のsourceと設定を再照合します。
 4. 候補がある場合、queryと全候補本文を1 batchでembeddingへ渡します。awaitは最大15秒です。
-5. 全候補のsourceと設定を再照合し、cosine類似度が正の候補を降順に並べます。同点は最新作成順です。
-6. limit以内の結果を現在のpolicyで認可し、返却前にもsourceと設定を照合します。
+5. 全候補のsourceと設定を再照合し、下記のPoC互換の順位付けを行います。
+6. 最大取得件数（limit指定時はその小さいほう）以内の結果を現在のpolicyで認可し、返却前にもsourceと設定を照合します。
+
+### PoC互換の順位付け（2026-10-06改訂）
+
+当初は正のcosine降順・最新作成順としていましたが、PoCの検索順位から移植漏れがあったため改訂します。
+参照元は公開`FYuki/digital-souls`の固定commitの
+[ranking.py](https://github.com/FYuki/digital-souls/blob/fce7382884d981c42be7fbd3ddaffe7469e27588/backend/app/memory/ranking.py)と
+[memory_policy.json](https://github.com/FYuki/digital-souls/blob/fce7382884d981c42be7fbd3ddaffe7469e27588/backend/app/memory/memory_policy.json#L42-L48)です。
+
+- `RetrievalPolicy`の既定値はPoCと同じ最大取得5件、候補20件、relevance閾値0.54、同等margin 0.002です。
+- 単位vector間の二乗L2距離（PoCのChroma既定空間）が近い順に候補20件へ絞ります。
+- relevance `1 / (1 + sqrt(距離))` が閾値未満の候補は返しません。
+- 先頭とのrelevance差がmargin以内を同等帯とし、帯の中はユーザーの最終言及が新しい順、作成が新しい順、IDの順です。
+- 最終言及はPoCの`last_user_mentioned_at`（出典user発話の最新時刻）に相当します。Coreの履歴は時刻を保存しないため、
+  出典turnの保存順（SQLite rowid、PostgreSQL seq）の最大値で同じ順序を表し、schemaは変更しません。
+- PoCの再言及時のTOUCH更新、期間検索、語彙補完、自己申告の現在値補完はCoreに未実装で、この改訂に含みません。
+
+後続の実装ではturnに`stated_at`を保存するようになりました。上記の「時刻を保存しない」「schemaは変更しません」は
+この改訂時点の記述です。移行前のturnは`stated_at`がNULLのままで日時による順序を付けられないため、
+現在も同等帯の並びには出典turnの保存順を使います。最終言及日時`last_user_mentioned_at`の正式な保存と
+TOUCHは[ADR 0018 §5](0018-memory-retrieval-context.md#5-最終言及日時とtouch)に従い後続で実装します。
 
 候補がない場合はembeddingを呼びません。vectorの件数・次元・有限性・非ゼロ長を検証し、不正値を
 許容した順位付けや別方式へのfallbackはしません。embedding失敗・timeoutは内容や例外文字列を
@@ -62,6 +84,11 @@ awaitを経た推論dispatch直前にも検証します。既に開始した処�
 
 queryの事前認可拒否だけを扱う`MemoryQueryUnavailable`の契約は維持します。候補認可の拒否、
 source撤回、embedding設定変更・不正出力・失敗を、会話の記憶なし継続へ変換しません。
+
+この会話継続の契約は[ADR 0018 §2](0018-memory-retrieval-context.md#2-検索前のquery判定と障害時の扱い)で
+置き換えられました。現在は`MemoryContext.context`が検索時の`CoreError`（`MemoryQueryUnavailable`を含む）を
+空contextへ変換し、記憶なしで会話を継続します。会話の認可とpolicyの同一性・stampは引き続き検証し、
+cancelは伝播します。`MemoryService.search`を直接呼ぶ場合は空結果へ変換せず、従来どおりエラーを返します。
 
 ## 検証と残る範囲
 

@@ -106,6 +106,18 @@ async def test_nonliteral_ranking_preserves_postgres_provenance_and_positive_cos
     assert len(semantic.embedding.calls) == 2
 
 
+async def test_postgres_equal_relevance_prefers_latest_user_mention(
+    stores: Stores, semantic: Semantic
+) -> None:
+    earlier = seed(stores, "I like synthetic tea in the morning.")
+    later = seed(stores, "I like synthetic tea after lunch.")
+    mentioned_later = await semantic.service.extract(BINDING, (later,))
+    created_later = await semantic.service.extract(BINDING, (earlier,))
+    result = await semantic.service.search(BINDING, "beverage")
+    assert result == mentioned_later + created_later
+    assert result[0].mentioned > result[1].mentioned
+
+
 @pytest.mark.parametrize(
     "other",
     [
@@ -183,7 +195,7 @@ async def test_official_sdk_receives_only_authorized_postgres_memories(
 
 @pytest.mark.parametrize("action", ["private", "delete"])
 @pytest.mark.parametrize("stream", [False, True])
-async def test_revocation_during_embedding_prevents_conversation_dispatch(
+async def test_revocation_during_embedding_allows_memoryless_conversation(
     stores: Stores, semantic: Semantic, monkeypatch: pytest.MonkeyPatch, action: str, stream: bool
 ) -> None:
     ref = seed(stores)
@@ -211,11 +223,19 @@ async def test_revocation_during_embedding_prevents_conversation_dispatch(
         revoke(stores.history, ref, action)
     finally:
         release.set()
-    with pytest.raises(CoreError) as caught:
-        await task
-    assert caught.value.code != "memory_query_unavailable"
-    assert semantic.provider.calls == []
-    assert stores.history.read(BINDING, target).revision == 0
+    receipt = await task
+    assert receipt.revision == 1 and receipt.message.content == "こんにちは"
+    assert len(semantic.provider.calls) == 1
+    assert semantic.provider.calls[0][1]["messages"] == [
+        {
+            "role": "system",
+            "content": semantic.conversation.inference.characters["synthetic"].system_prompt,
+        },
+        {"role": "user", "content": "beverage"},
+    ]
+    snapshot = stores.history.read(BINDING, target)
+    assert snapshot.revision == 1
+    assert snapshot.messages == (Message(role="user", content="beverage"), receipt.message)
     assert len(semantic.embedding.calls) == 1
 
 

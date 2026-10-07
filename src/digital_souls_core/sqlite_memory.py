@@ -4,10 +4,12 @@ import hashlib
 import json
 import sqlite3
 from dataclasses import asdict
+from datetime import datetime
 from uuid import uuid4
 
 from .application import CoreError
-from .history import Binding, SourceReference
+from .history import Binding, SourceReference, as_utc
+from .memory_confirmation import blocked, decode
 from .memory_contracts import Candidate, Evidence, Memory, MemoryJob, SourceVersion
 from .privacy_scan import scan
 from .sqlite_history import SQLiteHistory, _key
@@ -34,7 +36,8 @@ class SQLiteMemory(SQLiteHistory):
 
     def _source(self, db: sqlite3.Connection, binding: Binding, ref: SourceReference) -> Evidence:
         row = db.execute(
-            "SELECT c.private_mode,c.memory_epoch,t.private_mode,t.memory_excluded,t.messages "
+            "SELECT c.private_mode,c.memory_epoch,t.private_mode,t.memory_excluded,"
+            "t.messages,t.stated_at,t.memory_confirmation "
             "FROM conversations c JOIN turns t ON c.binding=t.binding AND c.id=t.conversation "
             "WHERE c.binding=? AND c.id=? AND t.revision=?",
             (_key(binding), ref.conversation_id, ref.turn_revision),
@@ -42,14 +45,22 @@ class SQLiteMemory(SQLiteHistory):
         if row is None or row[0] or row[2] or type(ref.message_index) is not int:
             raise CoreError(409, "memory_source_invalid", "Memory source is unavailable")
         messages = json.loads(row[4])
-        if not 0 <= ref.message_index < len(messages) or ref.message_index in json.loads(row[3]):
+        if (
+            not 0 <= ref.message_index < len(messages)
+            or ref.message_index in json.loads(row[3])
+            or blocked(decode(row[6]), ref.message_index)
+        ):
             raise CoreError(409, "memory_source_invalid", "Memory source is unavailable")
         message = messages[ref.message_index]
         # Do not turn assistant proposals or tool output into user facts.
         text = message.get("content")
         if message["role"] != "user" or not isinstance(text, str) or not 0 < len(text) <= 2048:
             raise CoreError(409, "memory_source_invalid", "Memory source is unavailable")
-        return Evidence(SourceVersion(ref, row[1]), text)
+        return Evidence(
+            SourceVersion(ref, row[1]),
+            text,
+            as_utc(datetime.fromisoformat(row[5])) if row[5] is not None else None,
+        )
 
     def sources(self, binding: Binding, refs: tuple[SourceReference, ...]) -> tuple[Evidence, ...]:
         if not 0 < len(refs) <= 16 or len(set(refs)) != len(refs):
@@ -182,8 +193,24 @@ class SQLiteMemory(SQLiteHistory):
                 )
             )
             if self._current(db, binding, sources):
-                memories.append(Memory(identifier, kind, text, sources))
+                memories.append(
+                    Memory(identifier, kind, text, sources, self._mentioned(db, binding, sources))
+                )
         return tuple(memories)
+
+    def _mentioned(
+        self, db: sqlite3.Connection, binding: Binding, sources: tuple[SourceVersion, ...]
+    ) -> int:
+        """Latest user source turn in append order; stands in for PoC mention time."""
+        return max(
+            int(
+                db.execute(
+                    "SELECT rowid FROM turns WHERE binding=? AND conversation=? AND revision=?",
+                    (_key(binding), s.reference.conversation_id, s.reference.turn_revision),
+                ).fetchone()[0]
+            )
+            for s in sources
+        )
 
     def results(self, binding: Binding, job_id: str) -> tuple[Memory, ...]:
         with self._connection() as db:

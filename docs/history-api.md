@@ -24,6 +24,7 @@ HistoryStoreと信頼されたHistoryPolicyを注入します。SQLite実装は
 | GET | prefix | このcharacter/scopeの`conversation_ids`を作成順に取得 |
 | GET | prefix/{conversation_id} | `conversation_id`・`revision`・順序付き`messages`を復元 |
 | DELETE | prefix/{conversation_id} | 会話と全turn/receiptを削除。存在しないIDにも204 |
+| POST | prefix/{conversation_id}/turn-deletions | 選択した往復だけ、または選択した往復以降を削除して200 |
 | POST | prefix/{conversation_id}/completions | 新規入力を追加して推論し、完了した往復を原子的保存 |
 
 completion本文の例（合成データ）:
@@ -99,18 +100,31 @@ private中は全sourceを利用不可にし、その間に保存したturnは解
 除外履歴に依存し得る後続assistant/toolも対象外です。新user発話は明示指定に従います。
 
 GETレスポンスには`private_mode`、`archived`、message順の`memory_sources`を追加します。
-各sourceは`turn_revision`、そのturn内の`message_index`、`eligible`を持ちます。
+各sourceは`turn_revision`、そのturn内の`message_index`、`eligible`、`stated_at`を持ちます。
+`stated_at`はturnを保存したUTC時刻のISO 8601文字列（例：`2024-02-29T12:34:56.123456+00:00`）です。
+同じturn内のuser・tool・assistant messageには同じ保存値を対応させます。移行前のturnは
+不明として`null`を返し、現在時刻で補完しません。GET・PATCHのsnapshotで同じ値を返します。
+Message本文やモデル向けmessagesの形式には日時を加えません。
 conversation IDとtrusted scope/characterと組み合わせて参照します。現在のconversation revisionと
 過去のturn revisionは異なり得ます。eligibleはsource条件だけで、privacyや候補採用の許可ではありません。
 
 DELETEは本文・receiptを消し、内容なしのsource削除通知を同じtransactionで残します。
 Stage3 consumer用Python portの`deletions(binding)`と`acknowledge_deletion(binding,event_id)`で処理します。
 scope違いの通知は取得・ackできません。通知のHTTP ackは公開しません。
-同じSQLite v3にある派生memory本文も同一transactionで消去します。再構成の完了とは別です。
+同じSQLite DBにある派生memory本文も同一transactionで消去します。再構成の完了とは別です。
 source参照自体は削除直後から無効です。
 
-schema v1/v2からv3へ原子的に移行します。履歴・receiptは保持し、未知versionは引き続き拒否します。
+SQLite schema v1/v2/v3/v4/v5からv6へ段階的に原子的移行します。schemaとversionを同じtransactionで
+更新し、途中失敗はrollbackして再実行できます。履歴・receipt・fingerprintは保持し、旧turnの
+日時はNULLのままです。未知versionは引き続き拒否します。
 過去発話への後付け除外変更は未実装で、指定はcompletionの入力配列に対して行います。
+
+trusted構築コードから`SQLiteHistory(path, clock=clock)`または
+`PostgresHistory(database, clock=clock)`へ、timezone付きdatetimeを返す時計を注入できます。
+既定は保存時の現在UTC時刻です。新規turnごとに一度取得してUTCへ正規化し、timezoneなしの値は
+拒否します。再送・read・thread操作では取り直しません。HTTP入力から時計や日時は指定できません。
+両Memory adapterも同じ構築引数を使い、`Evidence.stated_at`には抽出時刻ではなく元turnの保存日時
+または`None`を渡します。source参照・epoch・jobの識別には日時を含めません。
 
 
 ### Stage3の撤回処理
@@ -119,3 +133,110 @@ private化は、そのthread由来の既存memoryを削除する製品仕様と�
 複数sourceの旧memoryは直ちに利用停止し、残る適格sourceのみから再構成が成功するまで返しません。
 解除による旧memoryの自動復活は行いません。PATCHはepoch更新・派生本文消去・別のmemory撤回通知を
 原子的に確定します。明示batch再構成と制約は[記憶API説明](memory.md)を参照してください。
+
+
+## 保存拒否の確認
+
+現在のuser発話のcontentだけを既存scannerのno_history・no_memoryで検査します。
+assistantの引用・説明、tool結果、過去履歴は新しい確認の対象にしません。
+検出だけでprivate化や履歴削除は行いません。非stream応答とSSE completedのdataに、
+検出時だけ次の内容なしの信号を追加します（合成例）。
+
+```json
+{
+  "memory_confirmation": {
+    "sources": [{"turn_revision": 1, "message_index": 0}],
+    "private_mode": {
+      "method": "POST",
+      "path": "/v1/characters/synthetic/conversations/synthetic-id/memory-confirmations"
+    },
+    "delete_history": {
+      "method": "DELETE",
+      "path": "/v1/characters/synthetic/conversations/synthetic-id"
+    },
+    "delete_turns": {
+      "method": "POST",
+      "path": "/v1/characters/synthetic/conversations/synthetic-id/turn-deletions",
+      "scopes": ["selected", "following"]
+    }
+  }
+}
+```
+
+本文・検出語は信号へ含めません。モデルpayloadとrequest fingerprintにも確認metadataを
+加えません。GETおよび操作後snapshotのmemory_confirmations配列で未回答の参照を復元できます。
+未回答のsourceはeligible=falseで、実際の出典取得・形成・採用直前の再検証でも拒否します。
+未回答には期限がなく、再起動・再送で解除しません。保留に依存し得るassistant/toolも除外します。
+
+`POST prefix/{conversation_id}/memory-confirmations`へ次を渡します。
+
+```json
+{
+  "expected_revision": 1,
+  "turn_revision": 1,
+  "message_index": 0,
+  "accept_private_mode": false
+}
+```
+
+expected_revisionは現在の会話、turn_revisionは対象発話の保存revisionです。
+1回につき1発話へ回答し、成功で会話revisionを進めたsnapshotを返します。
+古いrevision、存在しない対象、回答済み対象は409で、部分更新しません。
+旧revisionで進行中の推論commitも拒否します。認可は既存controlsと同じpolicy・Bindingです。
+
+trueは既存private化を行い、epoch更新・そのスレッド由来のmemory本文消去・撤回通知を
+回答と同じtransactionで確定します。private解除後も旧memoryと受入発話は復活しません。
+falseは対象発話の保留だけを解除します。明示除外・private状態・他の未回答は維持し、
+通常のprivacy審査を引き続き適用します。どちらも履歴本文・stated_at・source識別を変更しません。
+履歴削除はユーザーが削除範囲を選び、案内されたAPIを明示的に呼ぶ別操作です。
+`delete_history`は会話全体のDELETE、`delete_turns`は往復単位のPOSTを案内します。
+`delete_turns.scopes`の`selected`は選択した往復だけ、`following`はその往復とそれ以降を
+対象にします。往復の選び方とtool対応による範囲の拡張は[往復単位の明示削除](#往復単位の明示削除)を
+参照してください。信号は案内だけで、AIやCoreが履歴を自動削除することはありません。
+
+SQLite v5 / PostgreSQL v3では独立したturnのmemory_confirmation列へ検出indexと回答を保存します。
+旧turnの確認状態は空で、過去本文を再走査しません。旧NULL日時、既知日時、履歴、receipt、
+fingerprintを保持します。同じrequestの再送では回答後も元receiptの信号を返し、
+再推論・再保留しません。回答の通信失敗後はGETで未回答一覧と現在revisionを確認してください。
+
+## 往復単位の明示削除
+
+GETの`memory_sources[].turn_revision`で保存済み往復を選び、
+`POST prefix/{conversation_id}/turn-deletions`へ次を渡します。
+
+```json
+{
+  "expected_revision": 3,
+  "turn_revision": 2,
+  "scope": "selected"
+}
+```
+
+`selected`は選択した往復だけ、`following`はその往復とそれ以降の保存済み往復を対象にします。
+会話全体の削除は既存DELETEです。自然文の検出から削除を実行しません。
+assistantの構造化`tool_calls[].id`とtool roleの`tool_call_id`の対応が往復をまたぐ場合は、
+call側・result側の両方向へ連鎖をたどり、対応する往復をまとめて削除します。
+`following`でも対応のために選択より前の往復を含む場合があります。本文やtool名の一致では拡張しません。
+
+成功は本文なしの`conversation_id`、更新後の`revision`、実際に削除した`turn_revisions`配列です。
+削除は会話revisionを1進めます。残す往復は再採番せず、日時・確認状態・private・明示除外・
+receiptを保持します。部分削除後も会話を継続でき、後続の適格な往復から記憶を形成できます。
+不正入力は400、未知・別Bindingの会話は404、revision不一致・存在しない／削除済み往復は409です。
+同意撤回後も既存DELETEと同じtrusted Bindingで削除できます。
+
+対象turn/receiptを物理削除し、`turn_tombstones`にはBinding・会話・request ID・元turn revisionだけを
+残します。本文・fingerprintは残しません。同じrequest IDは元入力の再送でも別入力での再利用でも
+`request_deleted`の409となり、再推論・保存しません。append内でも検査します。
+会話全体DELETEではこの印も消えます。削除前のsnapshotから進行中の推論をcommitしようとすると、
+JSON・streamとも既存のrevision検証で409となり、新receiptは保存しません。
+
+専用`turn_deletions` outboxは正確な対象revision集合を永続化します。
+trusted Python portの`turn_deletions(binding)`は`TurnDeletion(event_id, conversation_id, turn_revisions)`を返し、
+`acknowledge_turn_deletion(binding, event_id)`で処理後にackします。別Bindingから取得・ackできず、
+重複ackは無作用です。HTTPのackはありません。既存SourceDeletionの`through_revision`は会話全体の
+削除だけに使い、その形と意味を維持します。
+
+SQLite v6・PostgreSQL v4で削除済み印と往復通知表を追加します。PostgreSQL v1〜v3は版別に既存schemaを
+検証して移行します。DDL・version更新は原子的で、旧本文・日時（NULLを含む）・確認状態を変更しません。
+削除のrevision更新・印・対象派生本文のNULL化・通知・履歴DELETEも同一transactionです。
+SQLiteの`secure_delete`と保存先保護を維持します。途中失敗は全更新をrollbackし、再試行できます。

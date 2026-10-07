@@ -1,12 +1,26 @@
 """Storage-independent conversation contracts and trusted authorization boundary."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Annotated, Literal, Protocol
 
 from pydantic import Field, model_validator
 
 from .character import AccessScope
 from .contracts import Message, Name, NamedToolChoice, StrictModel, Tool
+
+type Clock = Callable[[], datetime]
+
+
+def current_utc() -> datetime:
+    return datetime.now(UTC)
+
+
+def as_utc(value: datetime) -> datetime:
+    if value.utcoffset() is None:
+        raise ValueError("turn clock must return a timezone-aware datetime")
+    return value.astimezone(UTC)
 
 
 class TurnInput(StrictModel):
@@ -44,6 +58,35 @@ class ConversationControls(StrictModel):
         return self
 
 
+class MemoryConfirmation(StrictModel):
+    expected_revision: Annotated[int, Field(ge=0)]
+    turn_revision: Annotated[int, Field(gt=0)]
+    message_index: Annotated[int, Field(ge=0)]
+    accept_private_mode: bool
+
+
+class TurnDeletionInput(StrictModel):
+    expected_revision: Annotated[int, Field(ge=0)]
+    turn_revision: Annotated[int, Field(gt=0)]
+    scope: Literal["selected", "following"]
+
+
+@dataclass(frozen=True)
+class TurnDeletionResult:
+    conversation_id: str
+    revision: int
+    turn_revisions: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class TurnDeletion:
+    """Content-free notification identifying exactly the removed turns."""
+
+    event_id: str
+    conversation_id: str
+    turn_revisions: tuple[int, ...]
+
+
 @dataclass(frozen=True)
 class SourceReference:
     """Immutable history address within a separately supplied trusted Binding."""
@@ -59,6 +102,7 @@ class SourceState:
 
     reference: SourceReference
     eligible: bool
+    stated_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -84,6 +128,7 @@ class Snapshot:
     private_mode: bool = False
     archived: bool = False
     memory_sources: tuple[SourceState, ...] = ()
+    memory_confirmations: tuple[SourceReference, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -92,6 +137,7 @@ class Receipt:
     revision: int
     message: Message
     finish_reason: str
+    memory_confirmation_indices: tuple[int, ...] = ()
 
 
 type Operation = Literal["create", "list", "read", "export", "store"]
@@ -128,14 +174,27 @@ class HistoryStore(Protocol):
         finish_reason: str,
         *,
         memory_excluded_indices: tuple[int, ...] = (),
+        memory_confirmation_indices: tuple[int, ...] = (),
     ) -> Receipt: ...
     def delete(self, binding: Binding, conversation_id: str) -> None: ...
+
+    def delete_turns(
+        self, binding: Binding, conversation_id: str, selection: TurnDeletionInput
+    ) -> TurnDeletionResult: ...
+
+    def turn_deletions(self, binding: Binding) -> tuple[TurnDeletion, ...]: ...
+
+    def acknowledge_turn_deletion(self, binding: Binding, event_id: str) -> None: ...
 
     def controls(
         self, binding: Binding, conversation_id: str, changes: ConversationControls
     ) -> Snapshot: ...
 
     def source_eligible(self, binding: Binding, source: SourceReference) -> bool: ...
+
+    def confirm(
+        self, binding: Binding, conversation_id: str, answer: MemoryConfirmation
+    ) -> Snapshot: ...
 
     def deletions(self, binding: Binding) -> tuple[SourceDeletion, ...]: ...
 

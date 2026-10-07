@@ -11,6 +11,7 @@ from digital_souls_core.memory_contracts import Memory, SourceVersion
 from digital_souls_core.memory_ranking import (
     EmbeddingSpace,
     MemoryEmbedding,
+    RetrievalPolicy,
     rank_memories,
     validate_embedding_space,
 )
@@ -20,13 +21,24 @@ pytestmark = pytest.mark.ut
 SPACE = EmbeddingSpace("synthetic-embedding", "revision-one", 2)
 
 
-def memory(identifier: str, text: str = '["I enjoy synthetic tea."]') -> Memory:
+POLICY = RetrievalPolicy()
+WIDE = RetrievalPolicy(max_retrieved_memories=8, candidate_pool_size=8)
+
+
+def memory(
+    identifier: str, text: str = '["I enjoy synthetic tea."]', *, mentioned: int = 0
+) -> Memory:
     return Memory(
         identifier,
         "semantic",
         text,
         (SourceVersion(SourceReference("synthetic-conversation", 3, 0), 2),),
+        mentioned,
     )
+
+
+def at_cosine(cosine: float) -> tuple[float, float]:
+    return (cosine, math.sqrt(max(0.0, 1.0 - cosine * cosine)))
 
 
 class SyntheticEmbedding:
@@ -44,7 +56,7 @@ async def test_fake_synonym_embedding_preserves_original_memory_and_provenance()
     tea, unrelated = memory("tea"), memory("trees", '["I grow synthetic trees."]')
     embedder: MemoryEmbedding = SyntheticEmbedding()
     vectors = await embedder.embed(("synthetic infusion", tea.text, unrelated.text))
-    result = rank_memories((unrelated, tea), (vectors[0], vectors[2], vectors[1]), SPACE, 8)
+    result = rank_memories((unrelated, tea), (vectors[0], vectors[2], vectors[1]), SPACE, POLICY)
     assert result == (tea,)
     assert result[0] is tea
     assert result[0].sources is tea.sources
@@ -54,35 +66,101 @@ async def test_fake_synonym_embedding_preserves_original_memory_and_provenance()
     assert "synthetic tea" not in repr(result)
 
 
-def test_cosine_order_top_k_ties_and_nonpositive_scores() -> None:
-    candidates = tuple(memory(str(index)) for index in range(6))
-    vectors = ((1.0, 0.0), (0.6, 0.8), (4.0, 0.0), (2.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.8, 0.6))
-    assert rank_memories(candidates, vectors, SPACE, 8) == (
-        candidates[1],
-        candidates[2],
-        candidates[5],
-        candidates[0],
+def test_poc_defaults_match_digital_souls_memory_policy() -> None:
+    assert (
+        POLICY.max_retrieved_memories,
+        POLICY.candidate_pool_size,
+        POLICY.relevance_threshold,
+        POLICY.equivalence_margin,
+    ) == (5, 20, 0.54, 0.002)
+
+
+def test_relevance_threshold_uses_poc_l2_mapping() -> None:
+    # relevance = 1 / (1 + sqrt(squared L2)); unit vectors make L2 = 2 - 2 cosine.
+    above, below = memory("above"), memory("below")
+    vectors = ((1.0, 0.0), at_cosine(0.65), at_cosine(0.62))
+    assert rank_memories((above, below), vectors, SPACE, POLICY) == (above,)
+
+
+def test_returns_at_most_max_retrieved_memories_by_relevance() -> None:
+    candidates = tuple(memory(str(index)) for index in range(7))
+    cosines = (0.70, 0.99, 0.80, 0.95, 0.90, 0.85, 0.75)
+    vectors = ((1.0, 0.0), *(at_cosine(value) for value in cosines))
+    assert rank_memories(candidates, vectors, SPACE, POLICY) == tuple(
+        candidates[index] for index in (1, 3, 4, 5, 2)
     )
-    assert rank_memories(candidates, vectors, SPACE, 2) == (candidates[1], candidates[2])
+
+
+def test_equivalence_band_prefers_latest_user_mention_then_newer_candidate() -> None:
+    old_mention = memory("old-mention", mentioned=1)
+    new_mention = memory("new-mention", mentioned=9)
+    newer_same = memory("newer-same", mentioned=9)
+    far = memory("far", mentioned=99)
+    # The first three are within 0.002 relevance of the band leader; far is not.
+    vectors = (
+        (1.0, 0.0),
+        at_cosine(0.9000),
+        at_cosine(0.8995),
+        at_cosine(0.8990),
+        at_cosine(0.8500),
+    )
+    ranked = rank_memories((old_mention, newer_same, new_mention, far), vectors, SPACE, POLICY)
+    assert ranked == (newer_same, new_mention, old_mention, far)
+
+
+def test_candidate_pool_limits_ranking_before_threshold_and_bands() -> None:
+    policy = RetrievalPolicy(max_retrieved_memories=2, candidate_pool_size=2)
+    first, second, third = memory("first"), memory("second"), memory("third", mentioned=50)
+    vectors = ((1.0, 0.0), at_cosine(0.9000), at_cosine(0.8995), at_cosine(0.8990))
+    # third is in the same relevance band but outside the nearest-two pool.
+    assert rank_memories((first, second, third), vectors, SPACE, policy) == (first, second)
+
+
+def test_nonpositive_and_distant_scores_are_not_returned() -> None:
+    candidates = tuple(memory(str(index)) for index in range(3))
+    vectors = ((1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (4.0, 0.0))
+    assert rank_memories(candidates, vectors, SPACE, WIDE) == (candidates[2],)
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"max_retrieved_memories": 0},
+        {"max_retrieved_memories": True},
+        {"max_retrieved_memories": 17},
+        {"candidate_pool_size": 4},
+        {"candidate_pool_size": 1001},
+        {"relevance_threshold": -0.1},
+        {"relevance_threshold": 1.1},
+        {"relevance_threshold": math.nan},
+        {"relevance_threshold": 1},
+        {"equivalence_margin": -0.001},
+        {"equivalence_margin": math.inf},
+    ],
+)
+def test_invalid_retrieval_policy_is_rejected(values: dict[str, Any]) -> None:
+    with pytest.raises(ValueError):
+        RetrievalPolicy(**values)
 
 
 @pytest.mark.parametrize("scale", [sys.float_info.max, 1e200, 1e-200, math.ulp(0.0)])
 def test_normalization_handles_large_and_small_finite_vectors(scale: float) -> None:
     positive, zero, negative = memory("positive"), memory("zero"), memory("negative")
     vectors = ((scale, scale), (scale, scale), (scale, -scale), (-scale, -scale))
-    assert rank_memories((positive, zero, negative), vectors, SPACE, 8) == (positive,)
+    assert rank_memories((positive, zero, negative), vectors, SPACE, POLICY) == (positive,)
 
 
 def test_integer_vectors_and_empty_candidates() -> None:
     item = memory("integer")
-    assert rank_memories((item,), ((1, 2), (2, 4)), SPACE, 1) == (item,)
-    assert rank_memories((), ((1, 0),), SPACE, 1) == ()
+    assert rank_memories((item,), ((1, 2), (2, 4)), SPACE, POLICY) == (item,)
+    assert rank_memories((), ((1, 0),), SPACE, POLICY) == ()
 
 
 def test_invalid_candidate_beyond_limit_still_rejects_the_whole_result() -> None:
     candidates = (memory("first"), memory("second"))
+    policy = RetrievalPolicy(max_retrieved_memories=1, candidate_pool_size=1)
     with pytest.raises(CoreError, match="^Memory embedding failed$"):
-        rank_memories(candidates, ((1.0, 0.0), (1.0, 0.0), (0.0, 0.0)), SPACE, 1)
+        rank_memories(candidates, ((1.0, 0.0), (1.0, 0.0), (0.0, 0.0)), SPACE, policy)
 
 
 @pytest.mark.parametrize(
@@ -113,7 +191,7 @@ def test_invalid_candidate_beyond_limit_still_rejects_the_whole_result() -> None
 )
 def test_invalid_vectors_fail_without_content_or_exception_chain(vectors: Any) -> None:
     with pytest.raises(CoreError) as caught:
-        rank_memories((memory("synthetic"),), vectors, SPACE, 8)
+        rank_memories((memory("synthetic"),), vectors, SPACE, POLICY)
     error = caught.value
     assert (error.status, error.code, error.message) == (
         502,
@@ -124,10 +202,17 @@ def test_invalid_vectors_fail_without_content_or_exception_chain(vectors: Any) -
     assert "private synthetic content" not in repr(error)
 
 
-@pytest.mark.parametrize("limit", [None, True, False, 0, -1, 1.0, "1"])
-def test_invalid_limit_fails_closed(limit: Any) -> None:
+@pytest.mark.parametrize("policy", [None, 5, (5, 20, 0.54, 0.002), "policy"])
+def test_invalid_policy_fails_closed(policy: Any) -> None:
     with pytest.raises(CoreError, match="^Memory embedding failed$"):
-        rank_memories((memory("synthetic"),), ((1.0, 0.0), (1.0, 0.0)), SPACE, limit)
+        rank_memories((memory("synthetic"),), ((1.0, 0.0), (1.0, 0.0)), SPACE, policy)
+
+
+def test_forged_policy_is_rechecked() -> None:
+    forged = RetrievalPolicy()
+    object.__setattr__(forged, "relevance_threshold", math.nan)
+    with pytest.raises(CoreError, match="^Memory embedding failed$"):
+        rank_memories((memory("synthetic"),), ((1.0, 0.0), (1.0, 0.0)), SPACE, forged)
 
 
 @pytest.mark.parametrize(
@@ -184,7 +269,7 @@ def test_runtime_space_validation_rechecks_forged_dataclass(field: str, value: o
     with pytest.raises(CoreError, match="^Memory embedding failed$"):
         validate_embedding_space(forged)
     with pytest.raises(CoreError, match="^Memory embedding failed$"):
-        rank_memories((memory("synthetic"),), ((1.0, 0.0), (1.0, 0.0)), forged, 8)
+        rank_memories((memory("synthetic"),), ((1.0, 0.0), (1.0, 0.0)), forged, POLICY)
 
 
 def test_runtime_space_validation_rejects_uninitialized_dataclass() -> None:
