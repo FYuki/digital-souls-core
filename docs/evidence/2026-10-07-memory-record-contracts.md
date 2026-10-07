@@ -3,7 +3,8 @@
 検証日: 2026-10-07（UTC）。対象: [Issue #71](https://github.com/FYuki/digital-souls-core/issues/71)。
 起点: `4d1c9b5e33bf014f3af759404be370fa5142d97d`（`epic/memory-canonical-records`）。
 作業branch: `feature/71-memory-record-contracts`、worktree: `feature-71`。
-この証跡を含むcommitの製品コード・UTが検証対象です。
+監督レビュー修正の起点: `2102c3e02279bc0b230fc9e44da2fe5a0e1f98d1`。
+この証跡を含む追加commitの製品コード・UTが検証対象です。
 
 ## 正本と範囲
 
@@ -30,16 +31,17 @@ push・PR作成・mergeは実行していません。
 | `TemporalValue` | 不明、部分日時の点、開始≦終了の範囲、解釈時のタイムゾーン文字列。日時を補完せず、範囲の端点は同じ精度を要求 |
 | `Episode` / `EpisodeContext` | 経験の5W・経験日時・不明可のtz-aware experienced_at・ACTUAL/HYPOTHETICAL/FICTION・引用1件以上 |
 | `Fact` | 呼出し側が採番する安定fact_idの内容一版。版ごとに5W・対象日時・保存文・引用1件以上を保持し、IDを内容から導出しない |
-| `EpisodeFactLink` | 独立したID・版を持つ参照。EpisodeとFactの種別・ID・版付き参照とBindingを照合 |
+| `EpisodeFactLink` | link_id・整数版≧1・Binding・tz-aware created_at・RecordState・Episode/FactのRecordRefだけを持つ本文なしの参照。参照の種別とBindingを照合し、保存文・last_user_mentioned_atを持たない |
 | `Proposition` / `FormationType` / `Semantic` | 非空の主体・属性・値、適用時期、形成種別。DIRECT_EXTRACTIONはuser引用1件以上を必須とする |
 | `EpisodeEvidence` | 同じBindingのEpisodeへの参照と、その引用元SourceReferenceの非空・不変集合 |
 | EXPERIENCE_DERIVEDの独立性 | 同一Episode IDの出典集合を合算し、異なるIDで互いに素な出典集合を持つ2件以上を必須とする。epoch・版・範囲の差や重複IDで独立性を増やさない |
 | `RecordRef` / `RecordKind` | 種別・安定ID・整数版≧1・Bindingを持つ参照 |
 | `RecordHead` / `dependency_invalidated` | 本文なしの現在参照・状態、または現在記録と照合する純粋関数。不存在・版不一致・利用停止・種別/ID/Binding不一致を失効と判定 |
-| 全記録 / `RecordState` | 安定ID・整数版≧1・Binding・非空保存文・tz-aware created_at・不明可のtz-aware last_user_mentioned_at・ACTIVE/SUSPENDED。frozen値型、引用はtuple、出典集合はfrozenset。不正値は生成時にValueErrorで拒否 |
+| 全記録 / `RecordState` | 安定ID・整数版≧1・Binding・tz-aware created_at・ACTIVE/SUSPENDED。frozen値型、不正値は生成時にValueErrorで拒否 |
+| `Episode` / `Fact` / `Semantic` の本文 | さらに非空保存文・不明可のtz-aware last_user_mentioned_atを保持。引用はtuple、出典集合はfrozenset |
 | repr | 保存文、5Wの発言内容、理由、命題内容を出さない。引用は本文をコピーしない |
 
-`_RecordFields` は共通フィールドの内部再利用で、汎用の記憶型として提供しません。
+`_RecordFields` はEpisode・Fact・Semanticの共通フィールドの内部再利用で、汎用の記憶型として提供しません。
 構造の検証は保存許可や出典の真実性を意味しません。引用範囲・話者と履歴の対応、sourceの現在版・
 適格性、Episode出典集合と参照先の対応、撤回・旧版保持は後続の保存portで検証します。
 
@@ -66,19 +68,39 @@ ERROR tests/test_memory_records.py
 0.14秒）を確認しました。追加実装後の新規UTは **PASS: 206件**（0.18秒）です。
 skip・xfail・dummy testはありません。
 
-## 固定toolchainと最終品質ゲート
+## 監督レビュー修正のTDD
+
+EpisodeFactLinkのfixtureから保存文・最終言及日時を除き、フィールドが指定の7個だけであること、
+本文用フィールドを受け付けないこと、両参照の種別・Binding不一致や欠落を拒否することを先にテストしました。
+修正前のテストファイルSHA-256（format前）:
+`d192b4b2fb6455b61c8da924f63e545e934107bd522bd2059b664299bb461726`。
 
 ```sh
-export PATH=/home/asa/dev/digital-souls-evidence/history-stage1-tools/bin:/home/asa/dev/digital-souls-evidence/history-stage1-tools/node/bin:$PATH
-export TMPDIR=/dev/shm
+uv run --no-sync pytest -m ut -q tests/test_memory_records.py -k 'episode_fact_link_has_only_content_free_reference_fields or link_rejects_wrong_kind_or_binding'
 ```
+
+結果: **FAIL（想定どおり）: 7 failed、201 deselected、終了code 1、0.16秒**。
+旧実装は次のTypeErrorで、保存文・最終言及日時なしの生成を拒否しました。
+
+```text
+TypeError: EpisodeFactLink.__init__() missing 2 required keyword-only arguments: 'normalized_text' and 'last_user_mentioned_at'
+```
+
+実装後の契約UTは **PASS: 208 passed、0.18秒**。
+本文用の不変条件とrepr検証はEpisode・Fact・Semanticだけに適用し、全記録共通の
+版・Binding・登録日時・状態・不変性、およびEpisodeFactLinkの依存失効判定は維持しています。
+
+## 固定toolchainと最終品質ゲート（監督レビュー修正後）
+
+固定toolchain（uv 0.8.22、Node 24.19.0）のディレクトリをPATHの先頭に置き、
+`TMPDIR=/dev/shm` を設定して再実行しました。
 
 確認値: uv 0.8.22、Node v24.19.0、CPython 3.12.3。
 最終のdomain module / UTのSHA-256:
 
 ```text
-f3c1f6a7ce37974a4b78e68e01542c47682ed64cdb6d7b3fc20429b90e893cb9  src/digital_souls_core/memory_records.py
-f41701a72f33671bdc67b8ccf15a5f42e2ebcd93dffaa66c49359751f32e0f24  tests/test_memory_records.py
+ec8ec2cfa3489fe79b58f5055c81dee429b126baa772105b93a467ef6e8406f6  src/digital_souls_core/memory_records.py
+44eca49c07495d51024563cfb0dab0680cee7f2f7aa32c3985b0fd09347ecc3c  tests/test_memory_records.py
 ```
 
 | コマンド | 結果・件数 |
@@ -87,20 +109,20 @@ f41701a72f33671bdc67b8ccf15a5f42e2ebcd93dffaa66c49359751f32e0f24  tests/test_mem
 | `uv run --no-sync ruff check src tests tools/evaluate-memory-search.py` | PASS: 指摘0件 |
 | `uv run --no-sync ruff format --check src tests tools/evaluate-memory-search.py` | PASS: 81 files |
 | `uv run --no-sync mypy` | PASS: 81 source files、指摘0件 |
-| `uv run --no-sync pytest -m ut -q` | PASS: 475 passed、1041 deselected、skip/xfail 0、3.01秒 |
-| `uv run --no-sync pytest -m it1 -q` | PASS: 863 passed、653 deselected、skip/xfail 0、18.78秒 |
+| `uv run --no-sync pytest -m ut -q` | PASS: 477 passed、1041 deselected、skip/xfail 0、3.11秒 |
+| `uv run --no-sync pytest -m it1 -q` | PASS: 863 passed、655 deselected、skip/xfail 0、18.75秒 |
 | `uv build --no-build-isolation` | PASS: sdist・wheelの2成果物 |
-| `bash tools/test-postgres.sh` | PASS: 178 passed、1338 deselected、skip/xfail 0、18.88秒 |
+| `bash tools/test-postgres.sh` | PASS: 178 passed、1340 deselected、skip/xfail 0、19.11秒 |
 | `node --test --test-reporter=./tools/required-tests-reporter.mjs tools/check-docs.test.mjs tools/required-tests-reporter.test.mjs` | PASS: 必須23件、skip/todo/cancel 0 |
 | `node tools/check-docs.mjs` | PASS: 1実行、追跡テキスト・Markdown参照の指摘0件 |
-| `git diff --check` | PASS: 指摘0件（新規ファイルのstage後も確認） |
+| `git diff --check` | PASS: 指摘0件（stage後も確認） |
 
 PostgreSQLはdigest固定の使い捨て合成コンテナを `--network none`・公開portなしで使用しました。
 Starlette/AnyIOのDeprecationWarningとPydantic TypedDict ReadOnly警告は既存依存由来で、
 UTでは1件、IT1では3件、PostgreSQLでは1件です。FAIL・SKIPに変換された結果はありません。
 IT2 / ST（実モデル・実環境）は **NOT RUN**、今回の対象外です。
 
-## 初回のFAILと再実行
+## 初回実装時のFAILと再実行（修正起点commitの記録）
 
 全品質ゲート初回のUTは **FAIL: 22 failed / 449 passed**、IT1は
 **FAIL: 82 failed / 781 passed** でした。SQLiteの既存保存先ガード
@@ -113,11 +135,17 @@ IT2 / ST（実モデル・実環境）は **NOT RUN**、今回の対象外です
 開発途中のlintはFAIL（長行3件・setattrの指摘1件）、mypyはFAIL（合成AccessScopeの
 Literal不一致1件）でした。新規テストだけをformat・修正し、最終検査はPASSです。
 
+監督レビュー修正の品質ゲート初回ではmypyが **FAIL: 6 errors in 1 file（81 source files）**。
+本文用フィールドの拒否テストで動的な不正引数を渡す辞書を `dict[str, Any]` と明記し、
+最終mypyは **PASS: 81 source files、指摘0件**。修正後にruff check・formatと全UTも再実行しました。
+IT1・PostgreSQL・buildはこのテストの型注釈修正前に実行済みで、製品コードは同じです。
+
 ## 判断・監督への引継ぎ
 
 - Factは履歴配列を抱えず、安定IDの内容一版として表現しました。旧版保持・楽観排他は#72の責務です。
 - 異なる精度の日時範囲は、欠損成分を補わず順序を確定できないためfail-closedで拒否します。
 - RecordHeadは、#72の本文消去後も依存先の状態を判定できるための本文なしの値です。
+- EpisodeFactLinkの本文・最終言及日時を除き、#72に参照用の不要な本文保存・消去を要求しない契約に修正しました。
 - 必須ゲートをPASSとして報告する際も、初回FAILと環境を変えた再実行を区別してください。
 - 日本語・簡潔な報告は今回の明示指示です。新しい回答の好みの推測はありません。
 - 編集先を指定worktreeに限定したため、共有private-knowledgeには書き込まず、本証跡を記録担当へ返します。

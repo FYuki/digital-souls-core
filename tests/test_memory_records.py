@@ -1,6 +1,6 @@
 """Canonical record contracts: synthetic evidence, no storage or inference."""
 
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import FrozenInstanceError, fields, replace
 from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
@@ -113,9 +113,7 @@ def link() -> EpisodeFactLink:
         link_id="link-1",
         version=1,
         binding=BINDING,
-        normalized_text="合成の参照説明",
         created_at=NOW,
-        last_user_mentioned_at=None,
         state=RecordState.ACTIVE,
         episode=ref(RecordKind.EPISODE, "episode-1"),
         fact=ref(RecordKind.FACT, "caller-assigned-fact"),
@@ -322,12 +320,8 @@ def test_time_range_rejects_reversed_uncomparable_or_untyped_values(
         {"version": -1},
         {"version": True},
         {"version": 1.5},
-        {"normalized_text": ""},
-        {"normalized_text": " \n"},
-        {"normalized_text": None},
         {"created_at": NOW.replace(tzinfo=None)},
         {"created_at": None},
-        {"last_user_mentioned_at": NOW.replace(tzinfo=None)},
         {"state": "ACTIVE"},
         {"binding": None},
     ],
@@ -346,13 +340,35 @@ def test_common_record_accepts_versions_states_and_aware_timestamps(factory: Any
         factory(),
         version=2,
         created_at=local,
-        last_user_mentioned_at=local,
         state=RecordState.SUSPENDED,
     )
     assert value.version == 2 and value.state is RecordState.SUSPENDED
-    assert value.created_at is local and value.last_user_mentioned_at is local
+    assert value.created_at is local
     with pytest.raises(FrozenInstanceError):
         value.version = 3
+
+
+@pytest.mark.parametrize("factory", [episode, fact, semantic])
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"normalized_text": ""},
+        {"normalized_text": " \n"},
+        {"normalized_text": None},
+        {"last_user_mentioned_at": NOW.replace(tzinfo=None)},
+    ],
+)
+def test_content_records_reject_invalid_text_or_last_mention(
+    factory: Any, changes: dict[str, Any]
+) -> None:
+    with pytest.raises(ValueError):
+        replace(factory(), **changes)
+
+
+@pytest.mark.parametrize("factory", [episode, fact, semantic])
+def test_content_records_accept_aware_last_mention(factory: Any) -> None:
+    local = NOW.astimezone(timezone(timedelta(hours=9)))
+    assert replace(factory(), last_user_mentioned_at=local).last_user_mentioned_at is local
 
 
 @pytest.mark.parametrize("factory", [episode, fact, semantic])
@@ -423,6 +439,28 @@ def test_record_ref_rejects_invalid_identity(changes: dict[str, Any]) -> None:
         replace(ref(RecordKind.EPISODE), **changes)
 
 
+def test_episode_fact_link_has_only_content_free_reference_fields() -> None:
+    value = link()
+    assert {item.name for item in fields(value)} == {
+        "link_id",
+        "version",
+        "binding",
+        "created_at",
+        "state",
+        "episode",
+        "fact",
+    }
+    assert not hasattr(value, "normalized_text")
+    assert not hasattr(value, "last_user_mentioned_at")
+
+
+@pytest.mark.parametrize("field", ["normalized_text", "last_user_mentioned_at"])
+def test_episode_fact_link_rejects_content_fields(field: str) -> None:
+    changes: dict[str, Any] = {field: None}
+    with pytest.raises(TypeError):
+        replace(link(), **changes)
+
+
 def test_episode_fact_link_keeps_both_typed_versioned_references() -> None:
     value = replace(
         link(), episode=ref(RecordKind.EPISODE, "ep", 2), fact=ref(RecordKind.FACT, "f", 3)
@@ -438,6 +476,7 @@ def test_episode_fact_link_keeps_both_typed_versioned_references() -> None:
         ("episode", replace(ref(RecordKind.EPISODE), binding=OTHER)),
         ("fact", replace(ref(RecordKind.FACT), binding=OTHER)),
         ("episode", None),
+        ("fact", None),
     ],
 )
 def test_link_rejects_wrong_kind_or_binding(field: str, reference: Any) -> None:
@@ -603,7 +642,7 @@ def test_dependency_invalidates_missing_updated_suspended_or_foreign_record(
     assert dependency_invalidated(replace(dependency, kind=other_kind), current)
 
 
-@pytest.mark.parametrize("factory", [episode, fact, semantic, link])
+@pytest.mark.parametrize("factory", [episode, fact, semantic])
 def test_repr_omits_normalized_and_structured_content(factory: Any) -> None:
     value = factory()
     assert value.normalized_text not in repr(value)

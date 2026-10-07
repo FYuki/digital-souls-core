@@ -325,14 +325,24 @@ class Fact(_RecordFields):
 
 
 @dataclass(frozen=True, kw_only=True)
-class EpisodeFactLink(_RecordFields):
+class EpisodeFactLink:
+    """Content-free, versioned association between one Episode and one Fact."""
+
     link_id: str
+    version: int
+    binding: Binding
+    created_at: datetime
+    state: RecordState
     episode: RecordRef
     fact: RecordRef
 
     def __post_init__(self) -> None:
-        super().__post_init__()
         _nonempty(self.link_id)
+        _integer(self.version, 1)
+        _binding(self.binding)
+        _aware(self.created_at, required=True)
+        if not isinstance(self.state, RecordState):
+            raise ValueError("RecordState required")
         _reference(self.episode, RecordKind.EPISODE, self.binding)
         _reference(self.fact, RecordKind.FACT, self.binding)
 
