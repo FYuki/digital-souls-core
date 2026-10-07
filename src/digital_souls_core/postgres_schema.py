@@ -1,9 +1,13 @@
-"""Version-four PostgreSQL schema and atomic source revocation."""
+"""Version-five PostgreSQL schema and atomic source revocation."""
 
 from typing import Any
 from uuid import uuid4
 
 from psycopg import Connection
+
+from .postgres_record_revocation import revoke_records
+from .postgres_record_schema import COLUMNS, RECORD_DDL
+from .postgres_record_schema import CONSTRAINTS as RECORD_CONSTRAINTS
 
 TABLE_COLUMNS = {
     "schema_version": ("version",),
@@ -86,6 +90,9 @@ CONSTRAINTS.update(
     }
 )
 
+TABLE_COLUMNS.update({table: tuple(columns) for table, columns in COLUMNS.items()})
+CONSTRAINTS.update(RECORD_CONSTRAINTS)
+
 TURN_DELETION_DDL = (
     """CREATE TABLE turn_tombstones (
         seq BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE,
@@ -148,7 +155,8 @@ DDL = (
     )""",
     "CREATE INDEX memory_source_lookup ON memory_sources(binding,conversation)",
     *TURN_DELETION_DDL,
-    "INSERT INTO schema_version(version) VALUES (4)",
+    *RECORD_DDL,
+    "INSERT INTO schema_version(version) VALUES (5)",
 )
 
 
@@ -176,6 +184,8 @@ def revoke(
         (event, binding, binding, conversation),
     )
 
+    revoke_records(db, binding, conversation, event)
+
 
 def revoke_turns(
     db: Connection[tuple[Any, ...]],
@@ -196,3 +206,5 @@ def revoke_turns(
         "AND revision=ANY(%s))",
         (event, binding, binding, conversation, list(revisions)),
     )
+
+    revoke_records(db, binding, conversation, event, revisions)
