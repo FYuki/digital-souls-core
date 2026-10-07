@@ -205,6 +205,23 @@ def test_link_only_registrations_distinguish_endpoints(
     assert set(port.list(BINDING, RecordKind.EPISODE_FACT_LINK)) == {first, second}
 
 
+def test_link_only_registrations_distinguish_endpoint_pairs(
+    port: "MemoryRecordStore", link_pair: tuple[EpisodeFactLink, EpisodeFactLink]
+) -> None:
+    from digital_souls_core.memory_record_store import RecordBatch
+
+    first, second = link_pair
+    crossed_first = replace(first, link_id="l3", fact=second.fact)
+    crossed_second = replace(second, link_id="l4", fact=first.fact)
+    for links in ((first, second), (crossed_first, crossed_second)):
+        result = port.register(BINDING, RecordBatch(links=links), "links-v1")
+        assert set(result) == {reference(link) for link in links}
+    all_links = (first, second, crossed_first, crossed_second)
+    for link in all_links:
+        assert port.get(BINDING, RecordKind.EPISODE_FACT_LINK, link.link_id) == link
+    assert set(port.list(BINDING, RecordKind.EPISODE_FACT_LINK)) == set(all_links)
+
+
 def test_link_only_registration_retry_returns_existing_result(
     port: "MemoryRecordStore", link_pair: tuple[EpisodeFactLink, EpisodeFactLink]
 ) -> None:

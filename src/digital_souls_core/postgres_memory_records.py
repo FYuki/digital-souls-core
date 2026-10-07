@@ -171,11 +171,11 @@ class PostgresMemoryRecords:
             all_citations = tuple(set((*citations, *evidence_citations)))
             identity_parts = [key(binding), normalized(all_citations), formation_version]
             if batch.links:
-                # Content-free endpoint addresses distinguish link-only registrations.
-                endpoints = tuple(
-                    target for link in batch.links for target in (link.episode, link.fact)
+                # Named endpoints preserve each pair and its roles during normalization.
+                endpoint_pairs = tuple(
+                    {"episode": link.episode, "fact": link.fact} for link in batch.links
                 )
-                identity_parts.append(normalized(endpoints))
+                identity_parts.append(normalized(endpoint_pairs))
             identity = _hash(identity_parts)
             digest = _hash(normalized(batch))
             prior = db.execute(
