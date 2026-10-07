@@ -57,9 +57,9 @@ localhostの単独利用者向けで、公開サービス用の認証・tool実�
 Stage3の明示的な記憶抽出・保存・参照検索と未検証範囲は[記憶API](docs/memory.md)を参照してください。
 
 履歴・記憶の保存先は [PostgreSQL backend](docs/postgresql.md) へ一本化します（[ADR 0021](docs/adr/0021-postgresql-only-storage.md)）。
-SQLite は廃止予定で、撤去までは現状維持とし、新機能は PostgreSQL のみへ追加します。
+SQLite は撤去済みです。ローカルでもDockerのPostgreSQLを使います。
 PostgreSQL は空の専用 schema を初期化し、履歴・記憶の既存契約を保ちます。
-通常のアプリは保存無効のままで、SQLite からのデータ移送は行いません。
+通常のアプリは保存無効のままで、データ移送は行いません。
 
 PostgreSQL と意味検索を同時に使う trusted 起動側の構成・未実施の配備作業は
 [統合と配備の境界](docs/semantic-postgresql-integration.md)を参照してください。

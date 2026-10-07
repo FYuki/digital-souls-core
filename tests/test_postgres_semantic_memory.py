@@ -22,12 +22,12 @@ from digital_souls_core.privacy import PrivacyPolicy
 from digital_souls_core.privacy_classifier import LocalClassifier
 
 from . import test_postgres_stores
+from .conversation_support import turn
+from .memory_support import selection
+from .privacy_support import assessment, local_profile
 from .support import FakeProvider, character
-from .test_conversations import turn
 from .test_local_embedding_memory import profile, response
-from .test_memory import selection
 from .test_postgres_stores import BINDING, MESSAGES, Stores, revoke, seed
-from .test_privacy import assessment, local_profile
 
 pytestmark = pytest.mark.postgres
 stores = test_postgres_stores.stores

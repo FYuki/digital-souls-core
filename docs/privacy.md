@@ -14,7 +14,7 @@ from digital_souls_core.application import Inference
 from digital_souls_core.api import create_app
 from digital_souls_core.history import Binding
 from digital_souls_core.privacy import PrivacyPolicy
-from digital_souls_core.sqlite_history import SQLiteHistory
+from digital_souls_core.storage import StorageConfig, open_storage
 
 policy = PrivacyPolicy()
 # characters/providerは起動側で解決した固定構成。
@@ -23,7 +23,9 @@ policy.configure({
     Binding(inference.scope, characters[0].config.character_id):
         frozenset({"history", "local"}),
 })
-app = create_app(inference, history_store=SQLiteHistory(), history_policy=policy)
+# storage_config: StorageConfig（backend="postgresql"、postgresは必須）
+stores = open_storage(storage_config)
+app = create_app(inference, history_store=stores.history, history_policy=policy)
 ```
 
 `local`として扱うのは、既存の検証済み`llamacpp_chat` loopback Profileだけです。

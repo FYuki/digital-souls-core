@@ -10,10 +10,9 @@ from digital_souls_core.postgres_db import PostgresDatabase
 from digital_souls_core.postgres_history import PostgresHistory
 from digital_souls_core.postgres_memory import PostgresMemory
 
-from . import test_memory_confirmation as contracts
+from . import memory_confirmation_contracts as contracts
 from . import test_postgres_stores
-from .test_history_stated_at import FIRST
-from .test_memory_confirmation import (
+from .memory_confirmation_contracts import (
     BASE,
     Harness,
     answer,
@@ -22,6 +21,7 @@ from .test_memory_confirmation import (
 )
 from .test_postgres_stated_at import CID, install_v1
 from .test_postgres_stores import BINDING, Stores
+from .time_support import FIRST
 
 pytestmark = pytest.mark.postgres
 stores = test_postgres_stores.stores

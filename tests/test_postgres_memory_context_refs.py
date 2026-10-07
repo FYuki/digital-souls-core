@@ -1,20 +1,21 @@
 """Synthetic UUID collisions must not alter content screening or identity guards."""
 
 import json
-from pathlib import Path
 from uuid import UUID
 
 import pytest
 
-from digital_souls_core import sqlite_history, sqlite_memory
+from digital_souls_core import postgres_history, postgres_memory
 from digital_souls_core.application import CoreError
 from digital_souls_core.contracts import CompletionInput, Message
 from digital_souls_core.privacy_scan import scan
 
-from .test_memory import selection, setup, source
-from .test_privacy import BINDING
+from . import postgres_memory_support
+from .postgres_memory_support import Stores, selection, setup, source
+from .privacy_support import BINDING
 
-pytestmark = pytest.mark.it1
+stores = postgres_memory_support.stores
+pytestmark = pytest.mark.postgres
 
 
 @pytest.mark.parametrize("local", [False, True])
@@ -24,14 +25,14 @@ pytestmark = pytest.mark.it1
     ["aaaaaaaa-aaaa-4aaa-8aaa-a09012345678", "aaaaaaaa-aaaa-4aaa-a000-000000000000"],
 )
 async def test_generated_identifier_collision_preserves_content_policy_and_guard(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, local: bool, identity: str, synthetic_id: str
+    stores: Stores, monkeypatch: pytest.MonkeyPatch, local: bool, identity: str, synthetic_id: str
 ) -> None:
     # A valid v4 UUID can contain a phone-shaped or Luhn-valid decimal run.
     collision = UUID(synthetic_id)
     assert collision.version == 4 and scan(synthetic_id).secret
-    adapter = sqlite_history if identity == "conversation" else sqlite_memory
+    adapter = postgres_history if identity == "conversation" else postgres_memory
     monkeypatch.setattr(adapter, "uuid4", lambda: collision)
-    service, conversation, _ = setup(tmp_path, local=local)
+    service, conversation, _ = setup(stores, local=local)
     ref = await source(conversation)
     memory = (await service.extract(BINDING, (ref,)))[0]
     assert (ref.conversation_id if identity == "conversation" else memory.memory_id) == synthetic_id
@@ -68,8 +69,8 @@ async def test_generated_identifier_collision_preserves_content_policy_and_guard
     assert await service.search(BINDING, "tea") == ()
 
 
-async def test_context_references_preserve_shared_source_relationships(tmp_path: Path) -> None:
-    service, conversation, provider = setup(tmp_path)
+async def test_context_references_preserve_shared_source_relationships(stores: Stores) -> None:
+    service, conversation, provider = setup(stores)
     a = await source(conversation, "I like synthetic tea alpha.")
     b = await source(conversation, "I like synthetic tea beta.")
     await service.extract(BINDING, (a,))

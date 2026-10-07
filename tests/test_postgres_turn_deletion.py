@@ -11,10 +11,10 @@ from digital_souls_core.postgres_history import PostgresHistory
 from digital_souls_core.postgres_memory import PostgresMemory
 
 from . import test_postgres_stores
-from . import test_turn_deletion as contracts
-from .test_memory_confirmation import Harness, make_harness
+from . import turn_deletion_contracts as contracts
+from .memory_confirmation_contracts import Harness, make_harness
 from .test_postgres_stores import BINDING, Stores
-from .test_turn_deletion import Storage
+from .turn_deletion_contracts import Storage
 
 pytestmark = pytest.mark.postgres
 stores = test_postgres_stores.stores

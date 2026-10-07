@@ -121,7 +121,7 @@ bypass権限とforkでの挙動を確認します。今回、これらの設定�
 ## PostgreSQL adapter の合成契約テスト
 
 保存backendはPostgreSQLへ一本化します（[ADR 0021](docs/adr/0021-postgresql-only-storage.md)）。
-SQLiteは廃止予定で、撤去までは既存adapterを現状維持とし、新機能を追加しません。
+SQLiteは撤去済みです。保存を使う試験はPostgreSQLの合成試験で検証します。
 
 PostgreSQL を変更する場合は `bash tools/test-postgres.sh` も実行します。専用の
 `postgres` marker は実 DB プロセスを使うため、プロセス内の UT / IT1 と分離します。

@@ -6,10 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from digital_souls_core import storage
-from digital_souls_core.character import AccessScope
-from digital_souls_core.history import Binding
 from digital_souls_core.postgres_db import PostgresConfig
-from digital_souls_core.sqlite_memory import SQLiteMemory
 
 pytestmark = pytest.mark.ut
 
@@ -20,12 +17,12 @@ pytestmark = pytest.mark.ut
         {},
         {"backend": "remote"},
         {"backend": "postgresql"},
-        {"backend": "sqlite", "extra": True},
-        {"backend": "sqlite", "sqlite_path": ""},
-        {"backend": "sqlite", "postgres": {"database": "synthetic", "user": "synthetic"}},
+        {"backend": "retired", "extra": True},
+        {"backend": "retired", "storage_path": ""},
+        {"backend": "retired", "postgres": {"database": "synthetic", "user": "synthetic"}},
         {
             "backend": "postgresql",
-            "sqlite_path": "/tmp/synthetic",
+            "storage_path": "/tmp/synthetic",
             "postgres": {"database": "synthetic", "user": "synthetic"},
         },
     ],
@@ -33,18 +30,6 @@ pytestmark = pytest.mark.ut
 def test_ambiguous_config_is_rejected(values: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         storage.StorageConfig.model_validate(values)
-
-
-def test_sqlite_stores_share_explicit_database(tmp_path: Path) -> None:
-    config = storage.StorageConfig(backend="sqlite", sqlite_path=str(tmp_path / "history.db"))
-    stores = storage.open_storage(config)
-    binding = Binding(
-        AccessScope(subject="synthetic", client="test", audience="local-private"), "char"
-    )
-    created = stores.history.create(binding)
-    assert isinstance(stores.memory, SQLiteMemory)
-    assert stores.memory.read(binding, created.conversation_id) == created
-    assert stores.memory.search(binding, "synthetic", 10) == ()
 
 
 def test_postgres_factory_shares_database_and_does_not_extract(
@@ -70,3 +55,40 @@ def test_construct_cannot_bypass_backend_validation() -> None:
     config = storage.StorageConfig.model_construct(backend="postgresql", postgres=None)
     with pytest.raises(ValidationError):
         storage.open_storage(config)
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"backend": "retired"},
+        {"backend": "retired", "storage_path": "/tmp/synthetic"},
+        {
+            "backend": "postgresql",
+            "postgres": {"database": "synthetic", "user": "synthetic"},
+            "storage_path": None,
+        },
+        {
+            "backend": "postgresql",
+            "postgres": {"database": "synthetic", "user": "synthetic"},
+            "unknown": True,
+        },
+        {
+            "backend": "postgresql",
+            "postgres": {"database": "synthetic", "user": "synthetic", "port": "5432"},
+        },
+        {"backend": b"postgresql", "postgres": {"database": "synthetic", "user": "synthetic"}},
+    ],
+)
+def test_retired_and_non_strict_config_is_rejected(values: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        storage.StorageConfig.model_validate(values)
+
+
+def test_only_explicit_postgres_fields_and_example_are_supported() -> None:
+    schema = storage.StorageConfig.model_json_schema()
+    assert set(schema["properties"]) == {"backend", "postgres"}
+    assert set(schema["required"]) == {"backend", "postgres"}
+    assert schema["properties"]["backend"]["const"] == "postgresql"
+    example = Path("examples/storage.postgresql.example.json").read_text(encoding="utf-8")
+    config = storage.StorageConfig.model_validate_json(example)
+    assert config.backend == "postgresql" and isinstance(config.postgres, PostgresConfig)

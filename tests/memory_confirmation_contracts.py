@@ -1,11 +1,7 @@
-"""Storage refusal contracts through the conversation API and real memory stores."""
-
 import asyncio
 import json
-import sqlite3
 from collections.abc import Iterator
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -21,16 +17,12 @@ from digital_souls_core.memory import MemoryService
 from digital_souls_core.memory_contracts import MemoryStore, SourceVersion
 from digital_souls_core.privacy import PrivacyPolicy
 from digital_souls_core.privacy_classifier import LocalClassifier
-from digital_souls_core.sqlite_history import SQLiteHistory
-from digital_souls_core.sqlite_memory import SQLiteMemory
 
+from .conversation_support import turn
+from .memory_support import selection
+from .privacy_support import BINDING, assessment, local_profile
 from .support import TOOL, FakeProvider, character, chunk, completion
-from .test_conversations import turn
-from .test_history_stated_at import CID, FIRST, legacy_sqlite
-from .test_memory import selection
-from .test_privacy import BINDING, assessment, local_profile
 
-pytestmark = pytest.mark.it1
 BASE = "/v1/characters/synthetic/conversations"
 
 
@@ -71,14 +63,6 @@ def make_harness(history: HistoryStore, memory: MemoryStore) -> Harness:
             raise_server_exceptions=False,
         ),
     )
-
-
-@pytest.fixture
-def harness(tmp_path: Path) -> Iterator[Harness]:
-    path = tmp_path / "private" / "db"
-    value = make_harness(SQLiteHistory(path), SQLiteMemory(path))
-    with value.http:
-        yield value
 
 
 def complete(harness: Harness, cid: str, **changes: Any) -> dict[str, Any]:
@@ -445,106 +429,8 @@ def test_resolved_confirmation_retry_keeps_receipt_dates_and_does_not_rehold(
     assert harness.conversation.store.source_eligible(BINDING, SourceReference(cid, 1, 0))
 
 
-def test_pending_confirmation_and_receipt_survive_sqlite_restart(
-    harness: Harness,
-    tmp_path: Path,
-) -> None:
-    cid = harness.conversation.create("synthetic").conversation_id
-    body = turn(messages=[{"role": "user", "content": "覚えないで"}])
-    first = complete(harness, cid, **body.model_dump())
-    before = harness.conversation.read("synthetic", cid)
-    path = tmp_path / "private" / "db"
-    restored = make_harness(SQLiteHistory(path), SQLiteMemory(path))
-    with restored.http:
-        assert restored.conversation.read("synthetic", cid) == before
-        assert restored.http.get(f"{BASE}/{cid}").json()["memory_confirmations"] == [
-            {"turn_revision": 1, "message_index": 0}
-        ]
-        assert not restored.conversation.store.source_eligible(BINDING, SourceReference(cid, 1, 0))
-        with pytest.raises(CoreError):
-            restored.memory.store.sources(BINDING, (SourceReference(cid, 1, 0),))
-        assert complete(restored, cid, **body.model_dump()) == first
-        assert restored.provider.calls == []
-        answer(restored, cid, 1, 0, False)
-
-
-async def test_sqlite_accept_rollback_preserves_memory_and_allows_retry(
-    harness: Harness,
-    tmp_path: Path,
-) -> None:
-    cid = harness.conversation.create("synthetic").conversation_id
-    complete(harness, cid)
-    old = await harness.memory.extract(BINDING, (SourceReference(cid, 1, 0),))
-    complete(
-        harness,
-        cid,
-        request_id="r2",
-        expected_revision=1,
-        messages=[{"role": "user", "content": "覚えないで"}],
-    )
-    before = harness.conversation.read("synthetic", cid)
-    path = tmp_path / "private" / "db"
-    with sqlite3.connect(path) as db:
-        db.execute(
-            "CREATE TRIGGER reject_revoke BEFORE UPDATE OF body ON memories "
-            "BEGIN SELECT RAISE(ABORT, 'synthetic'); END"
-        )
-    response = harness.http.post(
-        f"{BASE}/{cid}/memory-confirmations",
-        json={
-            "expected_revision": 2,
-            "turn_revision": 2,
-            "message_index": 0,
-            "accept_private_mode": True,
-        },
-    )
-    assert response.status_code >= 400
-    assert harness.conversation.read("synthetic", cid) == before
-    assert harness.memory.store.valid(BINDING, old)
-    assert harness.memory.store.events(BINDING) == ()
-    with sqlite3.connect(path) as db:
-        assert db.execute("SELECT body FROM memories").fetchone()[0] == old[0].text
-        db.execute("DROP TRIGGER reject_revoke")
-    answer(harness, cid, 2, 0, True, turn_revision=2)
-    with sqlite3.connect(path) as db:
-        assert db.execute("SELECT body FROM memories").fetchall() == [(None,)]
-    assert not harness.memory.store.valid(BINDING, old)
-
-
 def test_pending_source_is_not_current_for_memory_commit(harness: Harness) -> None:
     cid = harness.conversation.create("synthetic").conversation_id
     complete(harness, cid, messages=[{"role": "user", "content": "覚えないで"}])
     version = SourceVersion(SourceReference(cid, 1, 0), 0)
     assert not harness.memory.store.current(BINDING, (version,))
-
-
-@pytest.mark.parametrize("timestamp", [None, FIRST.isoformat()])
-def test_sqlite_v4_migration_keeps_old_dates_receipts_and_does_not_scan_history(
-    tmp_path: Path,
-    timestamp: str | None,
-) -> None:
-    path = tmp_path / "private" / "db"
-    legacy_sqlite(path, 3)
-    messages = [
-        {"role": "user", "content": "覚えないで"},
-        {"role": "assistant", "content": "Synthetic reply"},
-    ]
-    with sqlite3.connect(path) as db:
-        db.execute("ALTER TABLE turns ADD COLUMN stated_at TEXT")
-        db.execute(
-            "UPDATE turns SET stated_at=?,messages=?",
-            (timestamp, json.dumps(messages, ensure_ascii=False)),
-        )
-        db.execute("PRAGMA user_version=4")
-    restored = make_harness(SQLiteHistory(path), SQLiteMemory(path))
-    with restored.http:
-        snapshot = restored.conversation.read("synthetic", CID)
-        assert [m.model_dump(exclude_none=True) for m in snapshot.messages] == messages
-        assert snapshot.memory_sources[0].reference == SourceReference(CID, 1, 0)
-        assert snapshot.memory_sources[0].stated_at == (None if timestamp is None else FIRST)
-        assert restored.conversation.store.source_eligible(BINDING, SourceReference(CID, 1, 0))
-        evidence = restored.memory.store.sources(BINDING, (SourceReference(CID, 1, 0),))[0]
-        assert evidence.text == "覚えないで"
-        assert evidence.stated_at == snapshot.memory_sources[0].stated_at
-        receipt = restored.conversation.store.receipt(BINDING, CID, "r1")
-        assert receipt is not None and receipt.fingerprint == "original-fingerprint"

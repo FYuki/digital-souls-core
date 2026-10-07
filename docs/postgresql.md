@@ -1,11 +1,76 @@
 # 明示選択するPostgreSQL backend
 
 履歴・記憶の保存先はPostgreSQLへ一本化します（[ADR 0021](adr/0021-postgresql-only-storage.md)）。
-SQLiteは廃止予定で、撤去までは既存adapterを現状維持とし、新機能を追加しません。
+SQLiteは撤去済みです。
 PostgreSQLへの接続はtrusted起動コードで明示します。
-PostgreSQLは空の専用schemaを初期化して使います。既存のSQLiteからデータを移す機能はありません。
+PostgreSQLは空の専用schemaを初期化して使います。データを移す機能はありません。
 通常の`create_app()`は保存無効のままで、設定ファイルを置いただけでは接続・保存・記憶抽出を始めません。
 設計は[ADR 0012](adr/0012-postgresql-storage.md)を参照してください。
+
+## ローカルDockerでの起動
+
+Docker Engine と Docker Compose v2以降を用意します。
+[Compose定義](../compose.postgresql.json)は合成試験と同じ公式PostgreSQL 18 imageをdigest固定で使い、
+公開先を`127.0.0.1`に限定します。データはnamed volumeの`/var/lib/postgresql`へ永続化します。
+
+リポジトリのルートで、[空の環境変数例](../examples/postgresql.env.example)をコピーします。
+
+```sh
+cp examples/postgresql.env.example .env.postgresql.local
+chmod 600 .env.postgresql.local
+```
+
+`.env.postgresql.local`をローカルで編集し、専用のdatabase・user・passwordを設定します。
+例ファイルには値を含めません。このローカルファイルは`.gitignore`の`.env.*`で除外されます。
+passwordは十分な長さのランダム値を使い、画面・ログ・Gitへ出力しません。
+値を環境変数で渡す場合も`DSC_POSTGRES_*`を使い、Coreが拒否する`PG*`は使いません。
+5432が使用中なら、同じファイルに`DSC_POSTGRES_PORT`を追加して別の空きportを指定します。
+
+```sh
+docker compose --env-file .env.postgresql.local -f compose.postgresql.json config --quiet
+docker compose --env-file .env.postgresql.local -f compose.postgresql.json up -d --wait
+```
+
+`config --quiet`は構文と必須変数を検査し、秘密を含む展開結果を表示しません。
+初回起動時だけdatabase・role・passwordを設定します。既存volumeがある場合、環境変数の変更で
+DBのpassword等は変更されません。healthcheckは起動待機用で、Coreの認証・schema検証は以下の明示接続で行います。
+
+trusted起動プロセスへ同じ`DSC_POSTGRES_DATABASE`・`DSC_POSTGRES_USER`・`DSC_POSTGRES_PASSWORD`と
+任意の`DSC_POSTGRES_PORT`を環境変数として渡し、次のように接続します。
+Composeの`--env-file`はCoreプロセスの環境変数を設定しません。起動側でローカルファイルを安全に読み込み、
+または秘密管理から注入してください。秘密をJSON例へ書き込む必要はありません。
+
+```python
+import os
+from pydantic import SecretStr
+from digital_souls_core.postgres_db import PostgresConfig
+from digital_souls_core.storage import StorageConfig, open_storage
+
+postgres = PostgresConfig(
+    host="127.0.0.1",
+    port=int(os.environ.get("DSC_POSTGRES_PORT", "5432")),
+    database=os.environ["DSC_POSTGRES_DATABASE"],
+    user=os.environ["DSC_POSTGRES_USER"],
+    password=SecretStr(os.environ["DSC_POSTGRES_PASSWORD"]),
+    schema_name="digital_souls_core",
+)
+stores = open_storage(StorageConfig(backend="postgresql", postgres=postgres))
+```
+
+停止時はvolumeを残します。再起動は同じ`up -d --wait`です。
+データ削除を意図する場合だけ`down --volumes`を使います。このCompose projectの全DBデータを削除します。
+
+```sh
+# 停止（データ保持）
+docker compose --env-file .env.postgresql.local -f compose.postgresql.json down
+# 停止とデータ削除
+docker compose --env-file .env.postgresql.local -f compose.postgresql.json down --volumes
+```
+
+CIでは既存`postgres-storage`で`config --no-interpolate --quiet`による構文検査、
+既存`docs-tooling`のNode試験でimage・公開先・named volume・秘密値なしを検査します。
+ローカル用Composeの実起動・TCP接続はCIでは **NOT RUN** です。
+合成データによるローカル実起動・schema初期化は[日付付き証跡](evidence/2026-10-07-local-postgresql.md)を参照してください。
 
 ## 明示接続
 
@@ -28,9 +93,8 @@ stores = open_storage(config)
 # MemoryService(stores.memory, policy, extractor)
 ```
 
-現行実装では`StorageConfig.backend`は必須です。撤去前の`sqlite`では任意の`sqlite_path`、`postgresql`では`postgres`を
-指定します。型の暗黙変換や未知field、backendと整合しない設定は拒否します。
-撤去前のSQLite adapterは、既存のGit外保存先・POSIX権限・symlink拒否等の条件を維持します。
+`StorageConfig`は必須の`backend: "postgresql"`と必須の`postgres`だけを受け付けます。
+型の暗黙変換、未知field、他のbackend、接続設定の欠落・不正はfail-closedで拒否します。
 
 `StorageStores`は同じbackendのhistory/memory portをまとめて返します。historyとmemoryを別DBへ
 任意に分ける設定は提供しません。`open_storage`の明示呼出しにはDB初期化の副作用がありますが、
@@ -79,7 +143,7 @@ version 1の旧turnの`stated_at`はNULLのまま補完せず、確認列追加�
 移行途中の失敗は列とversionをまとめてrollbackし、再実行できます。
 この確認を、DBの全設定・権限・任意の改変の監査とは扱いません。
 初期化途中の失敗ではtransactionをrollbackし、正常な空状態から再実行できる境界を持ちます。
-初期化先に既存データを移送せず、SQLiteファイルを書き換えたり削除したりしません。
+初期化先に既存データを移送しません。
 
 各storage操作は接続を作り、transactionでcommit/rollback後にcloseします。read/writeとも
 Binding単位で直列化し、分類器や抽出器のawait中はtransactionを持ち越しません。
@@ -125,7 +189,7 @@ uv run --no-sync pytest -m postgres -q
 そのケースで生成したschemaだけを削除します。CIではネットワーク・公開portなしの使い捨てserverへ
 Unix socketで接続し、通常の品質ゲートと区別して実DB結果を確認します。
 
-PostgreSQLの管理運用、dogfoodへの切替、既存SQLite移行、私的実会話import、実モデル評価は対象外です。
+PostgreSQLの管理運用、dogfoodへの切替、既存データの移送、私的実会話import、実モデル評価は対象外です。
 backend試験の成功をこれらの完了として扱わず、正確なrevision・環境・結果は日付付き証跡に残します。
 
 

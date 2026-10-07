@@ -9,27 +9,27 @@
 trusted Python起動コードで、履歴と同じ保存先のMemoryStore、同じ`PrivacyPolicy`、
 検証済みlocal Profileを持つ`LocalClassifier`/`LocalExtractor`を構成します。
 保存先は[PostgreSQL backend](postgresql.md)へ一本化します（[ADR 0021](adr/0021-postgresql-only-storage.md)）。
-`SQLiteMemory`は廃止予定で、撤去までは現状維持とし、新機能を追加しません。
 [意味検索との統合例](semantic-postgresql-integration.md)でも、接続と記憶抽出は明示操作です。
 memoryのHTTP操作やscope自己申告fieldは追加しません。利用者のsubject/client/audience/characterは
 `Binding`に固定されます。別Bindingのsource・job・memory・通知を照合できません。
 
-以下は撤去前のSQLite adapterを使う既存の接続例です。
+以下はPostgreSQLへ明示接続する例です。接続先・資格情報はtrusted起動側で管理します。
 
 ```python
 from digital_souls_core.local_extractor import LocalExtractor
 from digital_souls_core.memory import MemoryContext, MemoryService
-from digital_souls_core.sqlite_memory import SQLiteMemory
+from digital_souls_core.storage import StorageConfig, open_storage
 
+# storage_config: StorageConfig（backend="postgresql"、postgresは必須）
 # policy/classifier、provider、local_profile、inferenceはtrusted起動側で固定済み。
 # historyとmemoryの同一DB・同一policyを保つ。実サービスへ自動適用しない。
-store = SQLiteMemory()
+stores = open_storage(storage_config)
 memory = MemoryService(
-    store, policy,
+    stores.memory, policy,
     LocalExtractor(provider, local_profile, model_digest="operator-pinned-model-digest"),
 )
 inference.memory_context = MemoryContext(memory)
-# create_app(inference, history_store=store, history_policy=policy)
+# create_app(inference, history_store=stores.history, history_policy=policy)
 # 明示sourceを選んだ時だけ await memory.extract(binding, source_refs)
 # await memory.search(binding, "mint")
 # await memory.rebuild(binding, limit=16)  # 有限batch。常駐workerではない。
@@ -71,10 +71,11 @@ job作成後の追加削除も実行前・採用前に再検証します。再�
 満たせば新しく抽出できます。privateや保留の解除を削除操作から推測しません。
 往復通知のoutboxはSourceDeletionと別であり、記憶再構成の既存`memory_events` consumerへも接続します。
 
-SQLiteの`user_version`は、既存v1〜v5から必要な段階を経てv6へ同一transactionで原子的に移行し、履歴・receiptを保持します。
-v2でprivate・除外・archiveと`source_deletions`、v3でmemory epoch・記憶tableを追加します。
-v4で`turns.stated_at`、v5で`turns.memory_confirmation`（既定値`{}`）、
-v6で`turn_tombstones`・`turn_deletions`を追加します。v3以前の旧turnの`stated_at`はNULLのまま補完しません。
+PostgreSQLのschemaとversionは、既存v1〜v4から必要な段階を経てv5へ同一transactionで原子的に移行し、履歴・receiptを保持します。
+v1はprivate・除外・archive・`source_deletions`・memory epoch・記憶tableを含む初期schemaです。
+v2で`turns.stated_at`、v3で`turns.memory_confirmation`（既定値`{}`）、
+v4で`turn_tombstones`・`turn_deletions`、v5で正本記憶の表を追加します。
+v1の旧turnの`stated_at`はNULLのまま補完しません。
 private化はconversationのmemory epochを進め、履歴を保持しつつ派生memory本文を同一transactionでNULL化します。
 履歴削除も派生本文を同一transactionで消します。text index/cacheを別途保持しないため、そこからの復活はありません。
 ID・source refs・epoch・versionの最小tombstoneは残り、旧IDをactiveへ戻しません。
@@ -227,7 +228,7 @@ profile IDだけの変更も別の承認先と扱います。token/key/headerは
 userinfo/query/fragmentを含むURLは既存のProfile検証で拒否します。
 これは運用者が固定した設定の識別であり、endpoint背後の実プロセスやmodel digestの真正性保証ではありません。
 
-送信先識別は既存SQLiteのversions JSONを拡張するため、追加のDDL migrationや旧行の書き換えはありません。
+送信先識別は既存PostgreSQLのversions JSONを拡張するため、追加のDDL migrationや旧行の書き換えはありません。
 送信先識別を欠く旧jobは新設定と一致せず、再構築時にはclassifier/extractorへ送信する前に拒否され、
 既存のfailed終端化・後続処理へ進みます。現在のendpointを旧承認へ補完しません。
 旧active memoryの出典検証・検索と履歴データは維持しますが、再構築・抽出jobを再利用する際には
@@ -237,7 +238,7 @@ userinfo/query/fragmentを含むURLは既存のProfile検証で拒否します�
 
 
 再構築全体での本文取得前拒否は保証しません。runの設定比較より先に、
-consume/rebaseの適格性確認が_current/_sourceを通じてSQLite内の本文を読み取って解析します。
+consume/rebaseの適格性確認が_current/_sourceを通じてPostgreSQL内の本文を読み取って解析します。
 今回の境界はモデルへの送信停止であり、このローカル内部読み取りは残ります。
 
 ## 管理された構造化出力
@@ -326,4 +327,4 @@ Episodeの経験日時、Factの各版の対象日時、Semanticの適用時期�
 直接・依存の影響記録を結果に含む登録の比較ダイジェスト消去も同じtransactionで行い、
 撤回が中断した場合は履歴・本文・イベント・ダイジェストをすべてrollbackします。無関係な登録は保持します。
 再有効化するAPIはなく、停止IDでの再登録・Fact版追加・冪等再試行も拒否します。
-既存の逐語記憶・consume・検索・SQLite adapterは維持し、期間検索の索引は追加しません。
+既存の逐語記憶・consume・検索・PostgreSQL adapterは維持し、期間検索の索引は追加しません。

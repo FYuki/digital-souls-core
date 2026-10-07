@@ -1,8 +1,8 @@
+"""Synthetic PostgreSQL migration of the corresponding process-local contracts."""
+
 import asyncio
-import json
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -13,55 +13,31 @@ from digital_souls_core.application import CoreError, Inference
 from digital_souls_core.character import AccessScope, Profile
 from digital_souls_core.contracts import Message
 from digital_souls_core.conversations import Conversations
-from digital_souls_core.history import Binding, Operation, TurnInput
-from digital_souls_core.sqlite_history import SQLiteHistory
+from digital_souls_core.history import Binding, Operation
 
+from . import test_postgres_stores
+from .conversation_support import PausedProvider, SyntheticPolicy, turn
+from .postgres_history_support import assert_text_absent, history
 from .support import CALL, TOOL, FakeProvider, character, chunk, completion
+from .test_postgres_stores import Stores
 
-pytestmark = pytest.mark.it1
-
-
-class SyntheticPolicy:
-    """Test-only policy for invented fixtures, not a production classifier."""
-
-    denied: set[str]
-
-    def __init__(self) -> None:
-        self.denied = set()
-        self.broken = False
-
-    def allows(self, operation: Operation, binding: Binding, messages: tuple[Message, ...]) -> bool:
-        if self.broken:
-            raise ValueError("synthetic policy failure")
-        return operation not in self.denied and "SYNTHETIC_SECRET" not in json.dumps(
-            [m.model_dump() for m in messages]
-        )
+pytestmark = pytest.mark.postgres
+stores = test_postgres_stores.stores
 
 
-def setup(tmp_path: Path) -> tuple[Conversations, FakeProvider, SyntheticPolicy]:
+def setup(stores: Stores) -> tuple[Conversations, FakeProvider, SyntheticPolicy]:
     provider = FakeProvider()
     policy = SyntheticPolicy()
     inference = Inference((character("synthetic"), character("other")), provider)
     return (
-        Conversations(inference, SQLiteHistory(tmp_path / "private" / "db"), policy),
+        Conversations(inference, history(stores), policy),
         provider,
         policy,
     )
 
 
-def turn(**values: Any) -> TurnInput:
-    return TurnInput.model_validate(
-        {
-            "request_id": "r1",
-            "expected_revision": 0,
-            "messages": [{"role": "user", "content": "Synthetic hello"}],
-            **values,
-        }
-    )
-
-
-async def test_restore_retry_and_new_turn_context(tmp_path: Path) -> None:
-    service, provider, _ = setup(tmp_path)
+async def test_restore_retry_and_new_turn_context(stores: Stores) -> None:
+    service, provider, _ = setup(stores)
     cid = service.create("synthetic").conversation_id
     first = await service.complete("synthetic", cid, turn())
     assert await service.complete("synthetic", cid, turn()) == first
@@ -70,7 +46,7 @@ async def test_restore_retry_and_new_turn_context(tmp_path: Path) -> None:
         await service.complete(
             "synthetic", cid, turn(messages=[{"role": "user", "content": "Changed"}])
         )
-    service.store = SQLiteHistory(tmp_path / "private" / "db")
+    service.store = history(stores)
     await service.complete("synthetic", cid, turn(request_id="r2", expected_revision=1))
     assert len(provider.calls[-1][1]["messages"]) == 4
     assert service.read("synthetic", cid).revision == 2
@@ -82,8 +58,8 @@ async def test_restore_retry_and_new_turn_context(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("stream", [False, True])
-async def test_tool_roundtrip(tmp_path: Path, stream: bool) -> None:
-    service, provider, _ = setup(tmp_path)
+async def test_tool_roundtrip(stores: Stores, stream: bool) -> None:
+    service, provider, _ = setup(stores)
     cid = service.create("synthetic").conversation_id
     provider.response = completion(tool=True)
     provider.chunks = [chunk({"tool_calls": [{"index": 0, **CALL}]}), chunk({}, "tool_calls")]
@@ -122,8 +98,8 @@ async def test_tool_roundtrip(tmp_path: Path, stream: bool) -> None:
 @pytest.mark.parametrize(
     "mode", ["initial", "middle", "unfinished", "length", "reasoning", "secret", "badtool"]
 )
-async def test_failed_stream_never_persists(tmp_path: Path, mode: str) -> None:
-    service, provider, _ = setup(tmp_path)
+async def test_failed_stream_never_persists(stores: Stores, mode: str) -> None:
+    service, provider, _ = setup(stores)
     cid = service.create("synthetic").conversation_id
     if mode == "initial":
         provider.error = RuntimeError("SYNTHETIC_SECRET")
@@ -143,11 +119,11 @@ async def test_failed_stream_never_persists(tmp_path: Path, mode: str) -> None:
         await service.complete("synthetic", cid, turn(stream=True))
     assert service.read("synthetic", cid).revision == 0
     assert provider.closed
-    assert b"SYNTHETIC_SECRET" not in (tmp_path / "private/db").read_bytes()
+    assert_text_absent(stores, "SYNTHETIC_SECRET")
 
 
-async def test_reasoning_fields_are_not_saved(tmp_path: Path) -> None:
-    service, provider, _ = setup(tmp_path)
+async def test_reasoning_fields_are_not_saved(stores: Stores) -> None:
+    service, provider, _ = setup(stores)
     cid = service.create("synthetic").conversation_id
     provider.response["choices"][0]["message"]["reasoning_content"] = "SYNTHETIC_SECRET"
     await service.complete("synthetic", cid, turn())
@@ -158,13 +134,13 @@ async def test_reasoning_fields_are_not_saved(tmp_path: Path) -> None:
     await service.complete(
         "synthetic", cid, turn(request_id="r2", expected_revision=1, stream=True)
     )
-    assert b"SYNTHETIC_SECRET" not in (tmp_path / "private/db").read_bytes()
+    assert_text_absent(stores, "SYNTHETIC_SECRET")
 
 
 async def test_policy_fail_closed_on_each_boundary_and_delete_after_revocation(
-    tmp_path: Path,
+    stores: Stores,
 ) -> None:
-    service, provider, policy = setup(tmp_path)
+    service, provider, policy = setup(stores)
     cid = service.create("synthetic").conversation_id
     for op in ("store", "read", "export"):
         policy.denied = {op}
@@ -191,35 +167,10 @@ async def test_policy_fail_closed_on_each_boundary_and_delete_after_revocation(
     assert service.store.list(service.binding("synthetic")) == []
 
 
-class PausedProvider(FakeProvider):
-    def __init__(self) -> None:
-        super().__init__()
-        self.started = asyncio.Event()
-        self.release = asyncio.Event()
-
-    async def complete(self, profile: Profile, payload: dict[str, Any]) -> dict[str, Any]:
-        self.started.set()
-        await self.release.wait()
-        return await super().complete(profile, payload)
-
-    async def stream(
-        self, profile: Profile, payload: dict[str, Any]
-    ) -> AsyncGenerator[dict[str, Any]]:
-        try:
-            yield chunk({"content": "Partial synthetic"})
-            self.started.set()
-            await self.release.wait()
-            yield chunk({}, "stop")
-        finally:
-            await asyncio.sleep(0)
-            await asyncio.sleep(0)
-            self.closed = True
-
-
 @pytest.mark.parametrize("stream", [False, True])
 @pytest.mark.parametrize("action", ["cancel", "delete", "revoke", "concurrent"])
-async def test_inflight_boundaries(tmp_path: Path, stream: bool, action: str) -> None:
-    service, _, policy = setup(tmp_path)
+async def test_inflight_boundaries(stores: Stores, stream: bool, action: str) -> None:
+    service, _, policy = setup(stores)
     provider = PausedProvider()
     service.inference.provider = provider
     cid = service.create("synthetic").conversation_id
@@ -251,8 +202,8 @@ async def test_inflight_boundaries(tmp_path: Path, stream: bool, action: str) ->
             assert service.list("synthetic") == []
 
 
-def test_http_opt_in_crud_stream_and_reject_scope(tmp_path: Path) -> None:
-    service, provider, policy = setup(tmp_path)
+def test_http_opt_in_crud_stream_and_reject_scope(stores: Stores) -> None:
+    service, provider, policy = setup(stores)
     base = "/v1/characters/synthetic/conversations"
     default = TestClient(create_app(service.inference), base_url="http://127.0.0.1")
     assert default.post(base).status_code == 404
@@ -287,8 +238,8 @@ def test_http_opt_in_crud_stream_and_reject_scope(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("stream", [False, True])
-async def test_export_revocation_during_context_lookup(tmp_path: Path, stream: bool) -> None:
-    service, provider, policy = setup(tmp_path)
+async def test_export_revocation_during_context_lookup(stores: Stores, stream: bool) -> None:
+    service, provider, policy = setup(stores)
     cid = service.create("synthetic").conversation_id
 
     class RevokingContext:
@@ -305,8 +256,8 @@ async def test_export_revocation_during_context_lookup(tmp_path: Path, stream: b
 
 
 @pytest.mark.parametrize("stream", [False, True])
-async def test_http_disconnect_discards_uncommitted_turn(tmp_path: Path, stream: bool) -> None:
-    service, _, policy = setup(tmp_path)
+async def test_http_disconnect_discards_uncommitted_turn(stores: Stores, stream: bool) -> None:
+    service, _, policy = setup(stores)
     provider = PausedProvider()
     service.inference.provider = provider
     cid = service.create("synthetic").conversation_id
@@ -349,8 +300,8 @@ async def test_http_disconnect_discards_uncommitted_turn(tmp_path: Path, stream:
         assert provider.closed
 
 
-async def test_fragmented_stream_tool_arguments_and_multiple_results(tmp_path: Path) -> None:
-    service, provider, _ = setup(tmp_path)
+async def test_fragmented_stream_tool_arguments_and_multiple_results(stores: Stores) -> None:
+    service, provider, _ = setup(stores)
     cid = service.create("synthetic").conversation_id
     provider.chunks = [
         chunk(
@@ -394,8 +345,8 @@ async def test_fragmented_stream_tool_arguments_and_multiple_results(tmp_path: P
     assert service.read("synthetic", cid).revision == 2
 
 
-async def test_size_role_and_invalid_output_rejections(tmp_path: Path) -> None:
-    service, provider, _ = setup(tmp_path)
+async def test_size_role_and_invalid_output_rejections(stores: Stores) -> None:
+    service, provider, _ = setup(stores)
     cid = service.create("synthetic").conversation_id
     for message in (
         {"role": "system", "content": "Injected"},
@@ -414,12 +365,12 @@ async def test_size_role_and_invalid_output_rejections(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("stream", [False, True])
 async def test_concurrent_retry_reauthorizes_actual_winner_receipt(
-    tmp_path: Path, stream: bool
+    stores: Stores, stream: bool
 ) -> None:
-    service, _, policy = setup(tmp_path)
+    service, _, policy = setup(stores)
     saved_at = datetime(2024, 2, 29, 12, 34, 56, tzinfo=UTC)
     times = iter((saved_at, saved_at + timedelta(days=1)))
-    service.store = SQLiteHistory(tmp_path / "private" / "db", clock=lambda: next(times))
+    service.store = history(stores, clock=lambda: next(times))
     cid = service.create("synthetic").conversation_id
     started = [asyncio.Event(), asyncio.Event()]
     released = [asyncio.Event(), asyncio.Event()]
@@ -480,11 +431,11 @@ async def test_concurrent_retry_reauthorizes_actual_winner_receipt(
 @pytest.mark.parametrize("stream", [False, True])
 @pytest.mark.parametrize("disconnect_first", [False, True])
 async def test_same_tick_disconnect_and_provider_completion(
-    tmp_path: Path,
+    stores: Stores,
     stream: bool,
     disconnect_first: bool,
 ) -> None:
-    service, _, policy = setup(tmp_path)
+    service, _, policy = setup(stores)
     provider = PausedProvider()
     service.inference.provider = provider
     cid = service.create("synthetic").conversation_id
@@ -537,9 +488,9 @@ async def test_same_tick_disconnect_and_provider_completion(
 
 @pytest.mark.parametrize("stream", [False, True])
 async def test_delivery_failure_after_commit_keeps_retry_receipt(
-    tmp_path: Path, stream: bool
+    stores: Stores, stream: bool
 ) -> None:
-    service, provider, policy = setup(tmp_path)
+    service, provider, policy = setup(stores)
     cid = service.create("synthetic").conversation_id
     app = create_app(service.inference, history_store=service.store, history_policy=policy)
     incoming: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
@@ -577,8 +528,8 @@ async def test_delivery_failure_after_commit_keeps_retry_receipt(
     assert receipt.revision == 1 and len(provider.calls) == 1
 
 
-async def test_sdk_profile_defaults_preserve_pre_llamacpp_receipt(tmp_path: Path) -> None:
-    service, provider, _ = setup(tmp_path)
+async def test_sdk_profile_defaults_preserve_pre_llamacpp_receipt(stores: Stores) -> None:
+    service, provider, _ = setup(stores)
     cid = service.create("synthetic").conversation_id
     # Frozen fingerprint generated by cd039186 before transport/api_base existed.
     legacy = "a7339e54ce565cabc49e4ae4e5332ec0b9391a54bd3d19219277855a60399487"

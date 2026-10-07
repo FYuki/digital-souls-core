@@ -16,6 +16,7 @@ from digital_souls_core.memory_records import (
     TimePrecision,
 )
 from digital_souls_core.postgres_db import PostgresDatabase, key
+from digital_souls_core.postgres_schema import SCHEMA_VERSION
 
 from . import test_postgres_stores
 from .test_memory_record_store_contract import citation, derived, episode, fact, reference
@@ -101,7 +102,7 @@ def test_v4_migration_preserves_all_rows_and_reopens(stores: Stores) -> None:
     after = snapshot(stores)
     assert all(after[t] == rows for t, rows in before.items())
     with stores.database.transaction(BINDING) as db:
-        assert db.execute("SELECT version FROM schema_version").fetchall() == [(5,)]
+        assert db.execute("SELECT version FROM schema_version").fetchall() == [(SCHEMA_VERSION,)]
     PostgresDatabase(stores.config).initialize()
 
 
@@ -335,7 +336,7 @@ def test_revoked_bodies_json_and_temporal_columns_are_null(stores: Stores) -> No
         "ALTER TABLE memory_episodes ALTER COLUMN time_start SET DEFAULT now()",
     ],
 )
-def test_v5_schema_drift_rejected(stores: Stores, alteration: str) -> None:
+def test_record_schema_drift_rejected(stores: Stores, alteration: str) -> None:
     with stores.database.transaction(BINDING) as db:
         db.execute(alteration)
     with pytest.raises(CoreError) as error:
@@ -544,7 +545,7 @@ def test_revocation_digest_erasure_rolls_back_with_history_and_records(
         ]
 
 
-def test_v5_rejects_nonnullable_registration_digest(stores: Stores) -> None:
+def test_record_schema_rejects_nonnullable_registration_digest(stores: Stores) -> None:
     with stores.database.transaction(BINDING) as db:
         db.execute(
             "ALTER TABLE memory_record_registrations ALTER COLUMN request_digest SET NOT NULL"

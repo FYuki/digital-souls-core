@@ -1,12 +1,8 @@
-"""Explicit partial deletion through HTTP and the real history/memory transaction."""
-
 import asyncio
 import copy
 import json
-import sqlite3
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from typing import Any, Protocol, cast
 
 import httpx
@@ -17,16 +13,12 @@ from digital_souls_core.character import AccessScope, Profile
 from digital_souls_core.contracts import CompletionInput, Message
 from digital_souls_core.history import Binding, SourceReference
 from digital_souls_core.memory import MemoryContext
-from digital_souls_core.sqlite_history import SQLiteHistory
-from digital_souls_core.sqlite_memory import SQLiteMemory
 
+from .conversation_support import PausedProvider, turn
+from .memory_confirmation_contracts import BASE, Harness, answer, complete
+from .memory_support import selection
+from .privacy_support import BINDING
 from .support import CALL, TOOL, completion
-from .test_conversations import PausedProvider, turn
-from .test_memory import selection
-from .test_memory_confirmation import BASE, Harness, answer, complete, make_harness
-from .test_privacy import BINDING
-
-pytestmark = pytest.mark.it1
 
 
 class TurnDeletionEvent(Protocol):
@@ -48,41 +40,6 @@ class Storage:
     reject_delete: Callable[[], None]
     allow_delete: Callable[[], None]
     stored_values: Callable[[], tuple[object, ...]]
-
-
-@pytest.fixture
-def storage(tmp_path: Path) -> Iterator[Storage]:
-    path = tmp_path / "private" / "db"
-
-    def reopen() -> Harness:
-        return make_harness(SQLiteHistory(path), SQLiteMemory(path))
-
-    def query(sql: str, parameters: tuple[object, ...]) -> list[tuple[Any, ...]]:
-        with sqlite3.connect(path) as db:
-            return db.execute(sql, parameters).fetchall()
-
-    def reject_delete() -> None:
-        query(
-            "CREATE TRIGGER reject_turn_delete BEFORE DELETE ON turns "
-            "BEGIN SELECT RAISE(ABORT, 'synthetic'); END",
-            (),
-        )
-
-    def allow_delete() -> None:
-        query("DROP TRIGGER reject_turn_delete", ())
-
-    def stored_values() -> tuple[object, ...]:
-        tables = query("SELECT name FROM sqlite_master WHERE type='table'", ())
-        return tuple(
-            value
-            for (table,) in tables
-            for row in query('SELECT * FROM "' + table.replace('"', '""') + '"', ())
-            for value in row
-        )
-
-    value = reopen()
-    with value.http:
-        yield Storage(value, reopen, query, reject_delete, allow_delete, stored_values)
 
 
 def seed(harness: Harness, texts: tuple[str, ...]) -> str:
@@ -813,17 +770,3 @@ async def test_tombstone_keeps_request_identifier_without_content_or_fingerprint
     assert all(receipt.fingerprint not in str(value) for value in values)
     assert h.http.delete(f"{BASE}/{cid}").status_code == 204
     assert "r2" not in storage.stored_values()
-
-
-async def test_sqlite_partial_deletion_physically_erases_source_and_derived_text(
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "private" / "db"
-    h = make_harness(SQLiteHistory(path), SQLiteMemory(path))
-    with h.http:
-        cid = seed(h, ("Synthetic kept rose", "Synthetic removed cactus"))
-        await h.memory.extract(BINDING, (SourceReference(cid, 2, 0),))
-        assert b"cactus" in path.read_bytes()
-        delete_turns(h, cid, 2, 2, "selected")
-        assert b"cactus" not in path.read_bytes()
-        assert b"Synthetic kept rose" in path.read_bytes()

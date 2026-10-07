@@ -1,4 +1,4 @@
-"""Version-five PostgreSQL schema and atomic source revocation."""
+"""Current PostgreSQL schema and atomic source revocation."""
 
 from typing import Any
 from uuid import uuid4
@@ -8,6 +8,8 @@ from psycopg import Connection
 from .postgres_record_revocation import revoke_records
 from .postgres_record_schema import COLUMNS, RECORD_DDL
 from .postgres_record_schema import CONSTRAINTS as RECORD_CONSTRAINTS
+
+SCHEMA_VERSION = 5
 
 TABLE_COLUMNS = {
     "schema_version": ("version",),
@@ -156,7 +158,7 @@ DDL = (
     "CREATE INDEX memory_source_lookup ON memory_sources(binding,conversation)",
     *TURN_DELETION_DDL,
     *RECORD_DDL,
-    "INSERT INTO schema_version(version) VALUES (5)",
+    f"INSERT INTO schema_version(version) VALUES ({SCHEMA_VERSION})",
 )
 
 

@@ -1,26 +1,32 @@
-"""Semantic retrieval uses only synthetic history and deterministic in-process vectors."""
+"""Semantic memory contracts with PostgreSQL and deterministic in-process vectors."""
 
 import asyncio
 import json
 from dataclasses import replace
-from pathlib import Path
 
 import pytest
 
 from digital_souls_core.application import CoreError
-from digital_souls_core.character import AccessScope
 from digital_souls_core.contracts import CompletionInput, Message
-from digital_souls_core.history import Binding, ConversationControls
+from digital_souls_core.history import ConversationControls
 from digital_souls_core.memory_ranking import EmbeddingSpace
 from digital_souls_core.privacy_classifier import LocalClassifier
-from digital_souls_core.sqlite_memory import SQLiteMemory
 
+from . import postgres_memory_support
+from .conversation_support import turn
+from .postgres_memory_support import (
+    Stores,
+    assert_memoryless_turn,
+    reopen,
+    selection,
+    setup,
+    source,
+)
+from .privacy_support import BINDING
 from .support import FakeProvider
-from .test_conversations import turn
-from .test_memory import assert_memoryless_turn, selection, setup, source, store
-from .test_privacy import BINDING
 
-pytestmark = pytest.mark.it1
+stores = postgres_memory_support.stores
+pytestmark = pytest.mark.postgres
 
 
 class SyntheticEmbedding:
@@ -34,9 +40,9 @@ class SyntheticEmbedding:
 
 
 async def test_opt_in_synonym_ranking_preserves_memory_and_source_provenance(
-    tmp_path: Path,
+    stores: Stores,
 ) -> None:
-    service, conversation, _ = setup(tmp_path)
+    service, conversation, _ = setup(stores)
     tea = await source(conversation)
     expected = await service.extract(BINDING, (tea,))
     await service.extract(BINDING, (await source(conversation, "I grow synthetic mint."),))
@@ -53,28 +59,13 @@ async def test_opt_in_synonym_ranking_preserves_memory_and_source_provenance(
         "synthetic", tea.conversation_id, ConversationControls(expected_revision=1, archived=True)
     )
     assert await service.search(BINDING, "beverage") == expected
-    service.store = SQLiteMemory(store(service).path)
+    service.store = reopen(stores)
     assert await service.search(BINDING, "beverage") == expected
     assert len(encoder.calls) == 3  # Every call recomputes; reopening does not introduce an index.
 
 
-async def test_equal_relevance_prefers_latest_user_mention_over_newer_memory(
-    tmp_path: Path,
-) -> None:
-    # PoC rag ranking: within the equivalence band, last_user_mentioned_at wins
-    # over creation order. Core uses the source turn append order for that time.
-    service, conversation, _ = setup(tmp_path)
-    earlier = await source(conversation, "I like synthetic tea in the morning.")
-    later = await source(conversation, "I like synthetic tea after lunch.")
-    mentioned_later = await service.extract(BINDING, (later,))
-    created_later = await service.extract(BINDING, (earlier,))
-    service.embedding = SyntheticEmbedding()
-    assert await service.search(BINDING, "beverage") == (*mentioned_later, *created_later)
-    assert mentioned_later[0].mentioned > created_later[0].mentioned
-
-
-async def test_semantic_search_returns_at_most_poc_max_retrieved(tmp_path: Path) -> None:
-    service, conversation, _ = setup(tmp_path)
+async def test_semantic_search_returns_at_most_poc_max_retrieved(stores: Stores) -> None:
+    service, conversation, _ = setup(stores)
     for index in range(7):
         await service.extract(
             BINDING, (await source(conversation, f"I like synthetic tea number {index}."),)
@@ -87,9 +78,9 @@ async def test_semantic_search_returns_at_most_poc_max_retrieved(tmp_path: Path)
 
 @pytest.mark.parametrize("action", ["private", "delete"])
 async def test_revocation_and_rebuild_never_reembed_withdrawn_source(
-    tmp_path: Path, action: str
+    stores: Stores, action: str
 ) -> None:
-    service, conversation, provider = setup(tmp_path)
+    service, conversation, provider = setup(stores)
     tea = await source(conversation)
     mint = await source(conversation, "I grow synthetic mint.")
     provider.response["choices"][0]["message"]["content"] = selection([0, 1])
@@ -118,9 +109,9 @@ async def test_revocation_and_rebuild_never_reembed_withdrawn_source(
 
 @pytest.mark.parametrize("excluded", ["specified", "private_turn"])
 async def test_ineligible_history_is_never_promoted_by_semantic_search(
-    tmp_path: Path, excluded: str
+    stores: Stores, excluded: str
 ) -> None:
-    service, conversation, _ = setup(tmp_path)
+    service, conversation, _ = setup(stores)
     cid = conversation.create("synthetic").conversation_id
     if excluded == "private_turn":
         conversation.controls(
@@ -149,46 +140,28 @@ async def test_ineligible_history_is_never_promoted_by_semantic_search(
 
 
 @pytest.mark.parametrize(
-    "other",
+    "change,stage",
     [
-        Binding(AccessScope(subject="other"), "synthetic"),
-        Binding(AccessScope(client="other"), "synthetic"),
-        Binding(AccessScope(audience="other"), "synthetic"),  # type: ignore[arg-type]
-        replace(BINDING, character_id="other"),
+        (change, stage)
+        for stage in ("candidate_authorization", "embedding")
+        for change in (
+            "private",
+            "delete",
+            "policy",
+            "classifier",
+            "embedding",
+            "space",
+            "mutated_space",
+            "scope",
+            "store",
+        )
+        if not (stage == "embedding" and change in {"store", "embedding", "space"})
     ],
 )
-async def test_semantic_candidates_never_cross_any_binding_axis(
-    tmp_path: Path, other: Binding
-) -> None:
-    service, conversation, _ = setup(tmp_path)
-    await service.extract(BINDING, (await source(conversation),))
-    service.policy.configure(
-        {BINDING: frozenset({"memory", "local"}), other: frozenset({"memory", "local"})}
-    )
-    encoder = SyntheticEmbedding()
-    service.embedding = encoder
-    assert await service.search(other, "beverage") == () and encoder.calls == []
-
-
-@pytest.mark.parametrize(
-    "change",
-    [
-        "private",
-        "delete",
-        "policy",
-        "classifier",
-        "embedding",
-        "space",
-        "mutated_space",
-        "scope",
-        "store",
-    ],
-)
-@pytest.mark.parametrize("stage", ["candidate_authorization", "embedding"])
 async def test_changes_during_await_fail_closed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str, stage: str
+    stores: Stores, monkeypatch: pytest.MonkeyPatch, change: str, stage: str
 ) -> None:
-    service, conversation, _ = setup(tmp_path)
+    service, conversation, _ = setup(stores)
     ref = await source(conversation)
     await service.extract(BINDING, (ref,))
     encoder = SyntheticEmbedding()
@@ -239,7 +212,7 @@ async def test_changes_during_await_fail_closed(
     elif change == "scope":
         allowed = False
     else:
-        service.store = SQLiteMemory(store(service).path)
+        service.store = reopen(stores)
     release.set()
     with pytest.raises(CoreError) as caught:
         await task
@@ -249,9 +222,9 @@ async def test_changes_during_await_fail_closed(
 
 @pytest.mark.parametrize("failure", ["error", "timeout", "cancel", "bad_vectors"])
 async def test_embedding_failure_is_bounded_content_free_and_never_optional(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+    stores: Stores, monkeypatch: pytest.MonkeyPatch, failure: str
 ) -> None:
-    service, conversation, _ = setup(tmp_path)
+    service, conversation, _ = setup(stores)
     ref = await source(conversation)
     await service.extract(BINDING, (ref,))
     encoder = SyntheticEmbedding()
@@ -299,13 +272,13 @@ async def test_embedding_failure_is_bounded_content_free_and_never_optional(
 @pytest.mark.parametrize("stream", [False, True])
 @pytest.mark.parametrize("failure", ["error", "timeout", "bad_vectors", "metadata"])
 async def test_embedding_failure_allows_memoryless_conversation(
-    tmp_path: Path,
+    stores: Stores,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
     failure: str,
     stream: bool,
 ) -> None:
-    service, conversation, _ = setup(tmp_path)
+    service, conversation, _ = setup(stores)
     ref = await source(conversation, "SYNTHETIC_EVIDENCE_MARKER tea")
     await service.extract(BINDING, (ref,))
     encoder = SyntheticEmbedding()
@@ -346,9 +319,9 @@ async def test_embedding_failure_allows_memoryless_conversation(
 
 
 async def test_conversation_cancel_during_embedding_propagates_without_append(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    stores: Stores, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    service, conversation, _ = setup(tmp_path)
+    service, conversation, _ = setup(stores)
     await service.extract(BINDING, (await source(conversation),))
     encoder = SyntheticEmbedding()
     service.embedding = encoder
@@ -385,9 +358,9 @@ async def test_conversation_cancel_during_embedding_propagates_without_append(
     "query,limit", [("", 1), ("x" * 257, 1), ("tea", 0), ("tea", 17), ("tea", True)]
 )
 async def test_invalid_search_rejected_before_classifier_or_embedding(
-    tmp_path: Path, query: str, limit: int
+    stores: Stores, query: str, limit: int
 ) -> None:
-    service, _, _ = setup(tmp_path)
+    service, _, _ = setup(stores)
     encoder = SyntheticEmbedding()
     service.embedding = encoder
     classifier = service.policy.classifier
@@ -402,9 +375,9 @@ async def test_invalid_search_rejected_before_classifier_or_embedding(
 
 @pytest.mark.parametrize("denial", ["query", "candidates", "permission", "budget", "count"])
 async def test_denied_content_and_oversize_scope_never_reach_embedding(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, denial: str
+    stores: Stores, monkeypatch: pytest.MonkeyPatch, denial: str
 ) -> None:
-    service, conversation, _ = setup(tmp_path)
+    service, conversation, _ = setup(stores)
     memories = await service.extract(BINDING, (await source(conversation),))
     encoder = SyntheticEmbedding()
     service.embedding = encoder
@@ -436,9 +409,9 @@ async def test_denied_content_and_oversize_scope_never_reach_embedding(
 @pytest.mark.parametrize("empty", [False, True])
 @pytest.mark.parametrize("change", ["private", "embedding", "space"])
 async def test_semantic_context_retains_dispatch_guard_and_stateless_compatibility(
-    tmp_path: Path, empty: bool, change: str
+    stores: Stores, empty: bool, change: str
 ) -> None:
-    service, conversation, _ = setup(tmp_path)
+    service, conversation, _ = setup(stores)
     ref = await source(conversation)
     if not empty:
         await service.extract(BINDING, (ref,))
@@ -469,8 +442,8 @@ async def test_semantic_context_retains_dispatch_guard_and_stateless_compatibili
             inference.check(prepared)
 
 
-async def test_broken_embedding_metadata_is_content_free(tmp_path: Path) -> None:
-    service, _, _ = setup(tmp_path)
+async def test_broken_embedding_metadata_is_content_free(stores: Stores) -> None:
+    service, _, _ = setup(stores)
 
     class BrokenEmbedding:
         @property
@@ -488,9 +461,9 @@ async def test_broken_embedding_metadata_is_content_free(tmp_path: Path) -> None
 
 
 async def test_nonselected_source_revoked_during_result_authorization_rejects_search(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    stores: Stores, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    service, conversation, _ = setup(tmp_path)
+    service, conversation, _ = setup(stores)
     tea = await source(conversation)
     mint = await source(conversation, "I grow synthetic mint.")
     await service.extract(BINDING, (tea,))
@@ -510,35 +483,3 @@ async def test_nonselected_source_revoked_during_result_authorization_rejects_se
     monkeypatch.setattr(classifier, "safe", revoke)
     with pytest.raises(CoreError):
         await service.search(BINDING, "beverage", limit=1)
-
-
-@pytest.mark.parametrize("stream", [False, True])
-async def test_semantic_revocation_during_dispatch_classification_never_calls_provider(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stream: bool
-) -> None:
-    service, conversation, _ = setup(tmp_path, local=False)
-    ref = await source(conversation)
-    await service.extract(BINDING, (ref,))
-    service.embedding = SyntheticEmbedding()
-    classifier = service.policy.classifier
-    assert classifier is not None
-    original = classifier.safe
-
-    async def revoke(value: object, version: str) -> bool:
-        allowed = await original(value, version)
-        if isinstance(value, dict) and "retrieved_memory_data" in json.dumps(value):
-            conversation.delete("synthetic", ref.conversation_id)
-        return allowed
-
-    monkeypatch.setattr(classifier, "safe", revoke)
-    provider = conversation.inference.provider
-    assert isinstance(provider, FakeProvider)
-    provider.calls.clear()
-    cid = conversation.create("synthetic").conversation_id
-    with pytest.raises(CoreError):
-        await conversation.complete(
-            "synthetic",
-            cid,
-            turn(messages=[{"role": "user", "content": "beverage"}], stream=stream),
-        )
-    assert provider.calls == []

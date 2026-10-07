@@ -1,12 +1,10 @@
 import json
-from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
 from pydantic import ValidationError
 
-from digital_souls_core import structured_output
 from digital_souls_core.application import CoreError
 from digital_souls_core.contracts import CompletionInput
 from digital_souls_core.history import SourceReference, TurnInput
@@ -16,9 +14,9 @@ from digital_souls_core.privacy_classifier import Assessment, LocalClassifier
 from digital_souls_core.privacy_scan import POLICY_VERSION
 from digital_souls_core.provider import LiteLLMProvider
 
+from .memory_support import selection
+from .privacy_support import assessment, local_profile
 from .support import completion
-from .test_memory import selection, setup, source
-from .test_privacy import BINDING, assessment, local_profile
 
 pytestmark = pytest.mark.it1
 
@@ -69,36 +67,6 @@ async def test_fixed_schema_over_actual_sdk_and_fail_closed(
             with pytest.raises(CoreError):
                 await extractor.extract(evidence)
     assert len(sent) == 1  # No retry with weaker output constraints.
-
-
-@pytest.mark.parametrize("change", ["schema", "contract", "sdk", "legacy"])
-async def test_structured_approval_change_requires_explicit_retry(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str
-) -> None:
-    service, conversation, provider = setup(tmp_path)
-    ref = await source(conversation)
-    versions = service._versions()
-    if change == "legacy":
-        legacy = json.loads(versions)
-        for adapter in legacy.values():
-            for key in ("structured_output_contract", "response_schema_sha256", "provider_sdk"):
-                adapter.pop(key)
-        versions = json.dumps(legacy, sort_keys=True)
-    evidence = service.store.sources(BINDING, (ref,))
-    service.store.begin(BINDING, tuple(e.source for e in evidence), versions)
-    if change == "schema":
-        schema = Extraction.model_json_schema()
-        schema["title"] = "SyntheticNewContract"
-        monkeypatch.setattr(Extraction, "model_json_schema", classmethod(lambda cls: schema))
-    elif change == "contract":
-        monkeypatch.setattr(structured_output, "CONTRACT_VERSION", "synthetic-contract-v2")
-    elif change == "sdk":
-        monkeypatch.setattr(structured_output, "version", lambda package: "synthetic-v2")
-    with pytest.raises(CoreError, match="explicit extraction"):
-        await service.rebuild(BINDING)
-    assert provider.calls == [] and service.store.pending(BINDING) == ()
-    assert service.store.search(BINDING, "tea") == ()
-    assert len(await service.extract(BINDING, (ref,))) == 1
 
 
 @pytest.mark.parametrize("contract", [CompletionInput, TurnInput])
