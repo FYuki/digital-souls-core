@@ -57,6 +57,11 @@ queryは1〜256文字、limitは1〜16件とし、1 Bindingのactive memoryは�
   出典turnの保存順（SQLite rowid、PostgreSQL seq）の最大値で同じ順序を表し、schemaは変更しません。
 - PoCの再言及時のTOUCH更新、期間検索、語彙補完、自己申告の現在値補完はCoreに未実装で、この改訂に含みません。
 
+後続の実装ではturnに`stated_at`を保存するようになりました。上記の「時刻を保存しない」「schemaは変更しません」は
+この改訂時点の記述です。移行前のturnは`stated_at`がNULLのままで日時による順序を付けられないため、
+現在も同等帯の並びには出典turnの保存順を使います。最終言及日時`last_user_mentioned_at`の正式な保存と
+TOUCHは[ADR 0018 §5](0018-memory-retrieval-context.md#5-最終言及日時とtouch)に従い後続で実装します。
+
 候補がない場合はembeddingを呼びません。vectorの件数・次元・有限性・非ゼロ長を検証し、不正値を
 許容した順位付けや別方式へのfallbackはしません。embedding失敗・timeoutは内容や例外文字列を
 含まないエラーとし、cancelは伝播します。実モデル品質は偽embeddingを使う試験では証明しません。
@@ -79,6 +84,11 @@ awaitを経た推論dispatch直前にも検証します。既に開始した処�
 
 queryの事前認可拒否だけを扱う`MemoryQueryUnavailable`の契約は維持します。候補認可の拒否、
 source撤回、embedding設定変更・不正出力・失敗を、会話の記憶なし継続へ変換しません。
+
+この会話継続の契約は[ADR 0018 §2](0018-memory-retrieval-context.md#2-検索前のquery判定と障害時の扱い)で
+置き換えられました。現在は`MemoryContext.context`が検索時の`CoreError`（`MemoryQueryUnavailable`を含む）を
+空contextへ変換し、記憶なしで会話を継続します。会話の認可とpolicyの同一性・stampは引き続き検証し、
+cancelは伝播します。`MemoryService.search`を直接呼ぶ場合は空結果へ変換せず、従来どおりエラーを返します。
 
 ## 検証と残る範囲
 

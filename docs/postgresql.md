@@ -64,13 +64,15 @@ schema・password・scopeを指定する機能はありません。DB接続権�
 
 `PostgresDatabase(config).initialize()`は専用schemaを初期化し、History/Memory adapterの構築時にも
 同じ処理を使います。schema単位のtransaction advisory lockを取り、存在しなければschemaを作り、
-空schemaへtableとversion 2を原子的に登録します。turnの`stated_at`はnullableな`TIMESTAMPTZ`で、
+空schemaへtableとversion 4を原子的に登録します。turnの`stated_at`はnullableな`TIMESTAMPTZ`で、
 新規turn保存時のUTC日時を保存します。trustedコードでadapterの時計を注入でき、既定は保存時の
 現在時刻です。snapshotとEvidenceは保存値をUTCで復元します（[履歴API](history-api.md)）。
 
 既存Core schemaはtable集合・列名/型/null/default/identity・PK/FK/UNIQUE制約・versionを照合します。不一致や途中のschemaは拒否し、
-不正schemaを自動修復しません。正常なversion 1だけは旧列定義で厳密検証した後、同じtransactionで
-日時列追加・version 2への更新・新版検証を行います。旧turnの日時はNULLのまま補完せず、
+不正schemaを自動修復しません。正常なversion 1〜3は各版の定義で厳密検証した後、同じtransactionで
+必要な段階を経てversion 4へ移行し、各段階で新版を検証します。version 1→2で`turns.stated_at`、
+2→3で`turns.memory_confirmation`（既定値`{}`）、3→4で`turn_tombstones`・`turn_deletions`を追加します。
+version 1の旧turnの`stated_at`はNULLのまま補完せず、確認列追加時は既存行に`{}`を設定します。
 履歴・receipt・fingerprint・source epochを保持します。未知versionは拒否します。
 移行途中の失敗は列とversionをまとめてrollbackし、再実行できます。
 この確認を、DBの全設定・権限・任意の改変の監査とは扱いません。

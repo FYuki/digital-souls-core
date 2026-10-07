@@ -68,7 +68,10 @@ job作成後の追加削除も実行前・採用前に再検証します。再�
 満たせば新しく抽出できます。privateや保留の解除を削除操作から推測しません。
 往復通知のoutboxはSourceDeletionと別であり、記憶再構成の既存`memory_events` consumerへも接続します。
 
-SQLite schema v3へ原子的に移行し、v1/v2の履歴・receiptを保持します。
+SQLiteの`user_version`は、既存v1〜v5から必要な段階を経てv6へ同一transactionで原子的に移行し、履歴・receiptを保持します。
+v2でprivate・除外・archiveと`source_deletions`、v3でmemory epoch・記憶tableを追加します。
+v4で`turns.stated_at`、v5で`turns.memory_confirmation`（既定値`{}`）、
+v6で`turn_tombstones`・`turn_deletions`を追加します。v3以前の旧turnの`stated_at`はNULLのまま補完しません。
 private化はconversationのmemory epochを進め、履歴を保持しつつ派生memory本文を同一transactionでNULL化します。
 履歴削除も派生本文を同一transactionで消します。text index/cacheを別途保持しないため、そこからの復活はありません。
 ID・source refs・epoch・versionの最小tombstoneは残り、旧IDをactiveへ戻しません。
@@ -221,12 +224,13 @@ profile IDだけの変更も別の承認先と扱います。token/key/headerは
 userinfo/query/fragmentを含むURLは既存のProfile検証で拒否します。
 これは運用者が固定した設定の識別であり、endpoint背後の実プロセスやmodel digestの真正性保証ではありません。
 
-既存SQLite v3のversions JSONを拡張するため、DDL migrationや旧行の書き換えはありません。
+送信先識別は既存SQLiteのversions JSONを拡張するため、追加のDDL migrationや旧行の書き換えはありません。
 送信先識別を欠く旧jobは新設定と一致せず、再構築時にはclassifier/extractorへ送信する前に拒否され、
 既存のfailed終端化・後続処理へ進みます。現在のendpointを旧承認へ補完しません。
 旧active memoryの出典検証・検索と履歴データは維持しますが、再構築・抽出jobを再利用する際には
 現在のsource適格性とprivacyを満たす明示extractが必要です。
-既存v1/v2→v3 migrationとoutboxの原子性は変更せず、crash回帰も継続します。
+送信先識別の拡張ではschema migrationやoutboxの原子性は変更せず、crash回帰も継続します。
+現在のschemaは、上記の段階的migrationでv6へ移行します。
 
 
 再構築全体での本文取得前拒否は保証しません。runの設定比較より先に、
