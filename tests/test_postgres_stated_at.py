@@ -13,6 +13,7 @@ from digital_souls_core.history import ConversationControls, SourceReference
 from digital_souls_core.postgres_db import PostgresDatabase, key
 from digital_souls_core.postgres_history import PostgresHistory
 from digital_souls_core.postgres_memory import PostgresMemory, _evidence
+from digital_souls_core.postgres_schema import SCHEMA_VERSION
 
 from . import test_postgres_stores
 from .postgres_v1_fixture import V1_DDL
@@ -100,9 +101,7 @@ def test_naive_clock_rolls_back_and_valid_retry_saves_timestamp(stores: Stores) 
     assert history.read(BINDING, created.conversation_id).memory_sources[0].stated_at == FIRST
 
 
-def test_new_schema_is_v5_and_default_clock_is_current_utc(stores: Stores) -> None:
-    with stores.database.transaction(BINDING) as db:
-        assert db.execute("SELECT version FROM schema_version").fetchall() == [(5,)]
+def test_default_clock_is_current_utc(stores: Stores) -> None:
     cid = stores.history.create(BINDING).conversation_id
     before = datetime.now(UTC)
     stores.history.append(BINDING, cid, "r1", "fp", 0, MESSAGES, "stop")
@@ -117,11 +116,11 @@ def test_new_schema_is_v5_and_default_clock_is_current_utc(stores: Stores) -> No
     assert timestamp.utcoffset() == timedelta(0)
 
 
-def test_v1_migration_preserves_old_null_history_receipt_and_evidence(stores: Stores) -> None:
+def test_legacy_migration_preserves_old_null_history_receipt_and_evidence(stores: Stores) -> None:
     install_v1(stores)
     memory = PostgresMemory(PostgresDatabase(stores.config))
     with stores.database.transaction(BINDING) as db:
-        assert db.execute("SELECT version FROM schema_version").fetchall() == [(5,)]
+        assert db.execute("SELECT version FROM schema_version").fetchall() == [(SCHEMA_VERSION,)]
         assert db.execute("SELECT stated_at FROM turns").fetchall() == [(None,)]
     snapshot = memory.read(BINDING, CID)
     assert snapshot.messages == MESSAGES and snapshot.revision == 1
@@ -145,7 +144,7 @@ def test_v1_migration_preserves_old_null_history_receipt_and_evidence(stores: St
 
 
 @pytest.mark.parametrize("after", ["column", "version"])
-def test_v1_migration_interruption_rolls_back_and_retries(
+def test_legacy_timestamp_migration_interruption_rolls_back_and_retries(
     stores: Stores,
     monkeypatch: pytest.MonkeyPatch,
     after: str,
@@ -194,7 +193,7 @@ def test_v1_migration_interruption_rolls_back_and_retries(
     restored = PostgresMemory(PostgresDatabase(stores.config))
     assert restored.read(BINDING, CID).messages == MESSAGES
     with stores.database.transaction(BINDING) as db:
-        assert db.execute("SELECT version FROM schema_version").fetchall() == [(5,)]
+        assert db.execute("SELECT version FROM schema_version").fetchall() == [(SCHEMA_VERSION,)]
         assert db.execute("SELECT stated_at FROM turns").fetchall() == [(None,)]
 
 
@@ -212,10 +211,10 @@ def test_timestamp_schema_drift_is_rejected(stores: Stores, alteration: str) -> 
     with pytest.raises(CoreError):
         PostgresDatabase(stores.config).initialize()
     with stores.database.transaction(BINDING) as db:
-        assert db.execute("SELECT version FROM schema_version").fetchall() == [(5,)]
+        assert db.execute("SELECT version FROM schema_version").fetchall() == [(SCHEMA_VERSION,)]
 
 
-def test_malformed_v1_is_rejected_before_migration(stores: Stores) -> None:
+def test_malformed_legacy_schema_is_rejected_before_migration(stores: Stores) -> None:
     install_v1(stores)
     with stores.database.transaction(BINDING) as db:
         db.execute("ALTER TABLE conversations ALTER COLUMN private_mode SET DEFAULT true")

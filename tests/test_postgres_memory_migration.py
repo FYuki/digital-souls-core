@@ -959,7 +959,6 @@ async def test_legacy_job_without_destination_is_not_implicitly_upgraded(stores:
         await service.rebuild(BINDING)
     assert provider.calls == [] and service.store.pending(BINDING) == ()
     with stores.database.transaction(BINDING) as db:
-        assert db.execute("SELECT version FROM schema_version").fetchone() == (5,)
         assert db.execute(
             "SELECT versions,state FROM memory_jobs WHERE id=%s", (job.job_id,)
         ).fetchone() == (legacy_versions, "failed")

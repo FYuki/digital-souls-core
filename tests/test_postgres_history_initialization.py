@@ -9,6 +9,7 @@ from psycopg import sql
 from digital_souls_core.application import CoreError
 from digital_souls_core.postgres_db import _lock_key
 from digital_souls_core.postgres_memory import PostgresMemory
+from digital_souls_core.postgres_schema import SCHEMA_VERSION
 from digital_souls_core.storage import StorageConfig, open_storage
 
 from . import test_postgres_stores
@@ -95,13 +96,13 @@ PostgresHistory(PostgresDatabase(PostgresConfig.model_validate_json(sys.argv[1])
     restored = history(stores)
     assert restored.create(BINDING).revision == 0
     with stores.database.transaction(BINDING) as db:
-        assert db.execute("SELECT version FROM schema_version").fetchall() == [(5,)]
+        assert db.execute("SELECT version FROM schema_version").fetchall() == [(SCHEMA_VERSION,)]
         assert {
             row[0]
             for row in db.execute(
                 "SELECT tablename FROM pg_tables WHERE schemaname=%s", (stores.config.schema_name,)
             )
-        } == set(stores.database._tables(5))
+        } == set(stores.database._tables(SCHEMA_VERSION))
 
 
 def test_deleted_conversation_cannot_be_resurrected_by_late_append(stores: Stores) -> None:

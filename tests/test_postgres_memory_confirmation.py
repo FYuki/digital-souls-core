@@ -142,7 +142,7 @@ async def test_postgres_accept_rollback_preserves_memory_and_allows_retry(
 
 
 @pytest.mark.parametrize("timestamp", [None, FIRST])
-def test_postgres_v2_migration_keeps_old_dates_receipts_and_does_not_scan_history(
+def test_legacy_confirmation_migration_keeps_old_dates_receipts_and_does_not_scan_history(
     stores: Stores,
     timestamp: object,
 ) -> None:
