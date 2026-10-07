@@ -12,7 +12,7 @@ from digital_souls_core.privacy_scan import scan
 
 from . import postgres_memory_support
 from .postgres_memory_support import Stores, selection, setup, source
-from .test_privacy import BINDING
+from .privacy_support import BINDING
 
 stores = postgres_memory_support.stores
 pytestmark = pytest.mark.postgres

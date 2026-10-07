@@ -20,6 +20,7 @@ from digital_souls_core.privacy import PrivacyPolicy
 from digital_souls_core.privacy_classifier import LocalClassifier
 
 from . import postgres_memory_support
+from .conversation_support import turn
 from .postgres_memory_support import (
     Stores,
     assert_memoryless_turn,
@@ -29,9 +30,8 @@ from .postgres_memory_support import (
     setup,
     source,
 )
+from .privacy_support import BINDING, assessment, local_profile
 from .support import FakeProvider
-from .test_conversations import turn
-from .test_privacy import BINDING, assessment, local_profile
 
 stores = postgres_memory_support.stores
 pytestmark = pytest.mark.postgres

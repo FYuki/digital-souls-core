@@ -16,9 +16,9 @@ from digital_souls_core.privacy_classifier import LocalClassifier
 from digital_souls_core.privacy_scan import POLICY_VERSION
 
 from . import test_postgres_stores
+from .conversation_support import turn
 from .postgres_history_support import assert_text_absent, history
 from .support import CALL, TOOL, FakeProvider, character, chunk, completion
-from .test_conversations import turn
 from .test_postgres_stores import Stores
 
 pytestmark = pytest.mark.postgres

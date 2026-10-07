@@ -12,11 +12,11 @@ from digital_souls_core.postgres_history import PostgresHistory
 from digital_souls_core.postgres_memory import PostgresMemory
 
 from . import test_postgres_stores
-from .test_history_stated_at import FIRST
-from .test_memory_confirmation import make_harness
+from .memory_confirmation_contracts import make_harness
 from .test_postgres_stated_at import CID, install_v1
 from .test_postgres_stores import BINDING, Stores
-from .test_turn_deletion import delete_turns
+from .time_support import FIRST
+from .turn_deletion_contracts import delete_turns
 
 pytestmark = pytest.mark.postgres
 stores = test_postgres_stores.stores

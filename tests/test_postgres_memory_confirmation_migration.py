@@ -3,7 +3,7 @@
 import pytest
 
 from . import test_postgres_memory_confirmation
-from .test_memory_confirmation import Harness, complete
+from .memory_confirmation_contracts import Harness, complete
 
 stores = test_postgres_memory_confirmation.stores
 harness = test_postgres_memory_confirmation.harness

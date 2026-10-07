@@ -6,8 +6,8 @@
 ## 有効化と信頼境界
 
 組込み利用者が`create_app(inference, history_store=store, history_policy=policy)`へ
-HistoryStoreと信頼されたHistoryPolicyを注入します。SQLite実装は
-`digital_souls_core.sqlite_history.SQLiteHistory`です。policyなしでは全操作を既定拒否しますが、
+HistoryStoreと信頼されたHistoryPolicyを注入します。保存adapterは
+`digital_souls_core.postgres_history.PostgresHistory`です。[接続手順](postgresql.md)を参照してください。policyなしでは全操作を既定拒否しますが、
 同じscopeの削除は可能です。HTTPからpolicyを設定したり、安全と自己申告したりする機能はありません。
 単一のローカル利用者がloopback上で使用します。既存Host/Origin境界を適用します。
 
@@ -54,7 +54,7 @@ Coreは実行しません。不正な往復は400です。入力・設定が同�
 `stream: true`は上流streamをバッファし、完了・policy許可・commit後に
 SSEの`event: completed`（dataは上記成功オブジェクト）と`data: [DONE]`を返します。
 逐次token配送ではありません。provider完了後、保存直前にcancelの受付点を設けます。
-ASGIの`http.disconnect`をそこで観測済みなら保存せず、SQLite commit区間はawaitなしで実行します。
+ASGIの`http.disconnect`をそこで観測済みなら保存せず、PostgreSQL commit区間はawaitなしで実行します。
 実際のネットワーク切断時刻とASGI通知の到着時刻は同一とは限りません。
 commit後に到着した通知や配送失敗では保存済みreceiptが残ります。
 保存完了後に配送が途切れた場合は同じ本文とrequest IDで再試行してください。
@@ -76,7 +76,7 @@ policy欠落・判定不能・拒否は403、不明会話は404、上限超過�
 許可が撤回されていれば403とし、保存済みの内容を別の応答へ書き換えません。
 
 初回schemaのDDLとversion設定は単一transactionです。初期化途中にprocessが終了しても、
-SQLiteのrollback後に再初期化できます。未知のversion 0 DBや旧実装で残った部分schemaは
+PostgreSQLのrollback後に再初期化できます。未知のversionや部分schemaは
 自動修復・削除せず拒否します。既存データを識別せず上書きする移行は行いません。
 
 
@@ -111,19 +111,18 @@ conversation IDとtrusted scope/characterと組み合わせて参照します。
 DELETEは本文・receiptを消し、内容なしのsource削除通知を同じtransactionで残します。
 Stage3 consumer用Python portの`deletions(binding)`と`acknowledge_deletion(binding,event_id)`で処理します。
 scope違いの通知は取得・ackできません。通知のHTTP ackは公開しません。
-同じSQLite DBにある派生memory本文も同一transactionで消去します。再構成の完了とは別です。
+同じPostgreSQL schemaにある派生memory本文も同一transactionで消去します。再構成の完了とは別です。
 source参照自体は削除直後から無効です。
 
-SQLite schema v1/v2/v3/v4/v5からv6へ段階的に原子的移行します。schemaとversionを同じtransactionで
+PostgreSQL schema v1〜v4からv5へ段階的に原子的移行します。schemaとversionを同じtransactionで
 更新し、途中失敗はrollbackして再実行できます。履歴・receipt・fingerprintは保持し、旧turnの
 日時はNULLのままです。未知versionは引き続き拒否します。
 過去発話への後付け除外変更は未実装で、指定はcompletionの入力配列に対して行います。
 
-trusted構築コードから`SQLiteHistory(path, clock=clock)`または
-`PostgresHistory(database, clock=clock)`へ、timezone付きdatetimeを返す時計を注入できます。
+trusted構築コードから`PostgresHistory(database, clock=clock)`へ、timezone付きdatetimeを返す時計を注入できます。
 既定は保存時の現在UTC時刻です。新規turnごとに一度取得してUTCへ正規化し、timezoneなしの値は
 拒否します。再送・read・thread操作では取り直しません。HTTP入力から時計や日時は指定できません。
-両Memory adapterも同じ構築引数を使い、`Evidence.stated_at`には抽出時刻ではなく元turnの保存日時
+PostgresMemoryも同じ構築引数を使い、`Evidence.stated_at`には抽出時刻ではなく元turnの保存日時
 または`None`を渡します。source参照・epoch・jobの識別には日時を含めません。
 
 
@@ -194,7 +193,7 @@ falseは対象発話の保留だけを解除します。明示除外・private�
 対象にします。往復の選び方とtool対応による範囲の拡張は[往復単位の明示削除](#往復単位の明示削除)を
 参照してください。信号は案内だけで、AIやCoreが履歴を自動削除することはありません。
 
-SQLite v5 / PostgreSQL v3では独立したturnのmemory_confirmation列へ検出indexと回答を保存します。
+PostgreSQL v3では独立したturnのmemory_confirmation列へ検出indexと回答を保存します。
 旧turnの確認状態は空で、過去本文を再走査しません。旧NULL日時、既知日時、履歴、receipt、
 fingerprintを保持します。同じrequestの再送では回答後も元receiptの信号を返し、
 再推論・再保留しません。回答の通信失敗後はGETで未回答一覧と現在revisionを確認してください。
@@ -236,7 +235,7 @@ trusted Python portの`turn_deletions(binding)`は`TurnDeletion(event_id, conver
 重複ackは無作用です。HTTPのackはありません。既存SourceDeletionの`through_revision`は会話全体の
 削除だけに使い、その形と意味を維持します。
 
-SQLite v6・PostgreSQL v4で削除済み印と往復通知表を追加します。PostgreSQL v1〜v3は版別に既存schemaを
+PostgreSQL v4で削除済み印と往復通知表を追加します。PostgreSQL v1〜v3は版別に既存schemaを
 検証して移行します。DDL・version更新は原子的で、旧本文・日時（NULLを含む）・確認状態を変更しません。
 削除のrevision更新・印・対象派生本文のNULL化・通知・履歴DELETEも同一transactionです。
-SQLiteの`secure_delete`と保存先保護を維持します。途中失敗は全更新をrollbackし、再試行できます。
+途中失敗は全更新をrollbackし、再試行できます。

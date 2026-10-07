@@ -13,9 +13,9 @@ from digital_souls_core.conversations import Conversations
 from digital_souls_core.provider import LiteLLMProvider
 
 from . import test_postgres_stores
+from .conversation_support import SyntheticPolicy, turn
 from .postgres_history_support import assert_text_absent, history
 from .support import CALL, TOOL, chunk, completion
-from .test_conversations import SyntheticPolicy, turn
 from .test_llamacpp_provider import local_character
 from .test_postgres_stores import Stores
 from .test_sdk_stream_ownership import TrackedBytes

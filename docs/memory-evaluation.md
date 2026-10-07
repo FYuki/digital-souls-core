@@ -69,7 +69,7 @@ local modeではfixtureの偽vectorを品質値として使わず、実adapter�
 
 このハーネスは合成の候補・正解集合を直接扱います。`excluded_ids`の除去は評価入力の制御で、
 実際のprivate thread、発話除外、削除transaction、Binding、privacy分類の結合試験を置き換えません。
-これらはMemoryService/SQLiteのUT・IT1で別に検証します。正本の履歴DBを読み込む機能はありません。
+これらはMemoryService/PostgreSQLの`postgres` markerの合成試験で別に検証します。正本の履歴DBを読み込む機能はありません。
 `dataset_type=synthetic`というラベルだけで実データが安全になるわけではなく、私的実会話をfixtureへ転記しません。
 
 ## 指標の定義

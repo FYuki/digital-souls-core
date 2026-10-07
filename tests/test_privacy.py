@@ -1,72 +1,18 @@
 import asyncio
 import json
-from pathlib import Path
 from typing import Any
 
 import pytest
 
-from digital_souls_core.application import CoreError, Inference
-from digital_souls_core.character import AccessScope, Profile
-from digital_souls_core.contracts import CompletionInput, Message
-from digital_souls_core.conversations import Conversations
-from digital_souls_core.history import Binding, SourceReference
+from digital_souls_core.character import Profile
 from digital_souls_core.privacy import Permission, PrivacyPolicy
 from digital_souls_core.privacy_classifier import Assessment, LocalClassifier
 from digital_souls_core.privacy_scan import POLICY_VERSION, scan
-from digital_souls_core.sqlite_history import SQLiteHistory
 
-from .support import CALL, TOOL, FakeProvider, character, chunk, completion
-from .test_conversations import turn
+from .privacy_support import BINDING, assessment, local_profile
+from .support import CALL, FakeProvider, character, completion
 
 pytestmark = pytest.mark.it1
-BINDING = Binding(AccessScope(), "synthetic")
-
-
-def local_profile() -> Profile:
-    return Profile(
-        profile_id="privacy-local",
-        model="openai/gemma4-12b",
-        transport="llamacpp_chat",
-        api_base="http://127.0.0.1:18080/v1",
-        external_send_allowed=True,
-        allowed_parameters=frozenset({"stream", "tools", "max_completion_tokens"}),
-    )
-
-
-def assessment(**changes: Any) -> str:
-    return json.dumps(
-        {
-            "classification": "NOT_SENSITIVE",
-            "subject": "GENERAL",
-            "category": "NONE",
-            "policy_version": POLICY_VERSION,
-            **changes,
-        }
-    )
-
-
-def policy_setup(
-    tmp_path: Path, *, local: bool = True
-) -> tuple[Conversations, FakeProvider, FakeProvider, PrivacyPolicy]:
-    provider = FakeProvider()
-    classifier = FakeProvider()
-    classifier.response["choices"][0]["message"]["content"] = assessment()
-    policy = PrivacyPolicy(
-        LocalClassifier(classifier, local_profile(), model_digest="synthetic-digest")
-    )
-    policy.configure({BINDING: frozenset({"history", "local", "external", "memory"})})
-    char = character("synthetic")
-    if local:
-        char = type(char)(
-            char.config.model_copy(update={"profile": local_profile()}), char.system_prompt
-        )
-    inference = Inference((char,), provider, privacy=policy)
-    return (
-        Conversations(inference, SQLiteHistory(tmp_path / "private" / "db"), policy),
-        provider,
-        classifier,
-        policy,
-    )
 
 
 @pytest.mark.parametrize(
@@ -124,111 +70,6 @@ async def test_default_denial(permission: Permission) -> None:
     assert not await PrivacyPolicy().authorize(BINDING, permission, "safe")
 
 
-@pytest.mark.parametrize("where", ["user", "assistant", "tool_args", "tool_result", "schema"])
-async def test_secret_never_reaches_classifier_or_history(
-    tmp_path: Path, where: str, caplog: pytest.LogCaptureFixture
-) -> None:
-    service, provider, classifier, _ = policy_setup(tmp_path, local=False)
-    cid = service.create("synthetic").conversation_id
-    marker = "password: SYNTHETIC_ONLY"
-    body = turn()
-    if where == "user":
-        body = turn(messages=[{"role": "user", "content": marker}])
-    elif where == "assistant":
-        provider.response["choices"][0]["message"]["content"] = marker
-    elif where == "tool_args":
-        provider.response = completion(tool=True)
-        provider.response["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] = (
-            json.dumps({"password": "SYNTHETIC_ONLY"})
-        )
-        body = turn(tools=[TOOL])
-    elif where == "tool_result":
-        provider.response = completion(tool=True)
-        await service.complete("synthetic", cid, turn(tools=[TOOL]))
-        classifier.calls.clear()
-        provider.calls.clear()
-        body = turn(
-            request_id="r2",
-            expected_revision=1,
-            tools=[TOOL],
-            messages=[{"role": "tool", "tool_call_id": CALL["id"], "content": marker}],
-        )
-    else:
-        tool = json.loads(json.dumps(TOOL))
-        tool["function"]["description"] = marker
-        body = turn(tools=[tool])
-    before = service.read("synthetic", cid)
-    with pytest.raises(CoreError) as error:
-        await service.complete("synthetic", cid, body)
-    assert "SYNTHETIC_ONLY" not in str(error.value) + caplog.text
-    assert service.read("synthetic", cid) == before
-    assert service.store.receipt(BINDING, cid, body.request_id) is None
-    for _, payload in classifier.calls:
-        assert "SYNTHETIC_ONLY" not in json.dumps(payload)
-    for file in (tmp_path / "private").iterdir():
-        assert b"SYNTHETIC_ONLY" not in file.read_bytes()
-
-
-@pytest.mark.parametrize(
-    "instruction", ["覚えないで", "do not remember", "保存しないで", "履歴に残さないで"]
-)
-async def test_natural_language_does_not_change_operation_scope(
-    tmp_path: Path, instruction: str
-) -> None:
-    service, _, classifier, policy = policy_setup(tmp_path)
-    cid = service.create("synthetic").conversation_id
-    body = turn(messages=[{"role": "user", "content": instruction}], memory_excluded_indices=[0])
-    assert (await service.complete("synthetic", cid, body)).revision == 1
-    # The caller selects the exact utterance through API metadata. Text alone is not a command.
-    assert classifier.calls == []
-    assert await policy.authorize(BINDING, "memory", instruction)
-
-
-@pytest.mark.parametrize(
-    "instruction", ["覚えないで", "do not remember", "保存しないで", "履歴に残さないで"]
-)
-async def test_natural_language_without_exclusion_holds_source_for_confirmation(
-    tmp_path: Path, instruction: str
-) -> None:
-    service, _, _, _ = policy_setup(tmp_path)
-    cid = service.create("synthetic").conversation_id
-    body = turn(messages=[{"role": "user", "content": instruction}])
-    assert body.memory_excluded_indices == []
-    assert (await service.complete("synthetic", cid, body)).revision == 1
-    snapshot = service.read("synthetic", cid)
-    assert snapshot.messages[0].content == instruction
-    source = SourceReference(cid, 1, 0)
-    assert snapshot.memory_sources[0].reference == source
-    assert not snapshot.memory_sources[0].eligible
-    assert not service.store.source_eligible(BINDING, source)
-    assert not snapshot.private_mode
-
-
-async def test_local_external_memory_permissions_and_sensitive_history(tmp_path: Path) -> None:
-    service, _, classifier, policy = policy_setup(tmp_path)
-    policy.configure({BINDING: frozenset({"history", "local"})})
-    cid = service.create("synthetic").conversation_id
-    text = "合成人物として、治療について不安を感じています"
-    await service.complete("synthetic", cid, turn(messages=[{"role": "user", "content": text}]))
-    assert classifier.calls == []
-    assert not await policy.authorize(BINDING, "external", text)
-    assert not await policy.authorize(BINDING, "memory", text)
-    policy.configure({BINDING: frozenset({"external", "memory"})})
-    assert not await policy.authorize(
-        BINDING, "external", text
-    )  # Classifier also needs local consent.
-    assert classifier.calls == []
-    policy.configure({BINDING: frozenset({"local", "external", "memory"})})
-    classifier.response["choices"][0]["message"]["content"] = assessment(
-        classification="SENSITIVE", category="HEALTH", subject="SELF"
-    )
-    assert not await policy.authorize(BINDING, "external", text)
-    assert not await policy.authorize(BINDING, "memory", text)
-    assert not await policy.authorize(
-        Binding(AccessScope(client="other"), "synthetic"), "local", "safe"
-    )
-
-
 @pytest.mark.parametrize(
     "raw",
     [
@@ -263,78 +104,6 @@ async def test_classifier_secret_exception_and_missing_policy(
     assert "SYNTHETIC_ONLY" not in caplog.text
     with pytest.raises(ValueError):
         LocalClassifier(provider, character().config.profile, model_digest="synthetic")
-
-
-async def test_revocation_during_classifier_wait(tmp_path: Path) -> None:
-    service, _, _, policy = policy_setup(tmp_path, local=False)
-    started, release = asyncio.Event(), asyncio.Event()
-
-    class Waiting:
-        async def safe(self, value: object, policy_version: str) -> bool:
-            started.set()
-            await release.wait()
-            return True
-
-    policy.classifier = Waiting()
-    task = asyncio.create_task(
-        service.inference.prepare(
-            "synthetic",
-            CompletionInput(messages=[Message(role="user", content="safe")]),
-            alias=False,
-        )
-    )
-    await started.wait()
-    policy.configure({})
-    release.set()
-    with pytest.raises(CoreError):
-        await task
-
-
-async def test_retry_and_output_recheck_current_grants(tmp_path: Path) -> None:
-    service, provider, _, policy = policy_setup(tmp_path)
-    cid = service.create("synthetic").conversation_id
-    first = await service.complete("synthetic", cid, turn())
-    assert await service.complete("synthetic", cid, turn()) == first
-    assert len(provider.calls) == 1
-    policy.configure({BINDING: frozenset({"local"})})
-    with pytest.raises(CoreError):
-        await service.complete("synthetic", cid, turn())
-    service.delete("synthetic", cid)
-
-
-async def test_stream_secret_split_never_saved(tmp_path: Path) -> None:
-    service, provider, _, _ = policy_setup(tmp_path)
-    cid = service.create("synthetic").conversation_id
-    provider.chunks = [chunk({"content": t}) for t in ("pass", "word", ": SYNTHETIC_ONLY")] + [
-        chunk({}, "stop")
-    ]
-    with pytest.raises(CoreError):
-        await service.complete("synthetic", cid, turn(stream=True))
-    assert service.read("synthetic", cid).messages == () and provider.closed
-
-
-@pytest.mark.parametrize("source", ["system", "lore", "context"])
-async def test_actual_payload_injection_blocked(tmp_path: Path, source: str) -> None:
-    from digital_souls_core.character import Character, Lore
-
-    service, provider, classifier, _ = policy_setup(tmp_path, local=False)
-    old = service.inference.characters["synthetic"]
-    marker = "password: SYNTHETIC_ONLY"
-    char = Character(
-        old.config,
-        marker if source == "system" else old.system_prompt,
-        (Lore(("Synthetic",), (), False, marker),) if source == "lore" else (),
-    )
-
-    class Context:
-        async def context(self, character: Character, scope: AccessScope, user_text: str) -> str:
-            return marker if source == "context" else ""
-
-    inference = Inference((char,), provider, Context(), privacy=service.inference.privacy)
-    with pytest.raises(CoreError):
-        await inference.prepare("synthetic", CompletionInput(messages=turn().messages), alias=False)
-    assert provider.calls == []
-    assert all("SYNTHETIC_ONLY" not in json.dumps(p) for _, p in classifier.calls)
 
 
 @pytest.mark.parametrize("mode", ["timeout", "cancel", "length", "multiple", "tool"])
@@ -408,48 +177,6 @@ async def test_classifier_existing_sdk_transport(monkeypatch: pytest.MonkeyPatch
     assert sent[0]["response_format"]["type"] == "json_schema"
     assert sent[0]["response_format"]["json_schema"]["schema"] == Assessment.model_json_schema()
     assert "SYNTHETIC_CLOUD_SECRET" not in json.dumps(sent)
-
-
-async def test_policy_replacement_prevents_context_lookup(tmp_path: Path) -> None:
-    from digital_souls_core.character import Character
-
-    service, provider, _, policy = policy_setup(tmp_path, local=False)
-    started, release = asyncio.Event(), asyncio.Event()
-    looked_up: list[str] = []
-
-    class Waiting:
-        async def safe(self, value: object, policy_version: str) -> bool:
-            started.set()
-            await release.wait()
-            return True
-
-    class Context:
-        async def context(self, character: Character, scope: AccessScope, user_text: str) -> str:
-            looked_up.append(user_text)
-            return ""
-
-    policy.classifier = Waiting()
-    service.inference.context = Context()
-    task = asyncio.create_task(
-        service.inference.prepare(
-            "synthetic", CompletionInput(messages=turn().messages), alias=False
-        )
-    )
-    await started.wait()
-    service.inference.privacy = PrivacyPolicy()
-    release.set()
-    with pytest.raises(CoreError):
-        await task
-    assert looked_up == [] and provider.calls == []
-
-
-async def test_history_policy_cannot_be_disconnected(tmp_path: Path) -> None:
-    service, provider, _, _ = policy_setup(tmp_path)
-    cid = service.create("synthetic").conversation_id
-    service.inference.privacy = None
-    with pytest.raises(CoreError):
-        await service.complete("synthetic", cid, turn())
-    assert provider.calls == []
 
 
 @pytest.mark.parametrize(

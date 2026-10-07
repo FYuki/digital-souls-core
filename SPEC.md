@@ -20,7 +20,7 @@ ADRの決定を機能単位に整理します。
 - 記憶・人格はBinding（subject・client・audience・character）で分離し、別Bindingの情報を混ぜません。
 - privacyはfail-closedです。判定できない場合は保存・検索・送信をしません。ただし記憶の障害で会話は止めません。
 - 履歴・記憶の保存先はPostgreSQLへ一本化します（[ADR 0021](docs/adr/0021-postgresql-only-storage.md)）。
-  SQLiteは廃止予定で、撤去までは現状維持とし、新機能はPostgreSQLのみへ追加します。
+  SQLiteは撤去済みです。ローカルでもDockerのPostgreSQLを使います。
 - 1つのスレッドを長く使う利用を想定します。
 - 長期記憶の登録を有効にした状態で会話したことを、保存への同意として扱います。製品として配布・販売する場合は、
   初回の画面でプライバシーポリシーの提示と同意の取得を行います。
@@ -47,7 +47,7 @@ revision排他付き回答APIを提供します。受入はprivate化・派生�
 契約は[履歴API](docs/history-api.md#保存拒否の確認)に記載します。
 
 往復単位の削除では、明示APIによる「選択した往復だけ」「選択した往復以降すべて」の削除を
-SQLite・PostgreSQLで提供します。tool対応がまたがる往復をまとめて物理削除し、
+PostgreSQLで提供します。tool対応がまたがる往復をまとめて物理削除し、
 削除済みrequest IDの再送と旧revisionでの推論commitを拒否します。対象往復を出典に持つ記憶だけを
 撤回し、残る適格出典から再構成します。対象外の後続往復と新規往復は引き続き記憶形成に使えます。
 日時・確認状態と既存の会話全体削除・通知を維持します。詳細は
@@ -180,7 +180,7 @@ Coreの実装Issueへ移して管理します。
 
 1. 既存の逐語記憶の削除、履歴へのstated_at追加とタイムゾーン設定（以後の日時の前提）
 2. 検索障害時の会話継続、PoC互換の順位、保存拒否の語の検出と確認の信号、会話往復単位の削除
-3. Episode・Fact・SemanticのPostgreSQL正本schemaと契約試験（SQLite版とデータ移送は行わない）
+3. Episode・Fact・SemanticのPostgreSQL正本schemaと契約試験（データ移送は行わない）
 4. 型付きの保存判定と、構造化Candidateの抽出・検証
 5. 形成jobの永続予約と非同期形成、同一スレッドのFact照合・更新
 6. TOUCHとlast_user_mentioned_at、期間検索、語彙・自己申告の補完、矛盾の注意

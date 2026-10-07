@@ -2,6 +2,8 @@
 
 Status: Accepted
 
+SQLiteの撤去は Epic #79（[Issue #88](https://github.com/FYuki/digital-souls-core/issues/88)）で完了しました。以下の決定・影響は決定時点の履歴です。
+
 日付: 2026-10-07
 
 Accepted日: 2026-10-07

@@ -6,7 +6,7 @@ from digital_souls_core.application import CoreError
 
 from . import postgres_memory_support
 from .postgres_memory_support import Stores, reopen, selection, setup, source
-from .test_privacy import BINDING
+from .privacy_support import BINDING
 
 stores = postgres_memory_support.stores
 pytestmark = pytest.mark.postgres
