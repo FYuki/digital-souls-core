@@ -2,9 +2,15 @@
 
 ファイル名は`NNNN-short-title.md`とし、Status（Proposed / Accepted / Superseded）、
 日付、背景、選択肢、決定、影響、関連Issue・PR・証跡のリンクを記載します。
-Acceptedにする際はレビューでの決定を参照してください。
+Statusは次の方針で扱います。
+
+- Proposed：合意・レビュー前の提案。
+- Accepted：ユーザーとの合意またはレビューでの決定を参照し、合意の日付とAcceptedにした日付を記載します。
+- Superseded：新しいADRで置き換えた決定。置換先を参照します。
+
 履歴を黙って書き換えず、新しい記録で以前の決定を置き換えます。
-今回の初期整備では、製品アーキテクチャの決定は承認していません。
+ADR 0001〜0012はレビューの機会がなかったため、Proposedのままです。
+ADR 0015〜0020は、2026-10-06のユーザー決定とPR #67のレビューを根拠に、2026-10-07にAcceptedとしました。
 
 - [ADR 0004: 明示的な会話履歴の永続化](0004-conversation-history.md)
 - [ADR 0008: 管理された分類器・抽出器の構造化出力](0008-managed-structured-output.md)
@@ -22,3 +28,4 @@ Acceptedにする際はレビューでの決定を参照してください。
 - [ADR 0018: 記憶の検索と会話での利用](0018-memory-retrieval-context.md)
 - [ADR 0019: 記憶の訂正・時間変化・矛盾・削除と失効](0019-memory-correction-invalidation.md)
 - [ADR 0020: 内省・人格・関係・生活状態と記憶の接続](0020-reflection-personality-relationship.md)
+- [ADR 0021: SQLiteを廃止しPostgreSQLへ一本化する](0021-postgresql-only-storage.md)

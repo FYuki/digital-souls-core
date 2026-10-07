@@ -8,10 +8,13 @@
 
 trusted Python起動コードで、履歴と同じ保存先のMemoryStore、同じ`PrivacyPolicy`、
 検証済みlocal Profileを持つ`LocalClassifier`/`LocalExtractor`を構成します。
-保存先は`SQLiteMemory`、または明示選択の[PostgreSQL backend](postgresql.md)です。
+保存先は[PostgreSQL backend](postgresql.md)へ一本化します（[ADR 0021](adr/0021-postgresql-only-storage.md)）。
+`SQLiteMemory`は廃止予定で、撤去までは現状維持とし、新機能を追加しません。
 [意味検索との統合例](semantic-postgresql-integration.md)でも、接続と記憶抽出は明示操作です。
 memoryのHTTP操作やscope自己申告fieldは追加しません。利用者のsubject/client/audience/characterは
 `Binding`に固定されます。別Bindingのsource・job・memory・通知を照合できません。
+
+以下は撤去前のSQLite adapterを使う既存の接続例です。
 
 ```python
 from digital_souls_core.local_extractor import LocalExtractor
@@ -240,3 +243,87 @@ consume/rebaseの適格性確認が_current/_sourceを通じてSQLite内の本�
 ## 管理された構造化出力
 
 分類器・抽出器は固定JSON Schemaをproviderへ渡し、返却値のstrict検証を維持します。未対応・不正出力は拒否し、制約なしの再試行は行いません。schema・対応契約・SDK versionも承認provenanceに含むため、旧承認は自動的に引き継ぎません。[ADR 0008](adr/0008-managed-structured-output.md)を参照してください。
+
+## 記憶の正本のdomain契約
+
+[記憶の種別・正本・日時](adr/0016-memory-kinds-and-records.md)に対応する保存非依存の値型を
+`digital_souls_core.memory_records` に定義します。既存の逐語記憶の型・挙動は維持します。
+`Episode` は経験の5W・日時・仮定/創作の文脈を持ち、`Fact` は呼出し側が採番した安定IDの内容一版です。
+`Episode` / `Fact` の各版は保存文と引用を独立して保持します。
+`EpisodeFactLink` は両者のID・版付き参照を持ち、保存文や最終言及日時を持ちません。
+`Semantic` は構造化命題と適用時期を持ち、直接抽出はuser引用を必須とします。
+経験からの形成は同一Episode IDの出典をまとめ、互いに素な `SourceReference` 集合を持つ
+Episodeが2件以上なければ拒否します。元発言のepochや引用範囲の違いは独立性を増やしません。
+
+`Citation` はBinding・既存の `SourceVersion`・話者・message内の半開文字範囲 `[start, end)` を
+結び付け、元の本文をコピーしません。5Wは述語を必須とし、不明な項目を補いません。
+`ExplicitReason` は明示された理由と引用を持ちます。`PartialDateTime` / `TemporalValue` は
+部分日時の精度、単一の点、同じ精度の端点の範囲、不明、解釈時のタイムゾーンを保持します。
+月精度で日を埋めず、未知の日時は `TemporalValue()` として明示します。
+
+全記録にID・1以上の整数版・Binding・tz-awareな登録日時・ACTIVE/SUSPENDEDの状態を持たせます。
+`Episode` / `Fact` / `Semantic` はさらに非空の保存文とtz-awareな最終言及日時（不明可）を持ちます。
+別Bindingの引用・参照や不正な値は生成時に拒否し、本文・構造化内容をreprに出しません。
+`RecordRef` と純粋関数
+`dependency_invalidated` は、現在の種別・ID・Binding・版・有効状態が一致する場合だけ依存先を
+有効と判定します。参照先が存在しない場合や版が一致しない場合も失効です。本文消去後も `RecordHead`（参照と状態だけの値）で判定できます。
+
+これらは構造の契約です。保存portでの現在版・適格性・引用・Episode出典集合の照合、
+旧版保持と撤回時の本文消去は次節のadapterで扱います。抽出・保存文の生成は後続の実装で扱います。
+
+
+## 記憶の正本の保存port
+
+storage非依存の `memory_record_store.MemoryRecordStore` は、前節の値型だけで入出力します。
+PostgreSQL実装は `postgres_memory_records.PostgresMemoryRecords`、物理設計は
+[PostgreSQL schema version 5](postgresql.md#正本記憶のschemaversion-5)を参照してください。
+このportはtrusted callerが形成・保存判定を済ませた記録を保存します。推論・privacy分類・保存文生成や
+HTTP API、検索切替、Fact照合・統合、Reflection、残る根拠からの再構成は実装しません。
+
+| API | 契約 |
+| --- | --- |
+| `register(binding, batch, formation_version)` | `RecordBatch` のEpisode・`FactWrite`・参照・Semanticを同じtransactionで登録し、`tuple[RecordRef, ...]` を返す |
+| `get(binding, kind, record_id, version=None)` | 有効記録を前節の型へ復元。Factは現在版、指定時は有効な旧内容版も取得可能。欠落・別Binding・停止済みはNone |
+| `list(binding, kind)` | Binding内の有効な現在版のtuple（登録順） |
+| `head(binding, kind, record_id)` | 停止済みを含む本文なしの `RecordHead`。欠落・別BindingはNone |
+| `affected(binding, event_id)` | 撤回イベントの影響記録（各版）の本文なしの `tuple[RecordRef, ...]`。既存consumerのconsume後も対応を保持 |
+
+新しいIDは版1・ACTIVEだけを受け付けます。`FactWrite(fact, expected_version=None)` は新規登録、
+既存Factには期待する現在の内容版を必須とし、その次の整数版だけを追加できます。
+更新は安定したfact_idを保持し、旧版の保存文・5W・対象日時・引用を独立して保持します。
+同じBindingのtransaction lockにより履歴操作と登録、並行再試行とFact更新を直列化します。
+別Bindingの入力・参照・根拠Episodeや、欠落・不正な版・停止済みの参照先は拒否します。
+EpisodeEvidenceの出典集合は参照先Episodeの引用のSourceReference集合と一致する必要があります。
+
+登録直前に、全引用（5Wの明示理由と根拠Episodeの引用も含む）の出典を履歴へ照合します。
+turn revision・epoch、履歴本文の存在、private・除外・確認保留状態、話者と半開文字範囲を検証します。
+保存拒否の確認を断った発話は既存の確認契約に従い対象へ戻せます。
+assistant等の引用も履歴側で適格な場合だけ保存できます。直接抽出Semanticのuser引用必須条件は維持します。
+引用は元本文を複写せず、話者・文字範囲を参照します。登録に失敗すると途中の記録・引用・冪等対応も残りません。
+
+冪等キーはBinding、登録の全引用（出典参照・epoch・文字範囲・話者）の正規化集合、呼出し側の
+形成version文字列、リンクがある場合は各リンクの両端の組（episodeとfactのRecordRef、本文なしのアドレス）
+の正規化集合から作ります。組の集合は並び順や重複に左右されず、組の中のepisodeとfactの区別を保ちます。
+根拠として参照する既存Episodeの引用も含み、生本文をキー材料にしません。
+同じキーかつ正規化した登録内容が同一なら元の参照を返し、異なれば409の衝突です。
+引用・根拠・登録の集合の並び順や引用の重複は一致判定を変えません。
+本文を保存する再試行台帳を作らず、比較用ダイジェストと結果の参照だけを保持します。
+撤回で結果に含む記録が一つでも停止した登録は、本文由来の比較ダイジェストもNULLにします。
+登録行・冪等キー・本文なしの結果参照は残し、同じキーの再試行は内容にかかわらず409で拒否します。
+NULLのダイジェストを新規登録として扱ったり、旧記録を復活させたりしません。
+再試行でも出典と既存結果の有効性を確認し、停止した結果を返したり再有効化したりしません。
+
+Episodeの経験日時、Factの各版の対象日時、Semanticの適用時期はJSONBと型付き範囲を持ちます。
+範囲は `[開始, 終了)`。開始は始点の精度の期間の最初、終了は終点（なければ始点）の精度の期間の次です。
+精度列は始点の精度で、JSONBの欠損成分は補完しません。始点なしは3列ともNULL、timezoneなしは
+開始・終了だけNULLです。timezone名はzoneinfoで解決し、不正な名前や表現不能な範囲は登録を拒否します。
+
+既存の会話削除・private化・往復削除は、同じtransactionで新正本も停止します。
+撤回した出典を引用するEpisode・Semantic、Fact全体の全版を停止し、保存文・5W・日時・命題のJSONB・
+型付き日時範囲・experienced_atをNULLにします。ID・引用アドレス・参照・登録日時等の本文なしの情報を残します。
+依存するEpisodeFactLinkと、撤回されたEpisodeを根拠にするSemanticも停止し、Semantic本文を消去します。
+停止記録の各版を既存の撤回イベントへ紐付け、consumerの処理状況にかかわらず即時に取得を止めます。
+直接・依存の影響記録を結果に含む登録の比較ダイジェスト消去も同じtransactionで行い、
+撤回が中断した場合は履歴・本文・イベント・ダイジェストをすべてrollbackします。無関係な登録は保持します。
+再有効化するAPIはなく、停止IDでの再登録・Fact版追加・冪等再試行も拒否します。
+既存の逐語記憶・consume・検索・SQLite adapterは維持し、期間検索の索引は追加しません。

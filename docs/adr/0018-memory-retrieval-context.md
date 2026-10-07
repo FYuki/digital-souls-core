@@ -1,8 +1,13 @@
 # ADR 0018: 記憶の検索と会話での利用
 
-Status: Proposed
+Status: Accepted
 
 日付: 2026-10-06
+
+Accepted日: 2026-10-07
+
+根拠: 2026-10-06のユーザー決定（[SPEC §4.1の決定表](../../SPEC.md#41-決定済み2026-10-06のユーザー決定)）と
+[PR #67](https://github.com/FYuki/digital-souls-core/pull/67)のレビュー。
 
 ## 背景
 

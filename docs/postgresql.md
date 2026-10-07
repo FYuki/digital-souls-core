@@ -1,6 +1,8 @@
 # 明示選択するPostgreSQL backend
 
-履歴・記憶の保存先をtrusted起動コードでSQLiteまたはPostgreSQLへ切り替えます。
+履歴・記憶の保存先はPostgreSQLへ一本化します（[ADR 0021](adr/0021-postgresql-only-storage.md)）。
+SQLiteは廃止予定で、撤去までは既存adapterを現状維持とし、新機能を追加しません。
+PostgreSQLへの接続はtrusted起動コードで明示します。
 PostgreSQLは空の専用schemaを初期化して使います。既存のSQLiteからデータを移す機能はありません。
 通常の`create_app()`は保存無効のままで、設定ファイルを置いただけでは接続・保存・記憶抽出を始めません。
 設計は[ADR 0012](adr/0012-postgresql-storage.md)を参照してください。
@@ -26,9 +28,9 @@ stores = open_storage(config)
 # MemoryService(stores.memory, policy, extractor)
 ```
 
-`StorageConfig.backend`は必須です。`sqlite`では任意の`sqlite_path`、`postgresql`では`postgres`を
+現行実装では`StorageConfig.backend`は必須です。撤去前の`sqlite`では任意の`sqlite_path`、`postgresql`では`postgres`を
 指定します。型の暗黙変換や未知field、backendと整合しない設定は拒否します。
-SQLiteを選ぶ場合も、既存のGit外保存先・POSIX権限・symlink拒否等の条件を維持します。
+撤去前のSQLite adapterは、既存のGit外保存先・POSIX権限・symlink拒否等の条件を維持します。
 
 `StorageStores`は同じbackendのhistory/memory portをまとめて返します。historyとmemoryを別DBへ
 任意に分ける設定は提供しません。`open_storage`の明示呼出しにはDB初期化の副作用がありますが、
@@ -64,14 +66,14 @@ schema・password・scopeを指定する機能はありません。DB接続権�
 
 `PostgresDatabase(config).initialize()`は専用schemaを初期化し、History/Memory adapterの構築時にも
 同じ処理を使います。schema単位のtransaction advisory lockを取り、存在しなければschemaを作り、
-空schemaへtableとversion 4を原子的に登録します。turnの`stated_at`はnullableな`TIMESTAMPTZ`で、
+空schemaへtableとversion 5を原子的に登録します。turnの`stated_at`はnullableな`TIMESTAMPTZ`で、
 新規turn保存時のUTC日時を保存します。trustedコードでadapterの時計を注入でき、既定は保存時の
 現在時刻です。snapshotとEvidenceは保存値をUTCで復元します（[履歴API](history-api.md)）。
 
 既存Core schemaはtable集合・列名/型/null/default/identity・PK/FK/UNIQUE制約・versionを照合します。不一致や途中のschemaは拒否し、
-不正schemaを自動修復しません。正常なversion 1〜3は各版の定義で厳密検証した後、同じtransactionで
-必要な段階を経てversion 4へ移行し、各段階で新版を検証します。version 1→2で`turns.stated_at`、
-2→3で`turns.memory_confirmation`（既定値`{}`）、3→4で`turn_tombstones`・`turn_deletions`を追加します。
+不正schemaを自動修復しません。正常なversion 1〜4は各版の定義で厳密検証した後、同じtransactionで
+必要な段階を経てversion 5へ移行し、各段階で新版を検証します。version 1→2で`turns.stated_at`、
+2→3で`turns.memory_confirmation`（既定値`{}`）、3→4で`turn_tombstones`・`turn_deletions`、4→5で下記の正本表を追加します。
 version 1の旧turnの`stated_at`はNULLのまま補完せず、確認列追加時は既存行に`{}`を設定します。
 履歴・receipt・fingerprint・source epochを保持します。未知versionは拒否します。
 移行途中の失敗は列とversionをまとめてrollbackし、再実行できます。
@@ -125,3 +127,47 @@ Unix socketで接続し、通常の品質ゲートと区別して実DB結果を�
 
 PostgreSQLの管理運用、dogfoodへの切替、既存SQLite移行、私的実会話import、実モデル評価は対象外です。
 backend試験の成功をこれらの完了として扱わず、正確なrevision・環境・結果は日付付き証跡に残します。
+
+
+## 正本記憶のschema（version 5）
+
+`MemoryRecordStore` の PostgreSQL 実装は `PostgresMemoryRecords(database)` で明示構築します。
+既存のhistoryと同じ `PostgresDatabase` を渡します。`open_storage`・逐語記憶の `MemoryStore`・
+検索経路の注入は変更しません。domain契約と操作は[記憶の正本](memory.md#記憶の正本の保存port)を参照してください。
+
+各新表の `seq` は BIGINT identity / UNIQUE、`binding` は NOT NULL TEXT です。
+記録表の共通列は `id`（TEXT）、`version`（INTEGER、1以上）、`state`（active / suspended）、
+`created_at`（TIMESTAMPTZ、NOT NULL）。本文表の共通列は `normalized_text`（nullable TEXT）、
+`last_user_mentioned_at`（nullable TIMESTAMPTZ）です。本文消去後もID・版・状態・登録日時を保持します。
+日時の範囲列は `time_start` / `time_end`（nullable TIMESTAMPTZ）と
+`time_precision`（nullable TEXT、year / month / day / hour / minute / second）です。
+
+| 表 | 共通列以外の列と型 | 主キー・参照 |
+| --- | --- | --- |
+| `memory_episodes` | 本文共通列、`five_w` / `experience_time`（nullable JSONB）、`experienced_at`（nullable TIMESTAMPTZ）、`context`（actual / hypothetical / fiction）、日時範囲列 | binding + id。binding + id + versionもUNIQUE |
+| `memory_facts` | Fact head。記録共通列だけを持つ | binding + id。versionは現在の内容版 |
+| `memory_fact_versions` | 本文共通列、`five_w` / `target_time`（nullable JSONB）、日時範囲列 | binding + id + version。Fact headへのbinding付きFK |
+| `memory_episode_fact_links` | `episode` / `fact`（TEXT）、`episode_version` / `fact_version`（INTEGER） | binding + id。両正本のID・版へbinding付きFK |
+| `memory_semantics` | 本文共通列、`formation_type`（direct_extraction / experience_derived）、`proposition` / `applicability`（nullable JSONB）、日時範囲列 | binding + id。binding + id + versionもUNIQUE |
+| `memory_semantic_episodes` | `semantic` / `episode`（TEXT）、`semantic_version` / `episode_version`（INTEGER） | binding + 両ID・版。両正本へbinding付きFK |
+| `memory_record_citations` | `record_kind` / `record_id`、`version`、nullableな`episode` / `fact` / `semantic`、`conversation`、`revision`、`position`、`epoch`、`speaker`、`citation_role`、`start_offset` / `end_offset` | binding + 所属記録の種別・ID・版 + 出典参照・epoch・話者・用途・文字範囲。所属正本へbinding付きFK |
+| `memory_event_records` | `event`、`record_kind` / `record_id`、`version`、nullableな`episode` / `fact` / `semantic` / `link` | binding + event + 種別・ID・版。撤回イベントと正本へbinding付きFK |
+| `memory_record_registrations` | `id`（引用集合と形成versionから作る冪等キー）、`request_digest`（正規化した登録内容の比較用nullable TEXT）、`results`（本文を含まない参照配列、NOT NULL JSONB） | binding + id |
+
+`memory_record_registrations.request_digest` は本文由来の比較値なので、撤回時に、直接・依存の
+影響記録のいずれかを `results` に含む登録行でNULLにします。Factは停止した全版を照合します。
+消去は履歴・正本本文・撤回イベントと同じtransactionで、途中の失敗時はすべてrollbackします。
+登録行・冪等キー・本文なしの結果参照は保持し、NULLのダイジェストを持つキーの再試行は
+内容にかかわらず拒否します。新規扱いや復活はせず、無関係な登録のダイジェストは保持します。
+
+記録の版、引用のrevision・epoch・文字範囲、enum値、日時範囲、引用と影響記録の所属種別にCHECKを置きます。
+引用表の `citation_role` は record / reason（5Wの明示理由）で、両者とも出典検証・撤回の対象です。
+所属正本のFKは、対応する nullable ID 列のうち一つだけが `record_id` と一致するCHECKと組み合わせます。
+履歴を削除しても引用の出典アドレスを保持するため、引用から履歴へのCASCADE FKは置きません。
+`memory_events` に binding + id のUNIQUEを追加し、影響記録の別Bindingへのevent参照も拒否します。
+型付き日時範囲とJSONBの対応はadapterで算出し、契約試験で照合します。期間検索の索引は追加しません。
+
+4→5は既存表の行を変更せず、履歴・逐語記憶・確認状態・往復削除の印を保持します。
+新版の新規作成と、各旧版の厳密検証・段階移行・新版の厳密検証は一つのtransactionです。
+新表も `TABLE_COLUMNS`・型/null/default/identity・PK/UNIQUE/FK/CHECK・relation集合で検証し、
+不正schemaを自動修復しません。途中失敗はDDLとversionをrollbackし、再試行できます。
