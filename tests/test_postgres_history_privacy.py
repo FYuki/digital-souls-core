@@ -2,51 +2,27 @@
 
 import asyncio
 import json
-from typing import Any
 
 import pytest
 
 from digital_souls_core.application import CoreError, Inference
-from digital_souls_core.character import AccessScope, Profile
+from digital_souls_core.character import AccessScope
 from digital_souls_core.contracts import CompletionInput, Message
 from digital_souls_core.conversations import Conversations
 from digital_souls_core.history import Binding, SourceReference
 from digital_souls_core.privacy import PrivacyPolicy
 from digital_souls_core.privacy_classifier import LocalClassifier
-from digital_souls_core.privacy_scan import POLICY_VERSION
 
 from . import test_postgres_stores
 from .conversation_support import turn
 from .postgres_history_support import assert_text_absent, history
+from .privacy_support import BINDING as BINDING
+from .privacy_support import assessment, local_profile
 from .support import CALL, TOOL, FakeProvider, character, chunk, completion
 from .test_postgres_stores import Stores
 
 pytestmark = pytest.mark.postgres
 stores = test_postgres_stores.stores
-BINDING = Binding(AccessScope(), "synthetic")
-
-
-def local_profile() -> Profile:
-    return Profile(
-        profile_id="privacy-local",
-        model="openai/gemma4-12b",
-        transport="llamacpp_chat",
-        api_base="http://127.0.0.1:18080/v1",
-        external_send_allowed=True,
-        allowed_parameters=frozenset({"stream", "tools", "max_completion_tokens"}),
-    )
-
-
-def assessment(**changes: Any) -> str:
-    return json.dumps(
-        {
-            "classification": "NOT_SENSITIVE",
-            "subject": "GENERAL",
-            "category": "NONE",
-            "policy_version": POLICY_VERSION,
-            **changes,
-        }
-    )
 
 
 def policy_setup(

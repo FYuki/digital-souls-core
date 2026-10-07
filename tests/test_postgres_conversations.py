@@ -16,7 +16,7 @@ from digital_souls_core.conversations import Conversations
 from digital_souls_core.history import Binding, Operation
 
 from . import test_postgres_stores
-from .conversation_support import SyntheticPolicy, turn
+from .conversation_support import PausedProvider, SyntheticPolicy, turn
 from .postgres_history_support import assert_text_absent, history
 from .support import CALL, TOOL, FakeProvider, character, chunk, completion
 from .test_postgres_stores import Stores
@@ -165,31 +165,6 @@ async def test_policy_fail_closed_on_each_boundary_and_delete_after_revocation(
         service.create("synthetic")
     service.delete("synthetic", cid)
     assert service.store.list(service.binding("synthetic")) == []
-
-
-class PausedProvider(FakeProvider):
-    def __init__(self) -> None:
-        super().__init__()
-        self.started = asyncio.Event()
-        self.release = asyncio.Event()
-
-    async def complete(self, profile: Profile, payload: dict[str, Any]) -> dict[str, Any]:
-        self.started.set()
-        await self.release.wait()
-        return await super().complete(profile, payload)
-
-    async def stream(
-        self, profile: Profile, payload: dict[str, Any]
-    ) -> AsyncGenerator[dict[str, Any]]:
-        try:
-            yield chunk({"content": "Partial synthetic"})
-            self.started.set()
-            await self.release.wait()
-            yield chunk({}, "stop")
-        finally:
-            await asyncio.sleep(0)
-            await asyncio.sleep(0)
-            self.closed = True
 
 
 @pytest.mark.parametrize("stream", [False, True])

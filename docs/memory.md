@@ -72,9 +72,10 @@ job作成後の追加削除も実行前・採用前に再検証します。再�
 往復通知のoutboxはSourceDeletionと別であり、記憶再構成の既存`memory_events` consumerへも接続します。
 
 PostgreSQLのschemaとversionは、既存v1〜v4から必要な段階を経てv5へ同一transactionで原子的に移行し、履歴・receiptを保持します。
-v2でprivate・除外・archiveと`source_deletions`、v3でmemory epoch・記憶tableを追加します。
-v4で`turns.stated_at`、v5で`turns.memory_confirmation`（既定値`{}`）、
-v6で`turn_tombstones`・`turn_deletions`を追加します。v3以前の旧turnの`stated_at`はNULLのまま補完しません。
+v1はprivate・除外・archive・`source_deletions`・memory epoch・記憶tableを含む初期schemaです。
+v2で`turns.stated_at`、v3で`turns.memory_confirmation`（既定値`{}`）、
+v4で`turn_tombstones`・`turn_deletions`、v5で正本記憶の表を追加します。
+v1の旧turnの`stated_at`はNULLのまま補完しません。
 private化はconversationのmemory epochを進め、履歴を保持しつつ派生memory本文を同一transactionでNULL化します。
 履歴削除も派生本文を同一transactionで消します。text index/cacheを別途保持しないため、そこからの復活はありません。
 ID・source refs・epoch・versionの最小tombstoneは残り、旧IDをactiveへ戻しません。
