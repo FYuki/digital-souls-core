@@ -169,7 +169,14 @@ class PostgresMemoryRecords:
                     if frozenset(c.source.reference for c in ec) != ev.sources:
                         raise rejected()
             all_citations = tuple(set((*citations, *evidence_citations)))
-            identity = _hash([key(binding), normalized(all_citations), formation_version])
+            identity_parts = [key(binding), normalized(all_citations), formation_version]
+            if batch.links:
+                # Named endpoints preserve each pair and its roles during normalization.
+                endpoint_pairs = tuple(
+                    {"episode": link.episode, "fact": link.fact} for link in batch.links
+                )
+                identity_parts.append(normalized(endpoint_pairs))
+            identity = _hash(identity_parts)
             digest = _hash(normalized(batch))
             prior = db.execute(
                 (
