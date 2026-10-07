@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -73,4 +73,46 @@ test('CLI checks tracked files and returns a failing exit code for broken links'
   writeFileSync(join(root, 'missing.md'), '# Found\n');
   const passed = spawnSync(process.execPath, [script], { cwd: root, encoding: 'utf8' });
   assert.equal(passed.status, 0);
+});
+
+function localPostgresCompose() {
+  return JSON.parse(readFileSync(new URL('../compose.postgresql.json', import.meta.url), 'utf8'));
+}
+
+test('local PostgreSQL uses the isolated fixture image and digest', () => {
+  const compose = localPostgresCompose();
+  const fixtureScript = readFileSync(new URL('./test-postgres.sh', import.meta.url), 'utf8');
+  const image = fixtureScript.match(/image='([^']+)'/)[1];
+  assert.deepEqual(Object.keys(compose.services), ['postgres']);
+  assert.equal(compose.services.postgres.image, image);
+});
+
+test('local PostgreSQL publishes only loopback with an optional host port', () => {
+  const service = localPostgresCompose().services.postgres;
+  assert.deepEqual(service.ports, [{
+    target: 5432, published: '${DSC_POSTGRES_PORT:-5432}', host_ip: '127.0.0.1', protocol: 'tcp'
+  }]);
+  assert.equal(service.network_mode, undefined);
+});
+
+test('local PostgreSQL persists the PostgreSQL 18 data directory in a named volume', () => {
+  const compose = localPostgresCompose();
+  assert.deepEqual(compose.volumes, { postgres_data: {} });
+  assert.deepEqual(compose.services.postgres.volumes, [
+    { type: 'volume', source: 'postgres_data', target: '/var/lib/postgresql' }
+  ]);
+});
+
+test('local PostgreSQL requires explicit credentials and ignores the local env file', () => {
+  const service = localPostgresCompose().services.postgres;
+  assert.deepEqual(service.environment, {
+    POSTGRES_DB: '${DSC_POSTGRES_DATABASE:?Set DSC_POSTGRES_DATABASE}',
+    POSTGRES_USER: '${DSC_POSTGRES_USER:?Set DSC_POSTGRES_USER}',
+    POSTGRES_PASSWORD: '${DSC_POSTGRES_PASSWORD:?Set DSC_POSTGRES_PASSWORD}'
+  });
+  const example = readFileSync(new URL('../examples/postgresql.env.example', import.meta.url), 'utf8');
+  assert.equal(example, 'DSC_POSTGRES_DATABASE=\nDSC_POSTGRES_USER=\nDSC_POSTGRES_PASSWORD=\n');
+  const root = fileURLToPath(new URL('../', import.meta.url));
+  const ignored = spawnSync('git', ['check-ignore', '.env.postgresql.local'], { cwd: root });
+  assert.equal(ignored.status, 0);
 });

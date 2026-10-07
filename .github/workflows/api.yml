@@ -63,5 +63,7 @@ jobs:
           python -m pip install uv==0.8.22
           uv lock --check
           uv sync --frozen
+      - name: Validate local PostgreSQL Compose syntax
+        run: docker compose -f compose.postgresql.json config --no-interpolate --quiet
       - name: Required isolated PostgreSQL storage contracts
         run: bash tools/test-postgres.sh
