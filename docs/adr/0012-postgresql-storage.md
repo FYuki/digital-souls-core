@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+一部を[ADR 0021](0021-postgresql-only-storage.md)のPostgreSQL一本化で置き換えます（SQLite実装を選択肢として維持する方針、`StorageConfig.backend`の選択肢。接続・保存・privacy・撤回の契約は維持）。
+
 日付: 2026-10-05
 
 ## 背景

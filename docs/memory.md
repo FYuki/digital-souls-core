@@ -8,10 +8,13 @@
 
 trusted Python起動コードで、履歴と同じ保存先のMemoryStore、同じ`PrivacyPolicy`、
 検証済みlocal Profileを持つ`LocalClassifier`/`LocalExtractor`を構成します。
-保存先は`SQLiteMemory`、または明示選択の[PostgreSQL backend](postgresql.md)です。
+保存先は[PostgreSQL backend](postgresql.md)へ一本化します（[ADR 0021](adr/0021-postgresql-only-storage.md)）。
+`SQLiteMemory`は廃止予定で、撤去までは現状維持とし、新機能を追加しません。
 [意味検索との統合例](semantic-postgresql-integration.md)でも、接続と記憶抽出は明示操作です。
 memoryのHTTP操作やscope自己申告fieldは追加しません。利用者のsubject/client/audience/characterは
 `Binding`に固定されます。別Bindingのsource・job・memory・通知を照合できません。
+
+以下は撤去前のSQLite adapterを使う既存の接続例です。
 
 ```python
 from digital_souls_core.local_extractor import LocalExtractor
