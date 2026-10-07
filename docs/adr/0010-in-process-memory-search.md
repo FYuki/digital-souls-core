@@ -2,7 +2,7 @@
 
 Status: Proposed
 
-一部を[ADR 0015](0015-memory-model-reorganization.md)の記憶モデル再編で置き換えます（検索の順位と障害時の扱い。ADR 0018を参照）。
+一部を[ADR 0015 §3「Coreの既存決定との優先関係」](0015-memory-model-reorganization.md#3-coreの既存決定との優先関係)の記憶モデル再編で置き換えます（検索の順位と障害時の扱い。ADR 0018を参照）。
 
 日付: 2026-10-05
 
