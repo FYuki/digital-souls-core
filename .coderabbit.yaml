@@ -8,15 +8,24 @@ reviews:
   path_instructions:
     - path: '**/*'
       instructions: >-
-        CONTRIBUTING.md、AGENTS.md、関連するdocs/adrとdocs/api.mdを読み、
+        CONTRIBUTING.md、AGENTS.md、README.md、SPEC.md、CONTEXT.md、関連するdocs/adrとdocs/*.mdを読み、
         差分を適用される規則・契約に照合してください。違反には該当規則を示してください。
-        Coreは人格文脈付きLLM Providerであり、tool実行ループや私的記憶の永続化は対象外です。
+        Coreの範囲（含むもの・含まないもの）は、READMEの「製品の範囲」・SPEC・ADRで判断してください。
+        ADRはStatusと冒頭の置換注記を確認し、置き換えられた記述を現行の規則として扱わないでください。
+        docs/evidenceは当時の証跡であり、現行の仕様の根拠にしないでください。
   auto_review:
     ignore_title_keywords: ['WIP', 'DO NOT MERGE']
     ignore_usernames: ['dependabot', 'github-actions', 'renovate']
 knowledge_base:
   code_guidelines:
     enabled: true
-    filePatterns: ['CONTRIBUTING.md', 'AGENTS.md', 'docs/adr/*.md', 'docs/api.md']
+    filePatterns:
+      - 'CONTRIBUTING.md'
+      - 'AGENTS.md'
+      - 'README.md'
+      - 'SPEC.md'
+      - 'CONTEXT.md'
+      - 'docs/adr/*.md'
+      - 'docs/*.md'
 chat:
   art: false
