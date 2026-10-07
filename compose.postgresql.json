@@ -1,0 +1,39 @@
+{
+  "services": {
+    "postgres": {
+      "image": "postgres:18-bookworm@sha256:3725f4e2499eef5134592b3b4ab79a543ed7f8e533b05b5b637af926630f6650",
+      "environment": {
+        "POSTGRES_DB": "${DSC_POSTGRES_DATABASE:?Set DSC_POSTGRES_DATABASE}",
+        "POSTGRES_USER": "${DSC_POSTGRES_USER:?Set DSC_POSTGRES_USER}",
+        "POSTGRES_PASSWORD": "${DSC_POSTGRES_PASSWORD:?Set DSC_POSTGRES_PASSWORD}"
+      },
+      "ports": [
+        {
+          "target": 5432,
+          "published": "${DSC_POSTGRES_PORT:-5432}",
+          "host_ip": "127.0.0.1",
+          "protocol": "tcp"
+        }
+      ],
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "postgres_data",
+          "target": "/var/lib/postgresql"
+        }
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -q -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""
+        ],
+        "interval": "1s",
+        "timeout": "5s",
+        "retries": 60
+      }
+    }
+  },
+  "volumes": {
+    "postgres_data": {}
+  }
+}
