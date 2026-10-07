@@ -152,7 +152,13 @@ backend試験の成功をこれらの完了として扱わず、正確なrevisio
 | `memory_semantic_episodes` | `semantic` / `episode`（TEXT）、`semantic_version` / `episode_version`（INTEGER） | binding + 両ID・版。両正本へbinding付きFK |
 | `memory_record_citations` | `record_kind` / `record_id`、`version`、nullableな`episode` / `fact` / `semantic`、`conversation`、`revision`、`position`、`epoch`、`speaker`、`citation_role`、`start_offset` / `end_offset` | binding + 所属記録の種別・ID・版 + 出典参照・epoch・話者・用途・文字範囲。所属正本へbinding付きFK |
 | `memory_event_records` | `event`、`record_kind` / `record_id`、`version`、nullableな`episode` / `fact` / `semantic` / `link` | binding + event + 種別・ID・版。撤回イベントと正本へbinding付きFK |
-| `memory_record_registrations` | `id`（引用集合と形成versionから作る冪等キー）、`request_digest`（正規化した登録内容の比較用TEXT）、`results`（本文を含まない参照配列、NOT NULL JSONB） | binding + id |
+| `memory_record_registrations` | `id`（引用集合と形成versionから作る冪等キー）、`request_digest`（正規化した登録内容の比較用nullable TEXT）、`results`（本文を含まない参照配列、NOT NULL JSONB） | binding + id |
+
+`memory_record_registrations.request_digest` は本文由来の比較値なので、撤回時に、直接・依存の
+影響記録のいずれかを `results` に含む登録行でNULLにします。Factは停止した全版を照合します。
+消去は履歴・正本本文・撤回イベントと同じtransactionで、途中の失敗時はすべてrollbackします。
+登録行・冪等キー・本文なしの結果参照は保持し、NULLのダイジェストを持つキーの再試行は
+内容にかかわらず拒否します。新規扱いや復活はせず、無関係な登録のダイジェストは保持します。
 
 記録の版、引用のrevision・epoch・文字範囲、enum値、日時範囲、引用と影響記録の所属種別にCHECKを置きます。
 引用表の `citation_role` は record / reason（5Wの明示理由）で、両者とも出典検証・撤回の対象です。

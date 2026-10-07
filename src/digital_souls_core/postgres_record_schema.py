@@ -85,7 +85,7 @@ COLUMNS = {
         "seq": SEQ,
         "binding": TEXT,
         "id": TEXT,
-        "request_digest": TEXT,
+        "request_digest": ("text", True),
         "results": ("jsonb", False),
     },
 }

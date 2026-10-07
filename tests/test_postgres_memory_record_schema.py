@@ -433,3 +433,122 @@ def test_foreign_binding_references_are_rejected_by_database(stores: Stores) -> 
             )
     assert error.value.code == "storage_unavailable"
     assert port.list(BINDING, RecordKind.EPISODE_FACT_LINK) == ()
+
+
+@pytest.mark.parametrize("revocation", ["delete", "private", "turn_delete"])
+def test_revocation_erases_only_affected_registration_digests(
+    stores: Stores, revocation: str
+) -> None:
+    from digital_souls_core.history import ConversationControls, TurnDeletionInput
+    from digital_souls_core.memory_record_store import FactWrite, RecordBatch
+    from digital_souls_core.memory_records import EpisodeFactLink, RecordState
+    from digital_souls_core.postgres_memory_records import PostgresMemoryRecords
+
+    port = PostgresMemoryRecords(stores.database)
+    e, e2 = episode(citation(stores)), episode(citation(stores), "e2")
+    f = fact(e.citations[0])
+    link = EpisodeFactLink(
+        link_id="l1",
+        version=1,
+        binding=BINDING,
+        created_at=e.created_at,
+        state=RecordState.ACTIVE,
+        episode=reference(e2),
+        fact=reference(f),
+    )
+    # Separate registrations exercise dependent results and every Fact version.
+    batches = (
+        RecordBatch(episodes=(e,)),
+        RecordBatch(episodes=(e2,)),
+        RecordBatch(facts=(FactWrite(f),)),
+        RecordBatch(facts=(FactWrite(replace(f, version=2, citations=e2.citations), 1),)),
+        RecordBatch(links=(link,)),
+        RecordBatch(semantics=(derived(e, e2),)),
+    )
+    results = [port.register(BINDING, batch, f"v{i}") for i, batch in enumerate(batches)]
+    before = snapshot(stores)["memory_record_registrations"]
+    assert len(before) == 6 and all(row[3] is not None for row in before)
+    cid = e.citations[0].source.reference.conversation_id
+    if revocation == "delete":
+        stores.history.delete(BINDING, cid)
+    elif revocation == "private":
+        stores.history.controls(
+            BINDING, cid, ConversationControls(expected_revision=1, private_mode=True)
+        )
+    else:
+        stores.history.delete_turns(
+            BINDING, cid, TurnDeletionInput(expected_revision=1, turn_revision=1, scope="selected")
+        )
+    after = snapshot(stores)["memory_record_registrations"]
+    # e2 is unrelated; f2, link and Semantic depend on revoked e / f1.
+    for i, (old, new) in enumerate(zip(before, after, strict=True)):
+        assert new[:3] == old[:3] and new[4] == old[4]
+        assert new[3] == (old[3] if i == 1 else None)
+    assert port.register(BINDING, batches[1], "v1") == results[1]
+    PostgresDatabase(stores.config).initialize()
+
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_null_registration_digest_rejects_same_key_retry(stores: Stores, changed: bool) -> None:
+    from digital_souls_core.memory_record_store import RecordBatch
+    from digital_souls_core.postgres_memory_records import PostgresMemoryRecords
+
+    port = PostgresMemoryRecords(stores.database)
+    e = episode(citation(stores))
+    port.register(BINDING, RecordBatch(episodes=(e,)), "v1")
+    stores.history.delete(BINDING, e.citations[0].source.reference.conversation_id)
+    before = snapshot(stores)
+    retry = (
+        replace(e, episode_id="new-id", normalized_text="Changed synthetic body") if changed else e
+    )
+    with pytest.raises(CoreError) as error:
+        port.register(BINDING, RecordBatch(episodes=(retry,)), "v1")
+    assert error.value.code == "memory_registration_conflict"
+    assert snapshot(stores) == before
+    assert port.list(BINDING, RecordKind.EPISODE) == ()
+
+
+def test_revocation_digest_erasure_rolls_back_with_history_and_records(
+    stores: Stores, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from digital_souls_core.memory_record_store import RecordBatch
+    from digital_souls_core.postgres_memory_records import PostgresMemoryRecords
+
+    port = PostgresMemoryRecords(stores.database)
+    e = episode(citation(stores))
+    batch = RecordBatch(episodes=(e,))
+    result = port.register(BINDING, batch, "v1")
+    before = snapshot(stores)
+    original = Connection.execute
+
+    def interrupted(db: Connection[tuple[Any, ...]], query: Any, *args: Any, **kwargs: Any) -> Any:
+        text = query.as_string(db) if isinstance(query, sql.Composable) else str(query)
+        value = original(db, query, *args, **kwargs)
+        if text.startswith("UPDATE memory_record_registrations SET request_digest=NULL"):
+            assert db.execute(
+                "SELECT request_digest FROM memory_record_registrations"
+            ).fetchall() == [(None,)]
+            raise RuntimeError("Synthetic digest erasure interruption")
+        return value
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Connection, "execute", interrupted)
+        with pytest.raises(RuntimeError, match="Synthetic digest erasure interruption"):
+            stores.history.delete(BINDING, e.citations[0].source.reference.conversation_id)
+    assert snapshot(stores) == before
+    assert port.register(BINDING, batch, "v1") == result
+    stores.history.delete(BINDING, e.citations[0].source.reference.conversation_id)
+    with stores.database.transaction(BINDING) as db:
+        assert db.execute("SELECT request_digest FROM memory_record_registrations").fetchall() == [
+            (None,)
+        ]
+
+
+def test_v5_rejects_nonnullable_registration_digest(stores: Stores) -> None:
+    with stores.database.transaction(BINDING) as db:
+        db.execute(
+            "ALTER TABLE memory_record_registrations ALTER COLUMN request_digest SET NOT NULL"
+        )
+    with pytest.raises(CoreError) as error:
+        PostgresDatabase(stores.config).initialize()
+    assert error.value.code == "storage_schema"

@@ -179,7 +179,7 @@ class PostgresMemoryRecords:
                 (key(binding), identity),
             ).fetchone()
             if prior is not None:
-                if prior[0] != digest:
+                if prior[0] is None or prior[0] != digest:
                     raise rejected("memory_registration_conflict")
                 result = tuple(
                     RecordRef(
@@ -241,7 +241,8 @@ class PostgresMemoryRecords:
                             "episode_version": ev.reference.version,
                         },
                     )
-            # Store only a comparison digest and content-free output addresses.
+            # Revocation erases the comparison digest, retaining only the key and
+            # content-free output addresses to reject subsequent retries.
             self._insert(
                 db,
                 "memory_record_registrations",

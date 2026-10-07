@@ -101,3 +101,16 @@ def revoke_records(
         "UPDATE memory_facts SET state='suspended' WHERE binding=%s AND id=ANY(%s::text[])",
         (binding, list(facts)),
     )
+    # The digest includes body-derived values. Clear it for any registration
+    # returning an affected record, including dependent records and old Fact
+    # versions, in the same transaction as body erasure and history revocation.
+    db.execute(
+        "UPDATE memory_record_registrations SET request_digest=NULL "
+        "WHERE binding=%s AND request_digest IS NOT NULL AND EXISTS ("
+        "SELECT 1 FROM jsonb_array_elements(results) AS result "
+        "JOIN memory_event_records affected ON affected.binding=%s AND affected.event=%s "
+        "AND affected.record_kind=result->>'kind' "
+        "AND affected.record_id=result->>'record_id' "
+        "AND affected.version=(result->>'version')::integer)",
+        (binding, binding, event),
+    )
