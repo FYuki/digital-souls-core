@@ -12,8 +12,8 @@ from digital_souls_core.character import AccessScope, Profile
 from digital_souls_core.history import Binding, ConversationControls, SourceReference
 
 from . import test_postgres_stores
+from .conversation_support import turn
 from .postgres_history_support import history
-from .test_conversations import turn
 from .test_postgres_history_privacy import BINDING, policy_setup
 from .test_postgres_stores import Stores
 

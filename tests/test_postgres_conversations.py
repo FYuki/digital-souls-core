@@ -16,9 +16,9 @@ from digital_souls_core.conversations import Conversations
 from digital_souls_core.history import Binding, Operation
 
 from . import test_postgres_stores
+from .conversation_support import SyntheticPolicy, turn
 from .postgres_history_support import assert_text_absent, history
 from .support import CALL, TOOL, FakeProvider, character, chunk, completion
-from .test_conversations import SyntheticPolicy, turn
 from .test_postgres_stores import Stores
 
 pytestmark = pytest.mark.postgres

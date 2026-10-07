@@ -16,8 +16,8 @@ from digital_souls_core.postgres_memory import PostgresMemory, _evidence
 
 from . import test_postgres_stores
 from .postgres_v1_fixture import V1_DDL
-from .test_history_stated_at import FIRST, SECOND
 from .test_postgres_stores import BINDING, MESSAGES, Stores, raw_connection
+from .time_support import FIRST, SECOND
 
 pytestmark = pytest.mark.postgres
 stores = test_postgres_stores.stores

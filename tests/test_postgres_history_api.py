@@ -10,12 +10,12 @@ from digital_souls_core.application import Inference
 from digital_souls_core.conversations import Conversations, request_fingerprint
 
 from . import test_postgres_stores
+from .conversation_support import SyntheticPolicy, turn
 from .postgres_history_support import history
 from .support import CALL, TOOL, FakeProvider, character, chunk, completion
-from .test_conversations import SyntheticPolicy, turn
-from .test_history_stated_at import FIRST, SECOND
 from .test_postgres_stated_at import CID, install_v1
 from .test_postgres_stores import BINDING, Stores
+from .time_support import FIRST, SECOND
 
 pytestmark = pytest.mark.postgres
 stores = test_postgres_stores.stores

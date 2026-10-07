@@ -13,10 +13,10 @@ from digital_souls_core.privacy import PrivacyPolicy
 from digital_souls_core.privacy_classifier import LocalClassifier
 
 from . import test_postgres_stores
+from .conversation_support import turn
+from .privacy_support import BINDING, assessment, local_profile
 from .support import FakeProvider, character
-from .test_conversations import turn
 from .test_postgres_stores import Stores as Stores
-from .test_privacy import BINDING, assessment, local_profile
 
 stores = test_postgres_stores.stores
 
