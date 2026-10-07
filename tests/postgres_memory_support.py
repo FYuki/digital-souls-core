@@ -1,7 +1,5 @@
 """Synthetic PostgreSQL harness; provider responses stay in process."""
 
-import json
-
 from digital_souls_core.application import Inference
 from digital_souls_core.conversations import Conversations
 from digital_souls_core.history import SourceReference
@@ -14,22 +12,12 @@ from digital_souls_core.privacy_classifier import LocalClassifier
 
 from . import test_postgres_stores
 from .conversation_support import turn
+from .memory_support import selection as selection
 from .privacy_support import BINDING, assessment, local_profile
 from .support import FakeProvider, character
 from .test_postgres_stores import Stores as Stores
 
 stores = test_postgres_stores.stores
-
-
-def selection(indices: list[int] | None = None, *, kind: str = "semantic") -> str:
-    return json.dumps(
-        {
-            "schema_version": "memory-v1",
-            "candidates": [
-                {"kind": kind, "basis": "explicit_user_statement", "source_indices": indices or [0]}
-            ],
-        }
-    )
 
 
 async def source(
@@ -107,6 +95,7 @@ def assert_not_persisted(stores: Stores, marker: str) -> None:
         tables = db.execute(
             "SELECT tablename FROM pg_tables WHERE schemaname=current_schema()"
         ).fetchall()
+        assert tables
         from psycopg import sql
 
         for (table,) in tables:
