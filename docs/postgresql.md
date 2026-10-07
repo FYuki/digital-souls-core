@@ -1,4 +1,4 @@
-# 明示選択するPostgreSQL backend
+# 明示的に接続するPostgreSQL backend
 
 履歴・記憶の保存先はPostgreSQLへ一本化します（[ADR 0021](adr/0021-postgresql-only-storage.md)）。
 SQLiteは撤去済みです。
