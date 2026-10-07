@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from .application import CoreError
 from .history import Binding
+from .postgres_record_schema import COLUMNS, RECORD_DDL
 from .postgres_schema import CONSTRAINTS, TABLE_COLUMNS, TURN_DELETION_DDL, create
 
 
@@ -122,7 +123,7 @@ class PostgresDatabase:
             ) from None
 
     def initialize(self) -> None:
-        """Validate each supported schema before atomic migration to v4."""
+        """Validate each supported schema before atomic migration to v5."""
         name = self.config.schema_name
         with self._connect() as db:
             db.execute("SELECT pg_advisory_xact_lock(%s)", (_lock_key("schema", name),))
@@ -145,11 +146,12 @@ class PostgresDatabase:
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
             if not relations:
                 create(db)
+                self._validate_schema(db, 5)
                 return
             if ("schema_version", "r") not in relations:
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
             versions = db.execute("SELECT version FROM schema_version").fetchall()
-            if versions not in ([(1,)], [(2,)], [(3,)], [(4,)]):
+            if versions not in ([(1,)], [(2,)], [(3,)], [(4,)], [(5,)]):
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
             version = versions[0][0]
             tables = self._tables(version)
@@ -162,6 +164,12 @@ class PostgresDatabase:
             expected_relations.update(
                 {("turns_binding_conversation_revision_key", "i"), ("memory_source_lookup", "i")}
             )
+            if version >= 5:
+                expected_relations.update(
+                    (name, "i")
+                    for (table, name), definition in CONSTRAINTS.items()
+                    if definition.startswith("UNIQUE") and table in tables
+                )
             if set(relations) != expected_relations:
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
             self._validate_schema(db, version)
@@ -180,13 +188,19 @@ class PostgresDatabase:
                     db.execute(statement)
                 db.execute("UPDATE schema_version SET version=4")
                 self._validate_schema(db, 4)
+            if version < 5:
+                for statement in RECORD_DDL:
+                    db.execute(statement)
+                db.execute("UPDATE schema_version SET version=5")
+                self._validate_schema(db, 5)
 
     @staticmethod
     def _tables(version: int) -> dict[str, tuple[str, ...]]:
         return {
             table: columns
             for table, columns in TABLE_COLUMNS.items()
-            if version >= 4 or table not in {"turn_tombstones", "turn_deletions"}
+            if (version >= 4 or table not in {"turn_tombstones", "turn_deletions"})
+            and (version >= 5 or table not in COLUMNS)
         }
 
     def _validate_schema(self, db: Connection[tuple[Any, ...]], version: int) -> None:
@@ -231,10 +245,14 @@ class PostgresDatabase:
                     wanted_default = "'[]'::text"
                 elif column == "memory_confirmation":
                     wanted_default = "'{}'::text"
+                if table in COLUMNS:
+                    wanted_type, can_be_null = COLUMNS[table][column]
+                    wanted_default = None
+                else:
+                    can_be_null = column in {"body", "revoked_by", "stated_at"}
                 if (
                     kind != wanted_type
-                    or nullable
-                    != ("YES" if column in {"body", "revoked_by", "stated_at"} else "NO")
+                    or nullable != ("YES" if can_be_null else "NO")
                     or identity != ("YES" if column == "seq" else "NO")
                     or default != wanted_default
                 ):
@@ -255,6 +273,7 @@ class PostgresDatabase:
             address: definition
             for address, definition in CONSTRAINTS.items()
             if address[0] in tables
+            and (version >= 5 or address != ("memory_events", "memory_events_binding_id_key"))
         }
         if actual != expected_constraints or any(
             not valid or deferred or deferrable
