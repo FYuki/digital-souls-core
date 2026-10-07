@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from .application import CoreError
 from .history import Binding
 from .postgres_record_schema import COLUMNS, RECORD_DDL
-from .postgres_schema import CONSTRAINTS, TABLE_COLUMNS, TURN_DELETION_DDL, create
+from .postgres_schema import CONSTRAINTS, SCHEMA_VERSION, TABLE_COLUMNS, TURN_DELETION_DDL, create
 
 
 class PostgresConfig(BaseModel):
@@ -123,7 +123,7 @@ class PostgresDatabase:
             ) from None
 
     def initialize(self) -> None:
-        """Validate each supported schema before atomic migration to v5."""
+        """Validate each supported schema before atomic migration to the current version."""
         name = self.config.schema_name
         with self._connect() as db:
             db.execute("SELECT pg_advisory_xact_lock(%s)", (_lock_key("schema", name),))
@@ -146,12 +146,12 @@ class PostgresDatabase:
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
             if not relations:
                 create(db)
-                self._validate_schema(db, 5)
+                self._validate_schema(db, SCHEMA_VERSION)
                 return
             if ("schema_version", "r") not in relations:
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
             versions = db.execute("SELECT version FROM schema_version").fetchall()
-            if versions not in ([(1,)], [(2,)], [(3,)], [(4,)], [(5,)]):
+            if versions not in ([(1,)], [(2,)], [(3,)], [(4,)], [(SCHEMA_VERSION,)]):
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
             version = versions[0][0]
             tables = self._tables(version)
@@ -164,6 +164,7 @@ class PostgresDatabase:
             expected_relations.update(
                 {("turns_binding_conversation_revision_key", "i"), ("memory_source_lookup", "i")}
             )
+            # Record tables and their extra UNIQUE indexes were introduced in version 5.
             if version >= 5:
                 expected_relations.update(
                     (name, "i")
@@ -188,11 +189,11 @@ class PostgresDatabase:
                     db.execute(statement)
                 db.execute("UPDATE schema_version SET version=4")
                 self._validate_schema(db, 4)
-            if version < 5:
+            if version < SCHEMA_VERSION:
                 for statement in RECORD_DDL:
                     db.execute(statement)
-                db.execute("UPDATE schema_version SET version=5")
-                self._validate_schema(db, 5)
+                db.execute(f"UPDATE schema_version SET version={SCHEMA_VERSION}")
+                self._validate_schema(db, SCHEMA_VERSION)
 
     @staticmethod
     def _tables(version: int) -> dict[str, tuple[str, ...]]:
