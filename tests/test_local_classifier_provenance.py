@@ -1,6 +1,5 @@
 import pytest
 
-from digital_souls_core.local_extractor import LocalExtractor
 from digital_souls_core.privacy_classifier import LocalClassifier
 
 from .privacy_support import local_profile
@@ -9,25 +8,9 @@ from .support import FakeProvider
 pytestmark = pytest.mark.it1
 
 
-def test_extractor_rejects_unmanaged_or_unpinned_profiles() -> None:
-    for profile in (
-        local_profile().model_copy(update={"transport": "sdk"}),
-        local_profile().model_copy(update={"api_base": "https://example.invalid/v1"}),
-        local_profile().model_copy(update={"external_send_allowed": False}),
-        local_profile().model_copy(update={"allowed_parameters": frozenset()}),
-    ):
-        with pytest.raises(ValueError):
-            LocalExtractor(FakeProvider(), profile, model_digest="synthetic")
-
-
-@pytest.mark.parametrize("adapter", ["classifier", "extractor"])
-def test_destination_identity_is_whitelisted_and_secret_free(adapter: str) -> None:
+def test_destination_identity_is_whitelisted_and_secret_free() -> None:
     profile = local_profile().model_copy(update={"api_base": "HTTP://127.0.0.1:018080/v1"})
-    instance = (
-        LocalClassifier(FakeProvider(), profile, model_digest="synthetic")
-        if adapter == "classifier"
-        else LocalExtractor(FakeProvider(), profile, model_digest="synthetic")
-    )
+    instance = LocalClassifier(FakeProvider(), profile, model_digest="synthetic")
     provenance = instance.provenance
     assert provenance["endpoint"] == "http://127.0.0.1:18080/v1"
     assert provenance["transport"] == "llamacpp_chat"

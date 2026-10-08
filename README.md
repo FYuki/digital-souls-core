@@ -31,7 +31,7 @@ Coreは記憶の正本と検証、機微情報の流出防止ゲート、イン�
 （[ADR 0015](docs/adr/0015-memory-model-reorganization.md)）。機能の実装状況と受入条件は[SPEC](SPEC.md)、
 現行の記憶APIは[記憶API](docs/memory.md)、開発規約は[CONTRIBUTING](CONTRIBUTING.md)で管理します。
 保存は既定拒否・明示注入のままで、私的な実会話を自動で取り込みません。
-分類・抽出・検索の実モデル品質は未評価です。
+現行形式の分類・形成・検索の実モデル品質は未受入です。
 
 最初の[キャラクター推論API](docs/api.md)をPython/FastAPI/LiteLLMで実装しています。
 通常チャットと外部Agentのtool call往復に対応する小範囲のChat Completions APIです。
@@ -48,13 +48,14 @@ localhostの単独利用者向けで、公開サービス用の認証・tool実�
 ## 明示的な会話履歴と記憶
 
 既存APIはstatelessのままです。保存・復元・一覧・削除の専用経路と、既定拒否の保存policy境界を
-[会話履歴API](docs/history-api.md)に記載しています。ローカル分類器と明示的な記憶抽出・参照検索は実装済みです。
-明示注入の意味検索とローカル embedding adapter も実装済みです。
-実モデルの分類・抽出・検索品質は未検証です。
+[会話履歴API](docs/history-api.md)に記載しています。ローカル分類器、Episode・Fact・Semanticの正本登録・版・撤回、
+正本からの意味検索とローカルembedding adapterは実装済みです。構造化抽出・保存判定・自動形成は未実装です。
+旧逐語記憶・逐語抽出は撤去済みで、schema版6で旧3表を削除します。
+embedding未接続時は記憶なしで会話を続けます。現行形式の実モデル品質は未受入です。
 
 機微情報の明示的な検査・保存と送信の許可境界は[privacyガイド](docs/privacy.md)を参照してください。
 
-Stage3の明示的な記憶抽出・保存・参照検索と未検証範囲は[記憶API](docs/memory.md)を参照してください。
+現行の正本登録・参照検索と未実装・未検証範囲は[記憶API](docs/memory.md)を参照してください。
 
 履歴・記憶の保存先は [PostgreSQL backend](docs/postgresql.md) へ一本化します（[ADR 0021](docs/adr/0021-postgresql-only-storage.md)）。
 SQLite は撤去済みです。ローカルでもDockerのPostgreSQLを使います。

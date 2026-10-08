@@ -100,7 +100,11 @@ def test_v4_migration_preserves_all_rows_and_reopens(stores: Stores) -> None:
     before = snapshot(stores)
     PostgresDatabase(stores.config).initialize()
     after = snapshot(stores)
-    assert all(after[t] == rows for t, rows in before.items())
+    assert all(
+        after[t] == rows
+        for t, rows in before.items()
+        if t not in {"memories", "memory_sources", "memory_jobs"}
+    )
     with stores.database.transaction(BINDING) as db:
         assert db.execute("SELECT version FROM schema_version").fetchall() == [(SCHEMA_VERSION,)]
     PostgresDatabase(stores.config).initialize()
@@ -131,7 +135,11 @@ def test_v4_migration_rolls_back_and_retries(
     with stores.database.transaction(BINDING) as db:
         assert db.execute("SELECT version FROM schema_version").fetchall() == [(4,)]
     PostgresDatabase(stores.config).initialize()
-    assert all(snapshot(stores)[t] == rows for t, rows in before.items())
+    assert all(
+        snapshot(stores)[t] == rows
+        for t, rows in before.items()
+        if t not in {"memories", "memory_sources", "memory_jobs"}
+    )
 
 
 @pytest.mark.parametrize(
@@ -410,7 +418,9 @@ def test_revocation_failure_rolls_back_history_event_and_canonical_body(
             stores.history.delete(BINDING, cid)
     assert stores.history.read(BINDING, cid) == before
     assert port.get(BINDING, RecordKind.EPISODE, "e1") == e
-    assert stores.memory.events(BINDING) == ()
+    from .postgres_record_support import events
+
+    assert events(stores.records) == ()
     with stores.database.transaction(BINDING) as db:
         assert db.execute("SELECT count(*) FROM memory_event_records").fetchone() == (0,)
     stores.history.delete(BINDING, cid)

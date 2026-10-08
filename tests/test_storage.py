@@ -45,7 +45,7 @@ def test_postgres_factory_shares_database_and_does_not_extract(
         return object()
 
     monkeypatch.setattr(storage, "PostgresHistory", opened)
-    monkeypatch.setattr(storage, "PostgresMemory", opened)
+    monkeypatch.setattr(storage, "PostgresMemoryRecords", opened)
     result = storage.open_storage(config)
     assert isinstance(result, storage.StorageStores)
     assert len(calls) == 2 and calls[0] is calls[1]

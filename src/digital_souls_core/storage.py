@@ -6,10 +6,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from .history import HistoryStore
-from .memory_contracts import MemoryStore
+from .memory_record_store import MemoryRecordStore
 from .postgres_db import PostgresConfig, PostgresDatabase
 from .postgres_history import PostgresHistory
-from .postgres_memory import PostgresMemory
+from .postgres_memory_records import PostgresMemoryRecords
 
 
 class StorageConfig(BaseModel):
@@ -24,11 +24,11 @@ class StorageConfig(BaseModel):
 @dataclass(frozen=True)
 class StorageStores:
     history: HistoryStore
-    memory: MemoryStore
+    records: MemoryRecordStore
 
 
 def open_storage(config: StorageConfig) -> StorageStores:
     """Open stores only on explicit invocation; never import or extract history."""
     config = StorageConfig.model_validate(config.model_dump())
     database = PostgresDatabase(config.postgres)
-    return StorageStores(PostgresHistory(database), PostgresMemory(database))
+    return StorageStores(PostgresHistory(database), PostgresMemoryRecords(database))

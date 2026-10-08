@@ -12,6 +12,7 @@ ADRの決定を機能単位に整理します。
 - **未実装**：ADRで採用済みだが、この文書と同じリビジョンに実装がない。
 
 実装状況は、この文書と同じリビジョンの実装を基準に照合します。
+「撤去済み」は旧経路が削除され、現行機能として提供しないことを示します。
 
 ## 1. 前提
 
@@ -34,7 +35,7 @@ ADRの決定を機能単位に整理します。
 | --- | --- | --- |
 | 会話履歴の明示的な保存・復元・一覧・削除 | 実装済み | [ADR 0004](docs/adr/0004-conversation-history.md) |
 | 指定発話の記憶除外、スレッド単位のプライベートモード、アーカイブ | 実装済み | ADR 0006 |
-| 履歴削除・private化による派生記憶の削除、残る出典からの再構成 | 実装済み | [ADR 0007](docs/adr/0007-memory-provenance-and-revocation.md) |
+| 履歴削除・private化による派生記憶の削除、残る出典からの再構成 | 一部（正本の撤回・本文消去は実装済み、再生成は未実装） | [ADR 0007](docs/adr/0007-memory-provenance-and-revocation.md)、[ADR 0022](docs/adr/0022-memory-retrieval-from-records.md) |
 | 元発言の日時（stated_at）の保存 | 実装済み | [ADR 0016](docs/adr/0016-memory-kinds-and-records.md)、[履歴API](docs/history-api.md) |
 | 保存拒否の語の検出、確認までの形成保留、プライベートモードと削除機能の案内 | 実装済み | [ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
 | 会話往復単位の削除（削除範囲をユーザーが選択） | 実装済み | ADR 0019 |
@@ -49,7 +50,8 @@ revision排他付き回答APIを提供します。受入はprivate化・派生�
 往復単位の削除では、明示APIによる「選択した往復だけ」「選択した往復以降すべて」の削除を
 PostgreSQLで提供します。tool対応がまたがる往復をまとめて物理削除し、
 削除済みrequest IDの再送と旧revisionでの推論commitを拒否します。対象往復を出典に持つ記憶だけを
-撤回し、残る適格出典から再構成します。対象外の後続往復と新規往復は引き続き記憶形成に使えます。
+撤回し、本文と依存結果を即時に利用停止します。形成が実装されるまで再生成しない期間を許容します。
+対象外の後続往復と新規往復は引き続き正本登録の出典にでき、自動形成は未実装です。
 日時・確認状態と既存の会話全体削除・通知を維持します。詳細は
 [往復単位の明示削除](docs/history-api.md#往復単位の明示削除)に記載します。
 
@@ -57,13 +59,18 @@ PostgreSQLで提供します。tool対応がまたがる往復をまとめて物
 
 | 機能 | 状態 | 根拠 |
 | --- | --- | --- |
-| 選択したuser発話を逐語で保存する記憶（現行形式） | 実装済み（置き換え対象） | ADR 0007 |
-| Episode（経験の5W、経験日時、一続きの経験の単位） | 未実装 | ADR 0016 |
-| Fact（独立ID、対象の5W・日時、Episode–Fact参照、内容版） | 未実装 | ADR 0016 |
-| Semantic（DIRECT_EXTRACTION / EXPERIENCE_DERIVED、命題、適用時期） | 未実装 | ADR 0016 |
-| 引用範囲と元発言の版の対応、保存文の構造化値からの生成 | 未実装 | ADR 0016 |
-| タイムゾーン設定と相対日時の解釈、部分日時・精度 | 未実装 | ADR 0016 |
-| 既存の逐語記憶の削除（移行しない） | 未実装 | ADR 0016 |
+| 選択したuser発話を逐語で保存する旧記憶 | 撤去済み（schema版6） | ADR 0016、ADR 0022 |
+| Episode（経験の5W、経験日時、一続きの経験の単位） | 一部（正本の型・schema・登録・撤回は実装済み、形成・経験単位の照合は未実装） | ADR 0016、ADR 0022 |
+| Fact（独立ID、対象の5W・日時、Episode–Fact参照、内容版） | 一部（正本の登録・内容版更新・旧版保持・参照・撤回は実装済み、形成・照合は未実装） | ADR 0016、ADR 0022 |
+| Semantic（DIRECT_EXTRACTION / EXPERIENCE_DERIVED、命題、適用時期） | 一部（両形成種別の正本登録・根拠検証・撤回は実装済み、直接抽出・一般化は未実装） | ADR 0016、ADR 0022 |
+| 引用範囲と元発言の版の対応、保存文の構造化値からの生成 | 一部（引用のrevision・epoch・話者・文字範囲の検証は実装済み、保存文生成は未実装） | ADR 0016 |
+| タイムゾーン設定と相対日時の解釈、部分日時・精度 | 一部（部分日時・精度・timezoneの保持と型付き範囲の保存は実装済み、設定・相対日時解釈は未実装） | ADR 0016 |
+| 既存の逐語記憶の削除（移行しない） | 実装済み（schema版6で旧3表を削除） | ADR 0016、ADR 0022 |
+
+正本のschema・登録・版・撤回の契約は合成試験で検証済みです。登録portはtrusted callerが
+形成・保存判定を済ませた構造化記録を受け取り、抽出・保存価値の判断・保存文生成を代行しません。
+Episode・SemanticのIDは版1で登録し、同一IDの内容版追加はFactだけが提供します。
+詳細は[記憶API](docs/memory.md)を参照してください。
 
 ### 2.3 形成と保存判定
 
@@ -71,10 +78,10 @@ PostgreSQLで提供します。tool対応がまたがる往復をまとめて物
 | --- | --- | --- |
 | 決定論的scanner、ローカル意味分類器、permission | 実装済み | [ADR 0005](docs/adr/0005-privacy-boundaries.md) |
 | 型付きの保存判定（DENY_* / ABSTAIN / NOT_MEMORY_WORTHY / ALLOW_STRUCTURED） | 未実装 | [ADR 0017](docs/adr/0017-memory-formation-admission.md) |
-| 明示したsource集合からの有限batch抽出 | 実装済み | ADR 0007 |
+| 明示したsource集合からの有限batch逐語抽出 | 撤去済み | ADR 0007、ADR 0022 |
 | 会話履歴の保存を起点とする形成jobの永続予約・集約・回復 | 未実装 | ADR 0017 |
-| スレッド範囲の抽出、長文分割、冪等な登録 | 未実装 | ADR 0017 |
-| 同一スレッドのFact照合、対象が明確な補足・訂正によるFact更新 | 未実装 | ADR 0017 |
+| スレッド範囲の抽出、長文分割、冪等な登録 | 一部（正本の冪等登録は実装済み、抽出・長文分割は未実装） | ADR 0017 |
+| 同一スレッドのFact照合、対象が明確な補足・訂正によるFact更新 | 一部（期待版を照合する内容版更新は実装済み、発話からのFact照合・訂正判断は未実装） | ADR 0017 |
 | Semanticの直接抽出 | 未実装 | ADR 0017 |
 | Episode群からの一般化（EXPERIENCE_DERIVED） | 未実装 | ADR 0017、[ADR 0020](docs/adr/0020-reflection-personality-relationship.md) |
 | 既存記憶の整理（consolidation） | 未実装 | ADR 0017 |
@@ -84,25 +91,30 @@ PostgreSQLで提供します。tool対応がまたがる往復をまとめて物
 
 | 機能 | 状態 | 根拠 |
 | --- | --- | --- |
-| 部分文字列検索、明示注入のembeddingによる意味検索 | 実装済み | [ADR 0010](docs/adr/0010-in-process-memory-search.md)、[ADR 0011](docs/adr/0011-local-memory-embedding.md) |
+| 部分文字列検索 | 撤去済み | ADR 0022 |
+| 正本のEpisode・Semanticを候補とするembedding意味検索（Episodeに有効なFactを添付） | 実装済み | [ADR 0010](docs/adr/0010-in-process-memory-search.md)、[ADR 0011](docs/adr/0011-local-memory-embedding.md)、ADR 0022 |
 | 検索前のquery判定（機微なqueryで検索しない） | 実装済み | [ADR 0018](docs/adr/0018-memory-retrieval-context.md) |
-| 検索障害時に記憶なしで会話を継続 | 実装済み | ADR 0018 |
-| PoC互換の順位（候補20、閾値0.54、同等帯、最大5件） | 実装済み | ADR 0018 |
-| last_user_mentioned_atとTOUCH | 未実装（同等帯の並びには出典turnの保存順を暫定で使用） | ADR 0018 |
+| embedding未接続・検索障害時に記憶なしで会話を継続 | 実装済み | ADR 0018、ADR 0022 |
+| PoC互換の順位（候補20、閾値0.54、同等帯、最大5件） | 実装済み（永続した言及日時・作成日時・IDで同等帯を並べる） | ADR 0018、ADR 0022 |
+| last_user_mentioned_atとTOUCH | 一部（日時の永続化・順位への利用は実装済み、再言及時のTOUCHは未実装） | ADR 0018、ADR 0022 |
 | 期間検索（日時・季節）と一致種別の順位 | 未実装 | ADR 0018 |
 | 語彙による補完、自己申告の現在値補完、矛盾の注意 | 未実装 | ADR 0018 |
 | 有効期限・policy versionの互換による除外 | 未実装 | ADR 0018 |
 | 永続的な派生index | 未実装 | ADR 0015 |
-| モデル向けcontextの一時参照名、送信直前の再検証 | 実装済み | [ADR 0009](docs/adr/0009-memory-context-references.md) |
+| モデル向けcontextの一時参照名、送信直前の再検証 | 実装済み（保存文・部分日時・Factを渡し、逐語引用と保存IDは渡さない） | [ADR 0009](docs/adr/0009-memory-context-references.md)、ADR 0022 |
+
+embedding未接続時はstorageを読まず空結果を返します。Factは独立のembedding候補にしません。
+同等帯の順位は `last_user_mentioned_at DESC NULLS LAST → created_at DESC → id ASC` です。
+TOUCH・検索・assistantの言及による日時更新は実装されていません。
 
 ### 2.5 訂正・削除・失効
 
 | 機能 | 状態 | 根拠 |
 | --- | --- | --- |
-| 明示訂正と時間変化の区別、旧状態の履歴 | 未実装 | [ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
+| 明示訂正と時間変化の区別、旧状態の履歴 | 一部（Factの旧内容版は保持、訂正と時間変化の判断は未実装） | [ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
 | 固定属性の矛盾保留、自己申告と一般化の共存 | 未実装 | ADR 0019 |
 | 管理操作による訂正（自己申告由来・Fact単位）と削除、再処理の防止 | 未実装 | ADR 0019 |
-| 根拠の訂正・削除時の依存結果の即時利用停止と再評価 | 一部（source撤回のみ） | ADR 0019 |
+| 根拠の訂正・削除時の依存結果の即時利用停止と再評価 | 一部（出典撤回時の正本・依存結果の停止と本文消去、検索時の参照版検証は実装済み、再評価・再生成は未実装） | ADR 0019、ADR 0022 |
 
 ### 2.6 内省・人格・関係
 
@@ -176,14 +188,15 @@ Coreの実装Issueへ移して管理します。
 
 ## 5. 実装の順序（案）
 
-依存の少ない順に、Epic・Issueへ分解します。
+依存の少ない順に、Epic・Issueへ分解します。正本の保存と検索・逐語記憶の撤去は完了し、
+構造化形成へ進む段階です。以下は完了した基盤と残る作業を分けた順序です。
 
-1. 既存の逐語記憶の削除、履歴へのstated_at追加とタイムゾーン設定（以後の日時の前提）
-2. 検索障害時の会話継続、PoC互換の順位、保存拒否の語の検出と確認の信号、会話往復単位の削除
-3. Episode・Fact・SemanticのPostgreSQL正本schemaと契約試験（データ移送は行わない）
+1. 既存の逐語記憶の削除・履歴へのstated_at追加は実装済み。タイムゾーン設定・相対日時解釈は未実装
+2. 検索障害時の会話継続・PoC互換の順位・保存拒否の語の検出と確認の信号・会話往復単位の削除は実装済み
+3. Episode・Fact・SemanticのPostgreSQL正本schema・登録・版・撤回・契約試験と正本検索は実装済み（データ移送は行わない）
 4. 型付きの保存判定と、構造化Candidateの抽出・検証
 5. 形成jobの永続予約と非同期形成、同一スレッドのFact照合・更新
-6. TOUCHとlast_user_mentioned_at、期間検索、語彙・自己申告の補完、矛盾の注意
+6. TOUCH、期間検索、語彙・自己申告の補完、矛盾の注意（last_user_mentioned_atの保持・順位利用は実装済み）
 7. 訂正・時間変化・矛盾・管理操作・依存結果の失効
 8. 一般化とReflection、Life State、人格・関係の更新
 9. consolidation、別スレッドのFact統合、永続的な派生index

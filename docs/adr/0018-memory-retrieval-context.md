@@ -2,6 +2,8 @@
 
 Status: Accepted
 
+置換注記（2026-10-08）: 逐語記憶の暫定候補元・出典 turn の保存順による最終言及の代用は、[ADR 0022](0022-memory-retrieval-from-records.md) の正本と日時列で置換します。§4 の順位と guard は維持します。
+
 日付: 2026-10-06
 
 Accepted日: 2026-10-07

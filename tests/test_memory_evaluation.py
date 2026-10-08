@@ -13,13 +13,13 @@ from pydantic import ValidationError
 
 from digital_souls_core import memory_evaluation
 from digital_souls_core.application import CoreError
-from digital_souls_core.memory_contracts import Memory
 from digital_souls_core.memory_evaluation import (
     EvaluationFixture,
     FixtureEmbedding,
     evaluate_memory_search,
 )
-from digital_souls_core.memory_ranking import EmbeddingSpace, RetrievalPolicy, rank_memories
+from digital_souls_core.memory_ranking import EmbeddingSpace, RetrievalPolicy, rank_records
+from digital_souls_core.memory_record_store import RetrievalCandidate
 
 FIXTURE = Path(__file__).parent / "fixtures/memory-retrieval-evaluation.json"
 CLI = Path(__file__).parents[1] / "tools/evaluate-memory-search.py"
@@ -79,30 +79,30 @@ async def test_exclusion_precedes_embedding_and_ranking_preserves_source_identit
 ) -> None:
     dataset = fixture()
     encoder = RecordingEmbedding(dataset)
-    observations: list[tuple[tuple[Memory, ...], tuple[Memory, ...]]] = []
+    observations: list[tuple[tuple[RetrievalCandidate, ...], tuple[RetrievalCandidate, ...]]] = []
 
     def rank(
-        candidates: tuple[Memory, ...],
+        candidates: tuple[RetrievalCandidate, ...],
         vectors: tuple[tuple[float, ...], ...],
         space: EmbeddingSpace,
         policy: RetrievalPolicy,
-    ) -> tuple[Memory, ...]:
-        result = rank_memories(candidates, vectors, space, policy)
+    ) -> tuple[RetrievalCandidate, ...]:
+        result = rank_records(candidates, vectors, space, policy)
         observations.append((candidates, result))
         return result
 
-    monkeypatch.setattr(memory_evaluation, "rank_memories", rank)
+    monkeypatch.setattr(memory_evaluation, "rank_records", rank)
     report = await evaluate_memory_search(dataset, encoder)
     excluded = next(
         document for document in dataset.documents if document.id == "excluded-placeholder"
     )
     assert all(excluded.text not in call for call in encoder.calls)
     assert all(excluded.id not in row.retrieved_ids for row in report.queries)
-    assert all(excluded.id not in {item.memory_id for item in pair[0]} for pair in observations)
+    assert all(excluded.id not in {item.identifier for item in pair[0]} for pair in observations)
     candidates, ranked = observations[0]
-    assert ranked[0] is next(memory for memory in candidates if memory.memory_id == "tea-ja")
-    assert ranked[0].sources is candidates[2].sources
-    source = ranked[0].sources[0]
+    assert ranked[0] is next(memory for memory in candidates if memory.identifier == "tea-ja")
+    assert ranked[0].record.citations is candidates[2].record.citations
+    source = ranked[0].record.citations[0].source
     assert (source.reference.conversation_id, source.reference.turn_revision) == ("synthetic-ja", 3)
     assert source.reference.message_index == 0 and source.epoch == 2
 
