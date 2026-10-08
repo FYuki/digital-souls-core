@@ -548,7 +548,8 @@ class PostgresMemoryRecords:
         if not values:
             return True
         try:
-            current = self.retrievable(binding)
+            # Frozen candidates are hashable; set lookup avoids quadratic deep equality.
+            current = frozenset(self.retrievable(binding))
             return all(v.record.binding == binding and v in current for v in values)
         except CoreError:
             return False

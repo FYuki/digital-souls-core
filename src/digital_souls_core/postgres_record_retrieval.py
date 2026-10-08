@@ -221,15 +221,18 @@ def snapshot(db: Connection[tuple[Any, ...]], binding: Binding) -> tuple[Retriev
         for r, v in records.items()
         if all(source_valid(c) for c in (*record_citations(v), *citations.get(r, ())))
     }
+    # Index links once by Episode, keeping eligible order for each Episode's links.
+    links_by_episode: dict[RecordRef, list[EpisodeFactLink]] = {}
+    for value in eligible.values():
+        if isinstance(value, EpisodeFactLink):
+            links_by_episode.setdefault(value.episode, []).append(value)
     result = []
     for r, value in eligible.items():
         if isinstance(value, Episode):
             links = tuple(
                 link
-                for link in eligible.values()
-                if isinstance(link, EpisodeFactLink)
-                and link.episode == r
-                and not dependency_invalidated(link.fact, eligible.get(link.fact))
+                for link in links_by_episode.get(r, ())
+                if not dependency_invalidated(link.fact, eligible.get(link.fact))
             )
             facts = tuple(dict.fromkeys(eligible[link.fact] for link in links))
             assert all(isinstance(f, Fact) for f in facts)
