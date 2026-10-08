@@ -174,6 +174,5 @@ def test_postgres_v2_migration_keeps_old_dates_receipts_and_does_not_scan_histor
         assert snapshot.memory_sources[0].reference == SourceReference(CID, 1, 0)
         assert snapshot.memory_sources[0].stated_at == timestamp
         assert restored.conversation.store.source_eligible(BINDING, SourceReference(CID, 1, 0))
-        assert snapshot.memory_sources[0].stated_at == timestamp
         receipt = restored.conversation.store.receipt(BINDING, CID, "r1")
         assert receipt is not None and receipt.fingerprint == "original-fingerprint"
