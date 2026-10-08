@@ -9,7 +9,8 @@ from psycopg import Connection, sql
 from digital_souls_core.history import SourceReference
 from digital_souls_core.postgres_db import PostgresDatabase
 from digital_souls_core.postgres_history import PostgresHistory
-from digital_souls_core.postgres_memory import PostgresMemory
+from digital_souls_core.postgres_schema import SCHEMA_VERSION
+from digital_souls_core.postgres_memory_records import PostgresMemoryRecords
 
 from . import test_postgres_stores
 from .memory_confirmation_contracts import make_harness
@@ -42,10 +43,13 @@ def test_v3_migration_preserves_stored_time_confirmation_and_receipt(
     with stores.database.transaction(BINDING) as db:
         original = db.execute("SELECT * FROM turns").fetchall()
     database = PostgresDatabase(stores.config)
-    h = make_harness(PostgresHistory(database), PostgresMemory(database))
+    h = make_harness(PostgresHistory(database), PostgresMemoryRecords(database))
     with h.http:
         with stores.database.transaction(BINDING) as db:
             assert db.execute("SELECT * FROM turns").fetchall() == original
+            assert db.execute("SELECT version FROM schema_version").fetchall() == [
+                (SCHEMA_VERSION,)
+            ]
         snapshot = h.conversation.read("synthetic", CID)
         assert snapshot.memory_sources[0].stated_at == timestamp
         assert snapshot.memory_confirmations == (
@@ -95,6 +99,6 @@ def test_v3_migration_interruption_rolls_back_and_allows_retry(
             == tables
         )
     database = PostgresDatabase(stores.config)
-    h = make_harness(PostgresHistory(database), PostgresMemory(database))
+    h = make_harness(PostgresHistory(database), PostgresMemoryRecords(database))
     with h.http:
         delete_turns(h, CID, 1, 1, "selected")

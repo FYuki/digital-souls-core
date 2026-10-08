@@ -16,7 +16,16 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from .application import CoreError
 from .history import Binding
 from .postgres_record_schema import COLUMNS, RECORD_DDL
-from .postgres_schema import CONSTRAINTS, SCHEMA_VERSION, TABLE_COLUMNS, TURN_DELETION_DDL, create
+from .postgres_schema import (
+    CONSTRAINTS,
+    LEGACY_VERBATIM_COLUMNS,
+    LEGACY_VERBATIM_CONSTRAINTS,
+    LEGACY_VERBATIM_INDEXES,
+    SCHEMA_VERSION,
+    TABLE_COLUMNS,
+    TURN_DELETION_DDL,
+    create,
+)
 
 
 class PostgresConfig(BaseModel):
@@ -151,7 +160,7 @@ class PostgresDatabase:
             if ("schema_version", "r") not in relations:
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
             versions = db.execute("SELECT version FROM schema_version").fetchall()
-            if versions not in ([(1,)], [(2,)], [(3,)], [(4,)], [(SCHEMA_VERSION,)]):
+            if versions not in ([(1,)], [(2,)], [(3,)], [(4,)], [(5,)], [(SCHEMA_VERSION,)]):
                 raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
             version = versions[0][0]
             tables = self._tables(version)
@@ -161,9 +170,9 @@ class PostgresDatabase:
                 if table != "schema_version":
                     expected_relations.add((table + "_seq_seq", "S"))
                     expected_relations.add((table + "_seq_key", "i"))
-            expected_relations.update(
-                {("turns_binding_conversation_revision_key", "i"), ("memory_source_lookup", "i")}
-            )
+            expected_relations.add(("turns_binding_conversation_revision_key", "i"))
+            if version <= 5:
+                expected_relations.update(LEGACY_VERBATIM_INDEXES)
             # Record tables and their extra UNIQUE indexes were introduced in version 5.
             if version >= 5:
                 expected_relations.update(
@@ -189,17 +198,25 @@ class PostgresDatabase:
                     db.execute(statement)
                 db.execute("UPDATE schema_version SET version=4")
                 self._validate_schema(db, 4)
-            if version < SCHEMA_VERSION:
+            if version < 5:
                 for statement in RECORD_DDL:
                     db.execute(statement)
-                db.execute(f"UPDATE schema_version SET version={SCHEMA_VERSION}")
+                db.execute("UPDATE schema_version SET version=5")
+                self._validate_schema(db, 5)
+            if version <= 5:
+                db.execute("DROP TABLE memory_sources")
+                db.execute("DROP TABLE memories")
+                db.execute("DROP TABLE memory_jobs")
+                db.execute("UPDATE schema_version SET version=6")
                 self._validate_schema(db, SCHEMA_VERSION)
 
     @staticmethod
     def _tables(version: int) -> dict[str, tuple[str, ...]]:
         return {
             table: columns
-            for table, columns in TABLE_COLUMNS.items()
+            for table, columns in (
+                TABLE_COLUMNS | (LEGACY_VERBATIM_COLUMNS if version <= 5 else {})
+            ).items()
             if (version >= 4 or table not in {"turn_tombstones", "turn_deletions"})
             and (version >= 5 or table not in COLUMNS)
         }
@@ -213,6 +230,8 @@ class PostgresDatabase:
             (name,),
         ).fetchall()
         tables = self._tables(version)
+        if {row[0] for row in columns} != set(tables):
+            raise CoreError(503, "storage_schema", "Unsupported PostgreSQL schema")
         for table, expected in tables.items():
             if version == 1 and table == "turns":
                 expected = tuple(column for column in expected if column != "stated_at")
@@ -272,7 +291,9 @@ class PostgresDatabase:
         }
         expected_constraints = {
             address: definition
-            for address, definition in CONSTRAINTS.items()
+            for address, definition in (
+                CONSTRAINTS | (LEGACY_VERBATIM_CONSTRAINTS if version <= 5 else {})
+            ).items()
             if address[0] in tables
             and (version >= 5 or address != ("memory_events", "memory_events_binding_id_key"))
         }

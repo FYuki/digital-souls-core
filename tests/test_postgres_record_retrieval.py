@@ -26,21 +26,24 @@ from digital_souls_core.privacy_classifier import LocalClassifier
 
 from . import test_postgres_stores
 from .conversation_support import turn
-from .postgres_memory_support import setup as writer_setup
+from .postgres_query_support import observe_queries
+from .postgres_record_support import setup as conversation_setup
 from .privacy_support import BINDING
 from .record_retrieval_support import setup
 from .support import FakeProvider, character
 from .test_local_embedding_memory import profile, response
 from .test_memory_record_store_contract import citation, derived, episode, fact, reference
-from .test_postgres_batch_reads import observe_queries
-from .test_postgres_stores import Stores, remember, seed
+from .test_postgres_stores import Stores, seed
 
 pytestmark = pytest.mark.postgres
 stores = test_postgres_stores.stores
 
 
-def records(stores: Stores) -> tuple[PostgresMemoryRecords, tuple[RetrievalCandidate, ...]]:
-    port = PostgresMemoryRecords(stores.database)
+def records(
+    stores: Stores, port: PostgresMemoryRecords | None = None
+) -> tuple[PostgresMemoryRecords, tuple[RetrievalCandidate, ...]]:
+    if port is None:
+        port = PostgresMemoryRecords(stores.database)
     e = replace(episode(citation(stores)), normalized_text="Synthetic tea experience")
     other = replace(episode(citation(stores), "e2"), normalized_text="Synthetic tea conversation")
     f = fact(citation(stores))
@@ -66,13 +69,11 @@ def records(stores: Stores) -> tuple[PostgresMemoryRecords, tuple[RetrievalCandi
     )
 
 
-def test_canonical_candidates_ignore_legacy_memories_and_reopen(stores: Stores) -> None:
-    legacy = remember(stores, (seed(stores, "Synthetic legacy tea marker."),))
+def test_canonical_candidates_reopen(stores: Stores) -> None:
     port, expected = records(stores)
     assert port.retrievable(BINDING) == expected
     assert port.current(BINDING, expected)
     assert PostgresMemoryRecords(PostgresDatabase(stores.config)).retrievable(BINDING) == expected
-    assert legacy[0].text not in repr(expected)
 
 
 @pytest.mark.parametrize(
@@ -265,7 +266,7 @@ async def test_revocation_races_stop_memory_use(
     port, expected = records(stores)
     service, _, encoder = setup()
     service.records = port
-    writer, conversation, _ = writer_setup(stores, local=False)
+    writer, conversation, _ = conversation_setup(stores, local=False)
     service.policy = writer.policy
     conversation.inference.memory_context = MemoryContext(service)
     ref = expected[0].record.citations[0].source.reference
@@ -349,7 +350,6 @@ async def test_sdk_receives_only_canonical_normalized_text(
     stores: Stores, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     port, expected = records(stores)
-    remember(stores, (seed(stores, "Synthetic legacy tea marker."),))
     service, _, _ = setup()
     service.records = port
     service.embedding = LocalEmbedding(profile())
@@ -442,7 +442,7 @@ async def test_storage_identifier_collision_never_enters_context(
     port.register(BINDING, RecordBatch(episodes=(e,)), "fixture-v1")
     service, _, _ = setup()
     service.records = port
-    writer, conversation, _ = writer_setup(stores, local=local)
+    writer, conversation, _ = conversation_setup(stores, local=local)
     service.policy = writer.policy
     inference = conversation.inference
     inference.memory_context = MemoryContext(service)
@@ -553,7 +553,7 @@ async def test_conversation_cancel_during_embedding_never_appends(
     port, _ = records(stores)
     service, _, encoder = setup()
     service.records = port
-    writer, conversation, _ = writer_setup(stores)
+    writer, conversation, _ = conversation_setup(stores)
     service.policy = writer.policy
     conversation.inference.memory_context = MemoryContext(service)
     entered, closed = asyncio.Event(), asyncio.Event()

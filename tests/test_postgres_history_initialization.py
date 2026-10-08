@@ -8,13 +8,13 @@ from psycopg import sql
 
 from digital_souls_core.application import CoreError
 from digital_souls_core.postgres_db import _lock_key
-from digital_souls_core.postgres_memory import PostgresMemory
+from digital_souls_core.postgres_history import PostgresHistory
+from digital_souls_core.postgres_memory_records import PostgresMemoryRecords
 from digital_souls_core.postgres_schema import SCHEMA_VERSION
 from digital_souls_core.storage import StorageConfig, open_storage
 
 from . import test_postgres_stores
 from .postgres_history_support import history
-from .postgres_memory_support import written
 from .test_postgres_stores import BINDING, MESSAGES, Stores, raw_connection
 
 pytestmark = pytest.mark.postgres
@@ -24,12 +24,12 @@ stores = test_postgres_stores.stores
 def test_factory_shares_explicit_database_without_extracting(stores: Stores) -> None:
     opened = open_storage(StorageConfig(backend="postgresql", postgres=stores.config))
     created = opened.history.create(BINDING)
-    assert isinstance(opened.memory, PostgresMemory)
-    assert opened.memory.read(BINDING, created.conversation_id) == created
+    assert isinstance(opened.records, PostgresMemoryRecords)
+    assert isinstance(opened.history, PostgresHistory)
+    assert opened.records.database is opened.history.database
     opened.history.append(BINDING, created.conversation_id, "r1", "fp1", 0, MESSAGES, "stop")
-    assert opened.memory.read(BINDING, created.conversation_id).messages == MESSAGES
-    assert all("synthetic" not in memory.text.lower() for memory in written(opened.memory, BINDING))
-    assert opened.memory.pending(BINDING) == ()
+    assert opened.history.read(BINDING, created.conversation_id).messages == MESSAGES
+    assert opened.records.retrievable(BINDING) == ()
 
 
 def test_unknown_unversioned_schema_is_preserved_and_rejected(stores: Stores) -> None:
