@@ -221,15 +221,15 @@ class PostgresMemory(PostgresHistory):
             )
 
     def _memories(
-        self, db: Connection[tuple[Any, ...]], binding: Binding, job_id: str | None = None
+        self, db: Connection[tuple[Any, ...]], binding: Binding, job_id: str
     ) -> tuple[Memory, ...]:
         rows = db.execute(
             "SELECT id,kind,body FROM memories WHERE binding=%s AND state='active' "
-            "AND (%s::text IS NULL OR job=%s) ORDER BY seq DESC LIMIT 1001",
-            (_key(binding), job_id, job_id),
+            "AND job=%s ORDER BY seq DESC LIMIT 1001",
+            (_key(binding), job_id),
         ).fetchall()
         if len(rows) > 1000:
-            raise CoreError(413, "memory_limit", "Memory search scope exceeds limit")
+            raise CoreError(413, "memory_limit", "Memory result scope exceeds limit")
         if not rows:
             return ()
         grouped: dict[str, list[SourceVersion]] = {}
@@ -278,20 +278,6 @@ class PostgresMemory(PostgresHistory):
     def results(self, binding: Binding, job_id: str) -> tuple[Memory, ...]:
         with self.database.transaction(binding) as db:
             return self._memories(db, binding, job_id)
-
-    def candidates(self, binding: Binding) -> tuple[Memory, ...]:
-        """Return only currently eligible memories, in deterministic newest-first order."""
-        with self.database.transaction(binding) as db:
-            return self._memories(db, binding)
-
-    def search(self, binding: Binding, query: str, limit: int = 8) -> tuple[Memory, ...]:
-        if not 0 < len(query) <= 256 or not 1 <= limit <= 16:
-            raise CoreError(400, "memory_query_invalid", "Invalid memory query")
-        # Literal casefold substring, no query DSL, embeddings, persisted index or cache.
-        with self.database.transaction(binding) as db:
-            return tuple(
-                m for m in self._memories(db, binding) if query.casefold() in m.text.casefold()
-            )[:limit]
 
     def valid(self, binding: Binding, memories: tuple[Memory, ...]) -> bool:
         with self.database.transaction(binding) as db:

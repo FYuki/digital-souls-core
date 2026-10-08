@@ -11,7 +11,7 @@ from .application import CoreError
 from .history import Binding, SourceReference
 from .memory_confirmation import blocked, decode
 from .memory_contracts import SourceVersion
-from .memory_record_store import MemoryRecord, RecordBatch
+from .memory_record_store import MemoryRecord, RecordBatch, RetrievalCandidate
 from .memory_records import (
     Citation,
     Episode,
@@ -534,3 +534,21 @@ class PostgresMemoryRecords:
                     (key(binding), event_id),
                 )
             )
+
+    def retrievable(self, binding: Binding) -> tuple[RetrievalCandidate, ...]:
+        from .postgres_record_retrieval import snapshot
+
+        with self.database.transaction(binding) as db:
+            try:
+                return snapshot(db, binding)
+            except (ValueError, TypeError, KeyError):
+                raise rejected("memory_source_invalid") from None
+
+    def current(self, binding: Binding, values: tuple[RetrievalCandidate, ...]) -> bool:
+        if not values:
+            return True
+        try:
+            current = self.retrievable(binding)
+            return all(v.record.binding == binding and v in current for v in values)
+        except CoreError:
+            return False

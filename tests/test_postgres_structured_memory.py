@@ -7,7 +7,7 @@ from digital_souls_core.application import CoreError
 from digital_souls_core.local_extractor import Extraction
 
 from . import test_postgres_stores
-from .postgres_memory_support import setup, source
+from .postgres_memory_support import setup, source, written
 from .privacy_support import BINDING
 from .test_postgres_stores import Stores
 
@@ -41,5 +41,5 @@ async def test_structured_approval_change_requires_explicit_retry(
     with pytest.raises(CoreError, match="explicit extraction"):
         await service.rebuild(BINDING)
     assert provider.calls == [] and service.store.pending(BINDING) == ()
-    assert service.store.search(BINDING, "tea") == ()
+    assert all("tea" not in memory.text.lower() for memory in written(service.store, BINDING))
     assert len(await service.extract(BINDING, (ref,))) == 1

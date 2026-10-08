@@ -1,6 +1,9 @@
 # ADR 0009: モデル向け記憶contextの一時参照名
 
 Status: Proposed
+
+置換注記（2026-10-08）: 原文の `user_evidence` 注入と Memory/source object の記述は、[ADR 0022](0022-memory-retrieval-from-records.md) の正本・保存文 context で置換します。一時参照名は維持します。
+
 日付: 2026-10-03
 
 ## 背景

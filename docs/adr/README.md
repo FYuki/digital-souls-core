@@ -35,5 +35,6 @@ ADR 0015〜0020は、2026-10-06のユーザー決定とPR #67のレビューを�
 - [ADR 0019: 記憶の訂正・時間変化・矛盾・削除と失効](0019-memory-correction-invalidation.md)
 - [ADR 0020: 内省・人格・関係・生活状態と記憶の接続](0020-reflection-personality-relationship.md)
 - [ADR 0021: SQLiteを廃止しPostgreSQLへ一本化する](0021-postgresql-only-storage.md)
+- [ADR 0022: 記憶の検索を Episode・Fact・Semantic の正本へ切り替える](0022-memory-retrieval-from-records.md)
 
 ADR 0021のSQLite撤去は Epic #79（[Issue #88](https://github.com/FYuki/digital-souls-core/issues/88)）で完了しました。本文は決定時点の履歴を保持します。

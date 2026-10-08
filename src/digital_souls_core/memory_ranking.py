@@ -6,6 +6,7 @@ from typing import Protocol
 
 from .application import CoreError
 from .memory_contracts import Memory
+from .memory_record_store import RetrievalCandidate
 from .privacy_scan import scan
 
 
@@ -158,3 +159,54 @@ def _tie_break(memories: tuple[Memory, ...], index: int) -> tuple[int, int, str]
     # Latest user mention, then newer creation (lower index), then ID.
     memory = memories[index]
     return (-memory.mentioned, index, memory.memory_id)
+
+
+def rank_records(
+    records: tuple[RetrievalCandidate, ...],
+    vectors: tuple[tuple[float, ...], ...],
+    space: EmbeddingSpace,
+    policy: RetrievalPolicy,
+) -> tuple[RetrievalCandidate, ...]:
+    """Unit-vector squared L2; metadata only breaks ties within a leader's band."""
+    try:
+        validate_embedding_space(space)
+        validate_retrieval_policy(policy)
+        if (
+            type(records) is not tuple
+            or any(type(r) is not RetrievalCandidate for r in records)
+            or type(vectors) is not tuple
+            or len(vectors) != len(records) + 1
+        ):
+            raise ValueError
+        query, *candidates = tuple(_unit_vector(v, space.dimensions) for v in vectors)
+        distances = [
+            math.fsum((a - b) ** 2 for a, b in zip(query, v, strict=True)) for v in candidates
+        ]
+        pool = sorted(range(len(records)), key=lambda i: distances[i])[: policy.candidate_pool_size]
+        relevant = [(1 / (1 + math.sqrt(distances[i])), i) for i in pool]
+        relevant = [(r, i) for r, i in relevant if r >= policy.relevance_threshold]
+
+        def tie(i: int) -> tuple[bool, float, float, str]:
+            record = records[i].record
+            mention = record.last_user_mentioned_at
+            return (
+                mention is None,
+                -mention.timestamp() if mention else 0,
+                -record.created_at.timestamp(),
+                records[i].identifier,
+            )
+
+        ranked: list[int] = []
+        band: list[int] = []
+        leader = 0.0
+        for relevance, index in relevant:
+            if band and leader - relevance > policy.equivalence_margin:
+                ranked.extend(sorted(band, key=tie))
+                band = []
+            if not band:
+                leader = relevance
+            band.append(index)
+        ranked.extend(sorted(band, key=tie))
+        return tuple(records[i] for i in ranked[: policy.max_retrieved_memories])
+    except Exception:
+        raise CoreError(502, "memory_embedding_failed", "Memory embedding failed") from None
