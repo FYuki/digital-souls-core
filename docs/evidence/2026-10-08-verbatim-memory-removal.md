@@ -316,3 +316,8 @@ README / CONTEXT に上記識別子・版5・逐語の直接記述は今回の�
 形成ができるまで再生成しない期間を許容する（U6）。outbox は保持し、消費機能を追加していない。
 実 DB 適用、IT2/ST、品質評価、remote CI、監督レビューは NOT RUN。文書同期は #105、評価再設計は PR #51。
 この実装担当は commit のみ。push / PR 作成 / merge を行っていない。
+
+## 監督の再実行（2026-10-08）
+
+監督が head `84e1337` で品質ゲートを再実行したところ、`ruff check` が FAIL しました（I001：`tests/test_postgres_memory_confirmation.py` と `tests/test_postgres_turn_deletion_migration.py` の import の並び順、計2件）。上記の最終ゲート表にある `ruff check` の PASS は、この head とは一致しません。
+`ruff check --select I001 --fix` で並び順だけを修正し、続く commit で再実行しました。ruff check・format --check・mypy・UT 473・IT1 579・PostgreSQL 398・`git diff --check` は PASS です。その他のゲート（uv sync・build・Node 27・check-docs・fixture 評価）は `84e1337` で PASS でした。並び順の修正後には再実行していません。

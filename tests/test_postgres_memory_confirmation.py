@@ -8,8 +8,8 @@ from digital_souls_core.application import CoreError
 from digital_souls_core.history import SourceReference
 from digital_souls_core.postgres_db import PostgresDatabase
 from digital_souls_core.postgres_history import PostgresHistory
-from digital_souls_core.postgres_schema import SCHEMA_VERSION
 from digital_souls_core.postgres_memory_records import PostgresMemoryRecords
+from digital_souls_core.postgres_schema import SCHEMA_VERSION
 
 from . import memory_confirmation_contracts as contracts
 from . import test_postgres_stores
