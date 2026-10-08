@@ -87,4 +87,47 @@ queryと全normalized_text（Fact各版を含む）には共通4次元の有限�
 
 偽vectorはCIで道具を検証するためのものです。**モデルの品質証拠ではありません**。実モデル評価は手動・cacheなし3回、各回各分類90%以上、必須ゲート全件合格で判定します。平均で相殺せず、結果に合わせて期待値・閾値を緩めません。
 
-回答goldの `required_facts` は全語句を含み、`forbidden_facts` は全語句が不在であることを要求します。出典の表記は採点しません。日英ケースではqueryと異なる言語の必須語句も維持し、回答プロンプトが記憶の語句を保持できるかを評価します。入力へgoldを注入しません。
+### 回答事実の判定契約
+
+入力の `schema_version` は1のまま、goldは破壊的な形式変更を明示するため **2** にします。旧goldのschema 1 / 平坦な語句配列は拒否し、暗黙変換しません。未公開の初期形式であり、既存ハーネスの移行はありません。
+
+`answer.required_facts` は `[["scarf", "scarves", "マフラー"], ["火曜", "Tuesday"]]` のようなグループ配列です。**全グループを満たし、各グループ内は許容表記のいずれか1つを含めばよい（AND of ORs）** とします。`forbidden_facts` も同じ形式で、全グループの全候補のいずれか1つでも含めば違反です。外側の空配列はその側の制約なしを表します。空グループ・空文字・空白だけの候補は拒否します。正規化後の同一候補の重複はグループ内・グループ間の両方で拒否し、required/forbidden間の同一候補も拒否します。
+
+回答と各候補の両方に **Unicode NFKC → Unicode casefold** の順で正規化を適用し、その後に決定論的な部分文字列一致で判定します。大文字小文字と全角英数字・半角カナ等のUnicode表記差を吸収します。空白・句読点は削除せず、単語境界・形態素解析・翻訳・文意解析・LLM judgeは使いません。`normalize_fact_text` / `AnswerExpectation.matches_facts` はこの純粋な語句判定だけを提供し、後続promptfooへ契約を引き継ぎます。挙動・guard・破棄の合否判定や評価ハーネスはIssue #114で実装します。出典の表記は採点しません。goldを入力へ注入しません。
+
+候補は記憶本文・合成会話の核心となる事実と、その自然な訳・表記揺れに限定します。日英ケースは記憶側とquery側の言語のどちらで答えても核心事実が一致すればよく、回答言語を採点しません。部分文字列一致の限界と全件見直しの結果は下表に記録します。
+
+## 第2ラウンドの全件gold監査
+
+第1ラウンド `5c52330` のgoldは未公開・回答評価未実行です。以下はprompt・設定調整と評価結果を見る前の判定基準の修正であり、結果に合わせた緩和ではありません。入力 `cases.json` は変更しません。全62件を確認し、非空のrequired/forbiddenを持つ51件をグループ形式へ移しました（残る11件は両方空のまま）。意味・許容表記を変更した22件は次のとおりです。
+
+| case id | required（グループ間はAND、` / `はOR） | forbidden（いずれかを含めば違反） | 理由 |
+| --- | --- | --- | --- |
+| cross-language-herb | ミント / mint | なし | 日英の自然な訳語を許容。 |
+| negated-coffee-preference | コーヒー / 珈琲 | なし | 飲み物の名前だけを要求。紅茶の否定関係は部分文字列で確実に判定できないため禁止を追加しない。 |
+| updated-morning-drink | ほうじ茶 / 焙じ茶 | 緑茶 | 現行茶の表記揺れを許容し、旧内容は語順に依存しない名詞で禁止。 |
+| multisource-partial-revocation | サンドイッチ | りんごジュース / リンゴジュース / 林檎ジュース | 撤回済み飲み物のかな/漢字表記も禁止。 |
+| long-text-explicit-detail | 橙 / だいだい / オレンジ | なし | 色を問うため自然な色名表記を許容。 |
+| synonym-06 | 傘 | なし | 雨具を問うため核心の傘だけを要求し、色と助詞の連結を採点しない。 |
+| paraphrase-02 | 庭、散歩 / 歩く / 歩き | なし | 場所と動作を分離し、庭を/庭での助詞差を許容。 |
+| paraphrase-03 | 目覚まし / めざまし / アラーム、二つ / 2つ / 二個 / 2個 / 二台 / 2台 | なし | 時計と数を分離し、語順・数字/漢数字・助数詞を許容。二つという固有事実を維持。 |
+| paraphrase-04 | しおり / 栞 | なし | 中断位置の記録方法を問うため核心のしおりだけを要求。 |
+| paraphrase-06 | カレンダー | なし | 予定の記入先を核心の名詞にし、壁との助詞連結を要求しない。 |
+| paraphrase-08 | 直後 / すぐ / 終えたら / 終わったら | なし | 時期を問うため料理終了直後の自然な表記を許容。鍋だけでは時期を採点できない。 |
+| cross-language-02 | フルート / flute | なし | 日英の自然な訳語を許容。 |
+| cross-language-03 | 海岸 / coast / beach / shore / seaside | なし | 海岸を表す自然な英訳を許容。 |
+| cross-language-04 | かぼちゃ / カボチャ / 南瓜 / pumpkin | なし | 日英訳・かな/漢字表記を許容。 |
+| cross-language-05 | ユリ / ゆり / 百合 / lily / lilies | なし | 日英訳・単複・かな/漢字表記を許容。 |
+| cross-language-06 | 赤 / あか / レッド / red | なし | 色の自然な訳語・表記を許容。赤は赤い/赤色を包含。 |
+| cross-language-07 | scarf / scarves / マフラー | なし | 日英訳と不規則な単複を許容。 |
+| cross-language-08 | Tuesday / 火曜 | なし | 日英訳を許容。火曜は火曜日も包含。 |
+| cross-language-09 | autumn / fall / 秋 | なし | 日英訳と米英表記を許容。 |
+| cross-language-10 | mountain / 山 | なし | 日英訳を許容。mountainはmountainsも包含。 |
+| direct-semantic | 静か / 静けさ / 静寂 | なし | 好みの核心を静けさとし、静かな/静かで等の語尾差を許容。 |
+| derived-semantic | 静か / 静けさ / 静寂 | なし | 好みの核心を静けさとし、静かな/静かで等の語尾差を許容。 |
+
+残る40件は語句の意味を維持（非空の配列だけ単要素グループ化）: `synonym-warm-drink-ja`、`paraphrase-weekend-ja`、`unrelated-observatory`、`multisource-picnic`、`private-source`、`excluded-source`、`deleted-source`、`deleted-memory`、`binding-character`、`binding-subject`、`binding-client`、`post-search-revocation`、`post-answer-revocation`、`source-epoch-changed`、`synonym-02`、`synonym-03`、`synonym-04`、`synonym-05`、`synonym-07`、`synonym-08`、`synonym-09`、`synonym-10`、`paraphrase-05`、`paraphrase-07`、`paraphrase-09`、`paraphrase-10`、`unrelated-02`、`unrelated-03`、`unrelated-04`、`unrelated-05`、`unrelated-06`、`unrelated-07`、`unrelated-08`、`unrelated-09`、`unrelated-10`、`valid-fact-attachment`、`stale-fact-link`、`revoked-fact-source`、`equivalent-band-order`、`below-threshold`。
+
+短い語も全件確認しました。`private-source` / `excluded-source` / `deleted-source` / `deleted-memory` の必須 `青` は「青い」「青色」を包含します。禁止 `紫` は単独の色名による失効情報の漏洩も拒否するため維持します。「紫外線」「紫陽花」でも誤検出する限界がありますが、これらの事実は合成会話・記憶に存在せず正解候補へ加えません。語境界・文意の判定を行わない方式では、単独の「紫」を漏洩として検出しつつ全ての複合語を除くことはできません。`青` / `赤` / `橙` / `秋` / `山` も他語を包含し得ます。色・季節・題材を問うケースの最小事実として採用し、完全な意味判定と同一視しません。
+
+同じ理由で「コーヒーと紅茶が苦手」は必須のコーヒーを含むためこの語句判定だけでは拒否できません。紅茶全体を禁止すると「紅茶は好きで、コーヒーが苦手」という正しい回答を拒否し、特定の否定句だけを禁止しても語順差を網羅できません。監督の指示に従い、このケースはコーヒーだけを必須とし、禁止関係の完全検出を主張しません。否定や時間的関係を含む語句一致は、自然言語の真偽・矛盾を完全には判定できません。

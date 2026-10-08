@@ -10,6 +10,7 @@ import pytest
 
 from digital_souls_core.memory_record_store import MemoryRecord, RecordBatch
 from digital_souls_core.semantic_evaluation_cases import (
+    AnswerExpectation,
     EvaluationDataError,
     EvaluationEpisode,
     EvaluationFact,
@@ -378,3 +379,132 @@ def test_unmutated_fake_vectors_follow_production_ranking() -> None:
             assert ids == expected.expected_order
         checked += 1
     assert checked >= 45
+
+
+@pytest.mark.parametrize("field", ["required_facts", "forbidden_facts"])
+@pytest.mark.parametrize(
+    "groups",
+    [
+        [[]],
+        [[""]],
+        [[" \t"]],
+        ["coffee"],
+        [[7]],
+        [["coffee", "coffee"]],
+        [["Coffee", "ＣＯＦＦＥＥ"]],
+        [["coffee"], ["COFFEE"]],
+        [["coffee", "コーヒー"], ["コーヒー", "珈琲"]],
+    ],
+)
+def test_answer_fact_groups_reject_invalid_alternatives(field: str, groups: Any) -> None:
+    cases, gold = inputs()
+    gold["cases"][0]["answer"][field] = groups
+    with pytest.raises(EvaluationDataError, match="^Invalid semantic evaluation data$"):
+        parse_evaluation_cases(json.dumps(cases), json.dumps(gold))
+
+
+def test_answer_fact_groups_reject_normalized_required_forbidden_overlap() -> None:
+    cases, gold = inputs()
+    gold["cases"][0]["answer"].update(
+        required_facts=[["Coffee", "コーヒー"]], forbidden_facts=[["ＣＯＦＦＥＥ"]]
+    )
+    with pytest.raises(EvaluationDataError):
+        parse_evaluation_cases(json.dumps(cases), json.dumps(gold))
+
+
+def test_legacy_answer_gold_schema_is_rejected() -> None:
+    cases, gold = inputs()
+    gold["schema_version"] = 1
+    with pytest.raises(EvaluationDataError):
+        parse_evaluation_cases(json.dumps(cases), json.dumps(gold))
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        ("SCARF and tea", True),
+        ("ＳＣＡＲＶＥＳ and ＴＥＡ", True),
+        ("マフラーと紅茶", True),
+        ("scarf", False),
+        ("tea", False),
+        ("scarf and tea, with coffee", False),
+        ("マフラーと紅茶、珈琲", False),
+        ("SCARF TEA ＣＯＦＦＥＥ", False),
+    ],
+)
+def test_answer_fact_matching_uses_all_groups_any_alternative(answer: str, expected: bool) -> None:
+    gold = AnswerExpectation.model_validate_json(
+        json.dumps(
+            dict(
+                behavior="grounded",
+                required_facts=[["scarf", "scarves", "マフラー"], ["tea", "紅茶"]],
+                forbidden_facts=[["coffee", "コーヒー", "珈琲"]],
+                discarded=False,
+            )
+        )
+    )
+    assert gold.matches_facts(answer) is expected
+
+
+@pytest.mark.parametrize(
+    ("case_id", "answer"),
+    [
+        ("cross-language-herb", "Mint."),
+        ("cross-language-02", "The flute."),
+        ("cross-language-03", "Along the beach."),
+        ("cross-language-04", "Pumpkin soup."),
+        ("cross-language-05", "Lilies."),
+        ("cross-language-06", "RED."),
+        ("cross-language-07", "マフラーを編みます。"),
+        ("cross-language-08", "火曜日です。"),
+        ("cross-language-09", "秋です。"),
+        ("cross-language-10", "山を描きます。"),
+        ("synonym-06", "傘を使います。"),
+        ("paraphrase-02", "庭で散歩します。"),
+        ("paraphrase-03", "二つの目覚まし時計を置きます。"),
+        ("paraphrase-04", "しおりを挟みます。"),
+        ("paraphrase-06", "カレンダーに書きます。"),
+        ("paraphrase-08", "調理が終わったらすぐに洗います。"),
+        ("negated-coffee-preference", "珈琲です。"),
+        ("long-text-explicit-detail", "オレンジ色です。"),
+        ("direct-semantic", "静かで落ち着いた場所です。"),
+    ],
+)
+def test_bundled_gold_accepts_natural_fact_wordings(case_id: str, answer: str) -> None:
+    data = load_evaluation_cases(ROOT / "cases.json", ROOT / "expectations.json")
+    gold = next(g for g in data.expectations.cases if g.id == case_id)
+    assert gold.answer.matches_facts(answer)
+
+
+@pytest.mark.parametrize(
+    ("case_id", "answer"),
+    [
+        ("cross-language-02", "A guitar."),
+        ("cross-language-08", "水曜日です。"),
+        ("paraphrase-03", "目覚まし時計を一つ置きます。"),
+        ("paraphrase-08", "料理の翌日に洗います。"),
+        ("negated-coffee-preference", "紅茶が苦手です。"),
+        ("private-source", "青いメモ帳、以前は紫でした。"),
+        ("updated-morning-drink", "ほうじ茶と緑茶です。"),
+        ("multisource-partial-revocation", "サンドイッチとリンゴジュースです。"),
+    ],
+)
+def test_bundled_gold_rejects_missing_or_forbidden_facts(case_id: str, answer: str) -> None:
+    data = load_evaluation_cases(ROOT / "cases.json", ROOT / "expectations.json")
+    gold = next(g for g in data.expectations.cases if g.id == case_id)
+    assert not gold.answer.matches_facts(answer)
+
+
+@pytest.mark.parametrize("answer", ["ｶﾌｪ", "cafe\u0301"])
+def test_answer_fact_matching_normalizes_unicode(answer: str) -> None:
+    gold = AnswerExpectation.model_validate_json(
+        json.dumps(
+            dict(
+                behavior="grounded",
+                required_facts=[["カフェ", "café"]],
+                forbidden_facts=[],
+                discarded=False,
+            )
+        )
+    )
+    assert gold.matches_facts(answer)

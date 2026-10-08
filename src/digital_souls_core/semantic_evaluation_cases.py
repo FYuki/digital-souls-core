@@ -8,9 +8,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Literal
+from unicodedata import normalize
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .character import AccessScope
 from .history import Binding, SourceReference
@@ -39,6 +40,7 @@ from .memory_records import (
 
 type Identifier = Annotated[str, Field(pattern=r"^[a-z][a-z0-9-]{0,95}$")]
 type Text = Annotated[str, Field(min_length=1)]
+type FactGroup = Annotated[tuple[Text, ...], Field(min_length=1)]
 type Positive = Annotated[int, Field(ge=1)]
 type Nonnegative = Annotated[int, Field(ge=0)]
 type Component = Annotated[float, Field(allow_inf_nan=False)]
@@ -407,11 +409,46 @@ class DispatchExpectation(_Model):
     memory_ids: tuple[Identifier, ...]
 
 
+def normalize_fact_text(text: str) -> str:
+    """Shared gold/answer normalization: NFKC followed by Unicode casefold."""
+    return normalize("NFKC", text).casefold()
+
+
 class AnswerExpectation(_Model):
     behavior: Literal["grounded", "no_memory", "blocked"]
-    required_facts: tuple[Text, ...] = Field(repr=False)
-    forbidden_facts: tuple[Text, ...] = Field(repr=False)
+    required_facts: tuple[FactGroup, ...] = Field(repr=False)
+    forbidden_facts: tuple[FactGroup, ...] = Field(repr=False)
     discarded: bool
+
+    @field_validator("required_facts", "forbidden_facts")
+    @classmethod
+    def validate_groups(cls, groups: tuple[FactGroup, ...]) -> tuple[FactGroup, ...]:
+        seen: set[str] = set()
+        for group in groups:
+            for text in group:
+                normalized = normalize_fact_text(text)
+                if not normalized.strip() or normalized in seen:
+                    raise ValueError("Invalid answer fact groups")
+                seen.add(normalized)
+        return groups
+
+    @model_validator(mode="after")
+    def validate_fact_overlap(self) -> "AnswerExpectation":
+        required = {normalize_fact_text(t) for g in self.required_facts for t in g}
+        forbidden = {normalize_fact_text(t) for g in self.forbidden_facts for t in g}
+        if required & forbidden:
+            raise ValueError("Overlapping answer facts")
+        return self
+
+    def matches_facts(self, answer: str) -> bool:
+        """Pure lexical predicate only; does not check behavior, guards or discard."""
+        normalized = normalize_fact_text(answer)
+        return all(
+            any(normalize_fact_text(t) in normalized for t in group)
+            for group in self.required_facts
+        ) and not any(
+            normalize_fact_text(t) in normalized for group in self.forbidden_facts for t in group
+        )
 
 
 class CaseExpectation(_Model):
@@ -429,7 +466,7 @@ class CaseExpectation(_Model):
 
 
 class EvaluationExpectations(_Model):
-    schema_version: Annotated[int, Field(ge=1, le=1)]
+    schema_version: Annotated[int, Field(ge=2, le=2)]
     cases: tuple[CaseExpectation, ...] = Field(min_length=1, repr=False)
 
 
@@ -682,10 +719,6 @@ def _validate(cases: EvaluationCases, expectations: EvaluationExpectations) -> N
         ):
             raise ValueError
         if gold.expected_order is not None and _unique(gold.expected_order) != relevant:
-            raise ValueError
-        _unique(gold.answer.required_facts)
-        _unique(gold.answer.forbidden_facts)
-        if set(gold.answer.required_facts) & set(gold.answer.forbidden_facts):
             raise ValueError
 
 

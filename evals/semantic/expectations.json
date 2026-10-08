@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "cases": [
     {
       "id": "synonym-warm-drink-ja",
@@ -21,7 +21,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "紅茶"
+          [
+            "紅茶"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -47,7 +49,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "自転車"
+          [
+            "自転車"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -73,7 +77,10 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "ミント"
+          [
+            "ミント",
+            "mint"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -119,8 +126,10 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "コーヒーが苦手",
-          "飲みません"
+          [
+            "コーヒー",
+            "珈琲"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -148,10 +157,15 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "ほうじ茶"
+          [
+            "ほうじ茶",
+            "焙じ茶"
+          ]
         ],
         "forbidden_facts": [
-          "緑茶を飲"
+          [
+            "緑茶"
+          ]
         ],
         "discarded": false
       }
@@ -176,8 +190,12 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "サンドイッチ",
-          "麦茶"
+          [
+            "サンドイッチ"
+          ],
+          [
+            "麦茶"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -205,10 +223,16 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "サンドイッチ"
+          [
+            "サンドイッチ"
+          ]
         ],
         "forbidden_facts": [
-          "りんごジュース"
+          [
+            "りんごジュース",
+            "リンゴジュース",
+            "林檎ジュース"
+          ]
         ],
         "discarded": false
       }
@@ -235,10 +259,14 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "青"
+          [
+            "青"
+          ]
         ],
         "forbidden_facts": [
-          "紫"
+          [
+            "紫"
+          ]
         ],
         "discarded": false
       }
@@ -265,10 +293,14 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "青"
+          [
+            "青"
+          ]
         ],
         "forbidden_facts": [
-          "紫"
+          [
+            "紫"
+          ]
         ],
         "discarded": false
       }
@@ -295,10 +327,14 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "青"
+          [
+            "青"
+          ]
         ],
         "forbidden_facts": [
-          "紫"
+          [
+            "紫"
+          ]
         ],
         "discarded": false
       }
@@ -325,10 +361,14 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "青"
+          [
+            "青"
+          ]
         ],
         "forbidden_facts": [
-          "紫"
+          [
+            "紫"
+          ]
         ],
         "discarded": false
       }
@@ -355,10 +395,14 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "りんご"
+          [
+            "りんご"
+          ]
         ],
         "forbidden_facts": [
-          "ぶどう"
+          [
+            "ぶどう"
+          ]
         ],
         "discarded": false
       }
@@ -385,10 +429,14 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "りんご"
+          [
+            "りんご"
+          ]
         ],
         "forbidden_facts": [
-          "ぶどう"
+          [
+            "ぶどう"
+          ]
         ],
         "discarded": false
       }
@@ -415,10 +463,14 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "りんご"
+          [
+            "りんご"
+          ]
         ],
         "forbidden_facts": [
-          "ぶどう"
+          [
+            "ぶどう"
+          ]
         ],
         "discarded": false
       }
@@ -443,7 +495,11 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "橙"
+          [
+            "橙",
+            "だいだい",
+            "オレンジ"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -468,7 +524,9 @@
         "behavior": "blocked",
         "required_facts": [],
         "forbidden_facts": [
-          "紅茶"
+          [
+            "紅茶"
+          ]
         ],
         "discarded": false
       }
@@ -494,7 +552,9 @@
         "behavior": "blocked",
         "required_facts": [],
         "forbidden_facts": [
-          "紅茶"
+          [
+            "紅茶"
+          ]
         ],
         "discarded": true
       }
@@ -518,7 +578,9 @@
         "behavior": "no_memory",
         "required_facts": [],
         "forbidden_facts": [
-          "紅茶"
+          [
+            "紅茶"
+          ]
         ],
         "discarded": false
       }
@@ -543,7 +605,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "鉛筆"
+          [
+            "鉛筆"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -569,7 +633,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "スニーカー"
+          [
+            "スニーカー"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -595,7 +661,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "自転車"
+          [
+            "自転車"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -621,7 +689,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "歴史小説"
+          [
+            "歴史小説"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -647,7 +717,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "黄色い傘"
+          [
+            "傘"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -673,7 +745,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "りんご"
+          [
+            "りんご"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -699,7 +773,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "金魚"
+          [
+            "金魚"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -725,7 +801,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "ジャズ"
+          [
+            "ジャズ"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -751,7 +829,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "図書館"
+          [
+            "図書館"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -777,7 +857,14 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "庭を散歩"
+          [
+            "庭"
+          ],
+          [
+            "散歩",
+            "歩く",
+            "歩き"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -803,7 +890,19 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "目覚まし時計を二つ"
+          [
+            "目覚まし",
+            "めざまし",
+            "アラーム"
+          ],
+          [
+            "二つ",
+            "2つ",
+            "二個",
+            "2個",
+            "二台",
+            "2台"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -829,7 +928,10 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "青いしおり"
+          [
+            "しおり",
+            "栞"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -855,7 +957,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "クッキー"
+          [
+            "クッキー"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -881,7 +985,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "壁のカレンダー"
+          [
+            "カレンダー"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -907,7 +1013,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "扇風機"
+          [
+            "扇風機"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -933,7 +1041,12 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "直後"
+          [
+            "直後",
+            "すぐ",
+            "終えたら",
+            "終わったら"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -959,7 +1072,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "折り紙"
+          [
+            "折り紙"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -985,7 +1100,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "夕焼け"
+          [
+            "夕焼け"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1011,7 +1128,10 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "フルート"
+          [
+            "フルート",
+            "flute"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1037,7 +1157,13 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "海岸"
+          [
+            "海岸",
+            "coast",
+            "beach",
+            "shore",
+            "seaside"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1063,7 +1189,12 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "かぼちゃ"
+          [
+            "かぼちゃ",
+            "カボチャ",
+            "南瓜",
+            "pumpkin"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1089,7 +1220,13 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "ユリ"
+          [
+            "ユリ",
+            "ゆり",
+            "百合",
+            "lily",
+            "lilies"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1115,7 +1252,12 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "赤"
+          [
+            "赤",
+            "あか",
+            "レッド",
+            "red"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1141,7 +1283,11 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "scarves"
+          [
+            "scarf",
+            "scarves",
+            "マフラー"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1167,7 +1313,10 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "Tuesday"
+          [
+            "Tuesday",
+            "火曜"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1193,7 +1342,11 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "autumn"
+          [
+            "autumn",
+            "fall",
+            "秋"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1219,7 +1372,10 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "mountains"
+          [
+            "mountain",
+            "山"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1427,7 +1583,9 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "星町"
+          [
+            "星町"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1456,8 +1614,12 @@
         "behavior": "grounded",
         "required_facts": [],
         "forbidden_facts": [
-          "星町",
-          "月町"
+          [
+            "星町"
+          ],
+          [
+            "月町"
+          ]
         ],
         "discarded": false
       }
@@ -1485,7 +1647,9 @@
         "behavior": "grounded",
         "required_facts": [],
         "forbidden_facts": [
-          "星町"
+          [
+            "星町"
+          ]
         ],
         "discarded": false
       }
@@ -1510,7 +1674,11 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "静かな"
+          [
+            "静か",
+            "静けさ",
+            "静寂"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1536,7 +1704,11 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "静かな"
+          [
+            "静か",
+            "静けさ",
+            "静寂"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
@@ -1576,11 +1748,21 @@
       "answer": {
         "behavior": "grounded",
         "required_facts": [
-          "春茶",
-          "夏茶",
-          "秋茶",
-          "冬茶",
-          "花茶"
+          [
+            "春茶"
+          ],
+          [
+            "夏茶"
+          ],
+          [
+            "秋茶"
+          ],
+          [
+            "冬茶"
+          ],
+          [
+            "花茶"
+          ]
         ],
         "forbidden_facts": [],
         "discarded": false
