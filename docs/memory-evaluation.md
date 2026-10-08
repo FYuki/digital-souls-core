@@ -64,12 +64,16 @@ fixtureはJSONで、`dataset_type`は`synthetic`、versionとdimensionsを持ち
 | `excluded_ids` | embeddingへ渡す前に候補から取り除くID |
 
 不明・重複IDや正解集合の不整合は拒否します。候補が0件ならembeddingを呼びません。
-同じquery内では製品と同じ`RetrievalPolicy`の順位付け（relevance 0.54以上、同等帯）を使い、返却件数だけkに合わせます。同等帯ではfixtureの候補順です。
+同じquery内では製品と同じ`RetrievalPolicy`の順位付け（relevance 0.54以上、同等帯）を使い、返却件数だけkに合わせます。同等帯では文書順から作った固定のcreated_at（先頭ほど新しい）とIDで並べます。last_user_mentioned_atは未知（None）です。
 local modeではfixtureの偽vectorを品質値として使わず、実adapterから得たvectorを評価します。
+
+JSON fixtureの形式は維持し、合成本文を `Episode.normalized_text` として持つ `RetrievalCandidate` と
+citationを作り、製品の `rank_records` で順位付けします。保存・形成を行うハーネスではありません。
+この最小追従後の評価再設計は[PR #51](https://github.com/FYuki/digital-souls-core/pull/51)で別途行います。
 
 このハーネスは合成の候補・正解集合を直接扱います。`excluded_ids`の除去は評価入力の制御で、
 実際のprivate thread、発話除外、削除transaction、Binding、privacy分類の結合試験を置き換えません。
-これらはMemoryService/PostgreSQLの`postgres` markerの合成試験で別に検証します。正本の履歴DBを読み込む機能はありません。
+これらはMemoryRetrieval・MemoryContextとPostgreSQL正本の`postgres` markerの合成試験で別に検証します。正本の履歴DBを読み込む機能はありません。
 `dataset_type=synthetic`というラベルだけで実データが安全になるわけではなく、私的実会話をfixtureへ転記しません。
 
 ## 指標の定義

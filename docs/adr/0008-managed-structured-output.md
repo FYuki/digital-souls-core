@@ -1,6 +1,9 @@
 # ADR 0008: 管理された分類器・抽出器の構造化出力
 
 Status: Proposed
+
+置換注記（2026-10-08）: [逐語記憶撤去の実施](../evidence/2026-10-08-verbatim-memory-removal.md)により、LocalExtractor・Extractionと旧抽出jobの承認経路は撤去済みです。LocalClassifier・Assessmentの固定構造化出力とprovenance検証は維持します。構造化記憶の抽出は[ADR 0017](0017-memory-formation-admission.md)の後続実装です。
+
 日付: 2026-10-03
 
 ## 背景と選択肢

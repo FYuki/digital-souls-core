@@ -65,9 +65,10 @@ policy欠落・判定不能・拒否は403、不明会話は404、上限超過�
 削除は進行中推論を自動キャンセルしませんが、その後の保存を拒否します。
 
 policyには保存前、復元、送信前、完了後の再確認があります。削除はpolicy撤回後にも
-使えます。既定は保存履歴の同一会話内での直接再利用です。記憶抽出・参照検索は
-[明示的な記憶API](memory.md)で利用でき、既定では接続しません。意味検索は実装済みです
-（[ADR 0010](adr/0010-in-process-memory-search.md)・[ADR 0011](adr/0011-local-memory-embedding.md)、
+使えます。既定は保存履歴の同一会話内での直接再利用です。正本の明示登録・参照検索は
+[記憶API](memory.md)で利用でき、構造化抽出・自動形成は未実装です。既定では接続しません。
+意味検索は正本のEpisode・Semanticと有効なFactを使います
+（[ADR 0022](adr/0022-memory-retrieval-from-records.md)、
 [SPEC §2.4](../SPEC.md#24-検索と会話での利用)）。実モデル品質は未検証です。
 
 
@@ -111,29 +112,32 @@ conversation IDとtrusted scope/characterと組み合わせて参照します。
 過去のturn revisionは異なり得ます。eligibleはsource条件だけで、privacyや候補採用の許可ではありません。
 
 DELETEは本文・receiptを消し、内容なしのsource削除通知を同じtransactionで残します。
-Stage3 consumer用Python portの`deletions(binding)`と`acknowledge_deletion(binding,event_id)`で処理します。
+trusted consumer向けPython portの`deletions(binding)`と`acknowledge_deletion(binding,event_id)`で処理します。
 scope違いの通知は取得・ackできません。通知のHTTP ackは公開しません。
 同じPostgreSQL schemaにある派生memory本文も同一transactionで消去します。再構成の完了とは別です。
 source参照自体は削除直後から無効です。
 
-PostgreSQL schema v1〜v4からv5へ段階的に原子的移行します。schemaとversionを同じtransactionで
+PostgreSQL schema v1〜v5からv6へ段階的に原子的移行します。schemaとversionを同じtransactionで
 更新し、途中失敗はrollbackして再実行できます。履歴・receipt・fingerprintは保持し、旧turnの
-日時はNULLのままです。未知versionは引き続き拒否します。
+日時はNULLのままです。v5→v6で旧逐語3表を削除し、確認状態・通知・正本表は保持します。
+[移行の詳細](postgresql.md#初期化と復旧境界)を参照してください。未知versionは引き続き拒否します。
 過去発話への後付け除外変更は未実装で、指定はcompletionの入力配列に対して行います。
 
 trusted構築コードから`PostgresHistory(database, clock=clock)`へ、timezone付きdatetimeを返す時計を注入できます。
 既定は保存時の現在UTC時刻です。新規turnごとに一度取得してUTCへ正規化し、timezoneなしの値は
 拒否します。再送・read・thread操作では取り直しません。HTTP入力から時計や日時は指定できません。
-PostgresMemoryも同じ構築引数を使い、`Evidence.stated_at`には抽出時刻ではなく元turnの保存日時
-または`None`を渡します。source参照・epoch・jobの識別には日時を含めません。
+正本の `Citation` は元turnのrevision・message index・epoch・話者・文字範囲を参照し、
+逐語原文や抽出時刻を複製しません。`PostgresMemoryRecords` に時計を注入する引数はありません。
+正本のcreated_at・last_user_mentioned_atはtrusted callerが記録に渡す値です。
 
 
 ### Stage3の撤回処理
 
 private化は、そのthread由来の既存memoryを削除する製品仕様として承認済みです。
-複数sourceの旧memoryは直ちに利用停止し、残る適格sourceのみから再構成が成功するまで返しません。
+複数sourceの正本は直ちに利用停止し、保存文・構造化本文を消去します。
+形成・再生成は未実装で、残る適格sourceから再生成できない期間を許容します。
 解除による旧memoryの自動復活は行いません。PATCHはepoch更新・派生本文消去・別のmemory撤回通知を
-原子的に確定します。明示batch再構成と制約は[記憶API説明](memory.md)を参照してください。
+原子的に確定します。正本・依存結果の撤回と未実装範囲は[記憶API説明](memory.md)を参照してください。
 
 
 ## 保存拒否の確認
@@ -166,7 +170,7 @@ assistantの引用・説明、tool結果、過去履歴は新しい確認の対�
 
 本文・検出語は信号へ含めません。モデルpayloadとrequest fingerprintにも確認metadataを
 加えません。GETおよび操作後snapshotのmemory_confirmations配列で未回答の参照を復元できます。
-未回答のsourceはeligible=falseで、実際の出典取得・形成・採用直前の再検証でも拒否します。
+未回答のsourceはeligible=falseで、正本登録・検索・送信直前の出典再検証でも拒否します。
 未回答には期限がなく、再起動・再送で解除しません。保留に依存し得るassistant/toolも除外します。
 
 `POST prefix/{conversation_id}/memory-confirmations`へ次を渡します。

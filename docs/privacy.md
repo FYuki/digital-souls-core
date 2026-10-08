@@ -45,10 +45,12 @@ localとexternalの両permissionが必要です。分類器は同じProvider por
 | history | 全messageの秘密値・直接識別値 | 保存・復元・receipt返却を拒否 |
 | local | 実送信payloadの決定論的検査 | ローカル推論を拒否 |
 | external | 決定論的検査＋ローカル意味分類 | 外部推論を拒否 |
-| memory | 決定論的検査＋ローカル意味分類（source除外は別途必須） | 将来の記憶形成を拒否 |
+| memory | 決定論的検査＋ローカル意味分類（source除外は別途必須） | 記憶検索を拒否（形成の保存判定は未実装） |
 
 意味分類のsafe判定だけで候補の根拠・型・有用性・保存先が承認されたことにはなりません。
-Stage3の最小抽出・保存・参照検索は[記憶API説明](memory.md)を参照してください。実モデル品質は未検証です。
+正本の登録・参照検索は[記憶API説明](memory.md)を参照してください。
+登録port自体はprivacy分類や保存価値の判断を行わず、trusted callerが保存判定を済ませる前提です。
+構造化形成は未実装で、現行形式の実モデル品質は未受入です。
 
 [ADR 0006](adr/0006-conversation-memory-controls.md)のユーザー操作仕様を優先します。
 「記録しないで（指定発話）」は履歴を残し、UI/Agentが`memory_excluded_indices`で指定した発話を
@@ -60,7 +62,8 @@ memory対象外にします。自然語だけから期間や操作を推定し�
 維持します。未回答は再起動後も対象外です。自然文・回答から履歴削除を実行しません。
 revision排他、再送、移行とHTTP形式は[履歴API](history-api.md#保存拒否の確認)を参照してください。
 履歴を残さない操作は会話削除で、派生memory削除の通知を同時に作ります。
-Stage3では同じDBの派生本文を同時に消去し、明示batch consumerが残存sourceだけの再構成jobを扱います。
+同じDBの正本と依存結果の本文を同時に消去します。旧逐語抽出・再構成のconsumerは撤去済みです。
+撤回イベントのoutboxは保持しますが、形成ができるまで再生成しない期間を許容します。
 secret検出時は引き続きturnを拒否します。stateless応答の事後マスク機能もありません。
 
 保存の許可と外部送信の許可は独立しています。health等の同一会話内履歴は
@@ -93,4 +96,13 @@ decimal表記へ変換して検査します。非有限値は拒否し、boolean
 
 ## 管理された構造化出力
 
-分類器・抽出器は固定JSON Schemaをproviderへ渡し、返却値のstrict検証を維持します。未対応・不正出力は拒否し、制約なしの再試行は行いません。schema・対応契約・SDK versionも承認provenanceに含むため、旧承認は自動的に引き継ぎません。[ADR 0008](adr/0008-managed-structured-output.md)を参照してください。
+分類器は固定JSON Schemaをproviderへ渡し、返却値のstrict検証を維持します。未対応・不正出力は拒否し、
+制約なしの再試行は行いません。schema・対応契約・SDK versionもprovenanceに含みます。
+[ADR 0008](adr/0008-managed-structured-output.md)の分類器側を維持し、逐語抽出器は撤去済みです。
+分類器のprovenanceにはmodel/digest、transport・profile ID・正規化loopback endpoint・識別形式versionを持たせます。
+http scheme・127.0.0.1・数値port・固定/v1 pathで組み立て、同値なURL表記は同じidentityとします。
+profile IDだけの変更も別の処理先と扱い、token/key/headerは保存しません。
+userinfo/query/fragmentを含むURLはProfile検証で拒否します。
+検索中とdispatch前に分類器設定とpolicyの同一性・世代を照合します。
+これは運用者が固定した設定の識別であり、endpoint背後の実プロセスやmodel digestの真正性保証ではありません。
+旧抽出jobの設定再承認・再試行APIは撤去済みで、現在のendpointを旧承認へ補完しません。
