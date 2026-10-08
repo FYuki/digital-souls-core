@@ -1,33 +1,20 @@
 """Explicit finite memory operations with current-policy and source authorization."""
 
-import asyncio
 import json
 from collections.abc import Callable
-from dataclasses import replace
 
 from .application import CoreError
 from .character import AccessScope, Character, GuardedContext
 from .history import Binding, SourceReference
 from .local_extractor import LocalExtractor
 from .memory_contracts import Memory, MemoryJob, MemoryStore, SourceVersion
-from .memory_ranking import (
-    EmbeddingSpace,
-    MemoryEmbedding,
-    RetrievalPolicy,
-    rank_memories,
-    validate_embedding_space,
-    validate_retrieval_policy,
-)
+from .memory_record_store import RetrievalCandidate
+from .memory_records import Episode, PartialDateTime, TemporalValue
+from .memory_retrieval import MemoryQueryUnavailable as MemoryQueryUnavailable
+from .memory_retrieval import MemoryRetrieval
 from .privacy import PrivacyPolicy
 from .privacy_classifier import LocalClassifier
 from .privacy_scan import scan
-
-
-class MemoryQueryUnavailable(CoreError):
-    """Query authorization refused/unavailable before any memory storage lookup."""
-
-    def __init__(self) -> None:
-        super().__init__(403, "memory_query_unavailable", "Memory query not authorized")
 
 
 class MemoryService:
@@ -36,43 +23,12 @@ class MemoryService:
         store: MemoryStore,
         policy: PrivacyPolicy,
         extractor: LocalExtractor,
-        *,
-        embedding: MemoryEmbedding | None = None,
-        retrieval: RetrievalPolicy | None = None,
     ) -> None:
         if not isinstance(policy.classifier, LocalClassifier):
             raise ValueError("memory requires managed local classification")
-        self.retrieval = validate_retrieval_policy(retrieval or RetrievalPolicy())
         self.store = store
         self.policy = policy
         self.extractor = extractor
-        self._embedding_generation = 0
-        self.embedding = embedding
-
-    @property
-    def embedding(self) -> MemoryEmbedding | None:
-        return self._embedding
-
-    @embedding.setter
-    def embedding(self, value: MemoryEmbedding | None) -> None:
-        # Trusted startup injection only. Even assigning the same instance retires
-        # outstanding ranking authorizations; no vector cache crosses generations.
-        self._embedding = value
-        self._embedding_generation += 1
-
-    def _retrieval_stamp(self) -> tuple[int, EmbeddingSpace | None]:
-        try:
-            space = None if self.embedding is None else self.embedding.space
-            if self.embedding is not None:
-                space = validate_embedding_space(space)
-                # Snapshot scalar metadata; even a trusted adapter bypassing the
-                # frozen dataclass cannot mutate a previously captured stamp.
-                space = replace(space)
-            return self._embedding_generation, space
-        except Exception:
-            raise CoreError(
-                502, "memory_embedding_failed", "Invalid memory embedding configuration"
-            ) from None
 
     def _versions(self) -> str:
         if not isinstance(self.policy.classifier, LocalClassifier):
@@ -150,77 +106,6 @@ class MemoryService:
         if not self.store.current(binding, sources):
             raise CoreError(409, "memory_source_invalid", "Memory source changed")
 
-    async def search(
-        self,
-        binding: Binding,
-        query: str,
-        limit: int | None = None,
-        *,
-        authorized: Callable[[], bool] = lambda: True,
-    ) -> tuple[Memory, ...]:
-        """Return at most the policy count; an explicit limit may only lower it."""
-        retrieval = self.retrieval
-        if limit is None:
-            limit = retrieval.max_retrieved_memories
-        if (
-            not isinstance(query, str)
-            or not 0 < len(query) <= 256
-            or type(limit) is not int
-            or not 1 <= limit <= 16
-        ):
-            raise CoreError(400, "memory_query_invalid", "Invalid memory query")
-        limit = min(limit, retrieval.max_retrieved_memories)
-        policy, stamp, versions = self.policy, self.policy.stamp, self._versions()
-        embedding, stamp_retrieval = self.embedding, self._retrieval_stamp()
-        memory_store = self.store
-
-        def check(memories: tuple[Memory, ...] = ()) -> None:
-            if (
-                not authorized()
-                or policy is not self.policy
-                or stamp != policy.stamp
-                or versions != self._versions()
-                or embedding is not self.embedding
-                or stamp_retrieval != self._retrieval_stamp()
-                or retrieval is not self.retrieval
-                or memory_store is not self.store
-                or (memories and not memory_store.valid(binding, memories))
-            ):
-                raise CoreError(403, "memory_denied", "Memory authorization changed")
-
-        check()
-        query_allowed = await policy.authorize(binding, "memory", query)
-        check()
-        if not query_allowed:
-            raise MemoryQueryUnavailable()
-        if embedding is None:
-            result = memory_store.search(binding, query, limit)
-        else:
-            candidates = memory_store.candidates(binding)
-            # No persistent index: each operation ranks only currently eligible
-            # memories, and limits total text before classification or embedding.
-            if len(candidates) > 1000 or sum(len(m.text.encode()) for m in candidates) > 262144:
-                raise CoreError(413, "memory_limit", "Memory embedding scope exceeds limit")
-            check(candidates)
-            if not candidates:
-                return ()
-            if not await policy.authorize(binding, "memory", [m.text for m in candidates]):
-                raise CoreError(403, "memory_denied", "Memory candidates denied")
-            check(candidates)
-            try:
-                async with asyncio.timeout(15):
-                    vectors = await embedding.embed((query, *(m.text for m in candidates)))
-            except Exception:
-                raise CoreError(502, "memory_embedding_failed", "Memory embedding failed") from None
-            check(candidates)
-            space = stamp_retrieval[1]
-            assert space is not None
-            result = rank_memories(candidates, vectors, space, retrieval)[:limit]
-        if not await policy.authorize(binding, "memory", [m.text for m in result]):
-            raise CoreError(403, "memory_denied", "Memory result denied")
-        check(candidates if embedding is not None else result)
-        return result
-
     async def rebuild(self, binding: Binding, *, limit: int = 16) -> int:
         """Finite drain; isolate failed work without migrating approved configuration."""
         for event in self.store.events(binding):
@@ -244,10 +129,26 @@ class MemoryService:
         return completed
 
 
+def _time(value: TemporalValue) -> dict[str, object]:
+    def partial(v: PartialDateTime | None) -> dict[str, object] | None:
+        if v is None:
+            return None
+        return {
+            "precision": v.precision.value,
+            **{
+                k: getattr(v, k)
+                for k in ("year", "month", "day", "hour", "minute", "second")
+                if getattr(v, k) is not None
+            },
+        }
+
+    return {"start": partial(value.start), "end": partial(value.end), "timezone": value.timezone}
+
+
 class MemoryContext:
     """Opt-in conversation-only context carrying an authorization guard until dispatch."""
 
-    def __init__(self, service: MemoryService) -> None:
+    def __init__(self, service: MemoryRetrieval) -> None:
         self.service = service
 
     @property
@@ -265,11 +166,13 @@ class MemoryContext:
         binding = Binding(scope, character.config.character_id)
         policy = self.service.policy
         stamp = policy.stamp
-        memories: tuple[Memory, ...] = ()
+        memories: tuple[RetrievalCandidate, ...] = ()
         try:
-            versions = self.service._versions()
+            versions = self.service._classifier()
             retrieval = self.service._retrieval_stamp()
-            memory_store = self.service.store
+            memory_store = self.service.records
+            ranking = self.service.retrieval
+            ranking_stamp = self.service._ranking_stamp()
             if user_text and policy.permits(binding, "memory"):
                 memories = await self.service.search(
                     binding, user_text[:256], authorized=authorized
@@ -286,7 +189,8 @@ class MemoryContext:
         # references while retaining the real identities in the dispatch guard.
         conversation_refs: dict[str, str] = {}
         for memory in memories:
-            for source in memory.sources:
+            for citation in memory.citations:
+                source = citation.source
                 cid = source.reference.conversation_id
                 if cid not in conversation_refs:
                     conversation_refs[cid] = f"conversation-{len(conversation_refs) + 1}"
@@ -296,8 +200,17 @@ class MemoryContext:
                 [
                     {
                         "memory_ref": f"memory-{index + 1}",
-                        "kind": m.kind,
-                        "user_evidence": json.loads(m.text),
+                        "kind": "episode" if isinstance(m.record, Episode) else "semantic",
+                        "text": m.record.normalized_text,
+                        **(
+                            {"experience_time": _time(m.record.experience_time)}
+                            if isinstance(m.record, Episode)
+                            else {"applicability": _time(m.record.applicability)}
+                        ),
+                        "facts": [
+                            {"text": f.normalized_text, "target_time": _time(f.target_time)}
+                            for f in m.facts
+                        ],
                         "sources": [
                             {
                                 "conversation_ref": conversation_refs[
@@ -307,7 +220,7 @@ class MemoryContext:
                                 "message_index": source.reference.message_index,
                                 "epoch": source.epoch,
                             }
-                            for source in m.sources
+                            for source in dict.fromkeys(c.source for c in m.citations)
                         ],
                     }
                     for index, m in enumerate(memories)
@@ -319,21 +232,27 @@ class MemoryContext:
         )
 
         def valid() -> bool:
-            return (
-                authorized()
-                and self.service.policy is policy
-                and policy.stamp == stamp
-                and self.service._versions() == versions
-                and self.service._retrieval_stamp() == retrieval
-                and self.service.store is memory_store
-                and (
-                    not memories
-                    or (
-                        policy.permits(binding, "memory")
-                        and policy.permits(binding, "local")
-                        and self.service.store.valid(binding, memories)
+            try:
+                self.service._classifier()
+                return (
+                    authorized()
+                    and self.service.policy is policy
+                    and policy.stamp == stamp
+                    and self.service._classifier() == versions
+                    and self.service.retrieval is ranking
+                    and self.service._ranking_stamp() == ranking_stamp
+                    and self.service._retrieval_stamp() == retrieval
+                    and self.service.records is memory_store
+                    and (
+                        not memories
+                        or (
+                            policy.permits(binding, "memory")
+                            and policy.permits(binding, "local")
+                            and memory_store.current(binding, memories)
+                        )
                     )
                 )
-            )
+            except CoreError:
+                return False
 
         return GuardedContext(text, valid, policy)

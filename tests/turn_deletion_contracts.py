@@ -17,6 +17,7 @@ from digital_souls_core.memory import MemoryContext
 from .conversation_support import PausedProvider, turn
 from .memory_confirmation_contracts import BASE, Harness, answer, complete
 from .memory_support import selection
+from .postgres_memory_support import written
 from .privacy_support import BINDING
 from .support import CALL, TOOL, completion
 
@@ -92,7 +93,7 @@ async def test_deletion_scopes_preserve_only_untargeted_history_and_memory(
     for n, old in enumerate(memories, start=1):
         assert h.memory.store.valid(BINDING, old) == (n in remaining)
         assert bodies[old[0].memory_id] == (old[0].text if n in remaining else None)
-    assert {m.memory_id for m in await h.memory.search(BINDING, "Synthetic")} == {
+    assert {m.memory_id for m in written(h.memory.store, BINDING)} == {
         memories[n - 1][0].memory_id for n in remaining
     }
 
@@ -123,7 +124,9 @@ async def test_multisource_memory_rebuild_uses_only_remaining_turns(storage: Sto
     old = await h.memory.extract(BINDING, refs)
     delete_turns(h, cid, 3, 2, "selected")
     assert storage.query("SELECT body FROM memories", ()) == [(None,)]
-    assert await h.memory.search(BINDING, "Synthetic") == ()
+    assert all(
+        "synthetic" not in memory.text.lower() for memory in written(h.memory.store, BINDING)
+    )
     events = h.memory.store.events(BINDING)
     assert len(events) == 1
     h.memory.store.consume(BINDING, events[0])
@@ -134,7 +137,7 @@ async def test_multisource_memory_rebuild_uses_only_remaining_turns(storage: Sto
     h.extractor.calls.clear()
     h.extractor.response["choices"][0]["message"]["content"] = selection([0, 1])
     assert await h.memory.rebuild(BINDING) == 1
-    rebuilt = await h.memory.search(BINDING, "Synthetic")
+    rebuilt = written(h.memory.store, BINDING)
     assert len(rebuilt) == 1 and rebuilt[0].memory_id != old[0].memory_id
     assert json.loads(rebuilt[0].text) == [texts[0], texts[2]]
     assert json.loads(h.extractor.calls[0][1]["messages"][1]["content"]) == [texts[0], texts[2]]
@@ -380,7 +383,29 @@ async def test_partial_deletion_invalidates_same_prepared_memory_context(storage
     cid = seed(h, ("Synthetic tea", "Synthetic rose"))
     await h.memory.extract(BINDING, (SourceReference(cid, 1, 0),))
     inference = h.conversation.inference
-    inference.memory_context = MemoryContext(h.memory)
+    from dataclasses import replace
+
+    from digital_souls_core.memory_contracts import SourceVersion
+    from digital_souls_core.memory_record_store import RecordBatch
+    from digital_souls_core.memory_records import Citation, Speaker
+    from digital_souls_core.memory_retrieval import MemoryRetrieval
+    from digital_souls_core.postgres_memory import PostgresMemory
+    from digital_souls_core.postgres_memory_records import PostgresMemoryRecords
+
+    from .record_retrieval_support import SyntheticEmbedding
+    from .test_memory_record_store_contract import episode
+
+    assert isinstance(h.memory.store, PostgresMemory)
+    records = PostgresMemoryRecords(h.memory.store.database)
+    c = Citation(BINDING, SourceVersion(SourceReference(cid, 1, 0), 0), Speaker.USER, 0, 5)
+    records.register(
+        BINDING,
+        RecordBatch(episodes=(replace(episode(c), normalized_text="Synthetic tea experience"),)),
+        "fixture-v1",
+    )
+    inference.memory_context = MemoryContext(
+        MemoryRetrieval(records, h.memory.policy, embedding=SyntheticEmbedding())
+    )
     prepared = await inference.prepare(
         "synthetic",
         CompletionInput(messages=[Message(role="user", content="tea")]),
@@ -389,7 +414,7 @@ async def test_partial_deletion_invalidates_same_prepared_memory_context(storage
     )
     inference.check(prepared)
     data = json.loads(prepared.payload["messages"][1]["content"].split("\n", 1)[1])
-    assert data[0]["user_evidence"] == ["Synthetic tea"]
+    assert data[0]["text"] == "Synthetic tea experience"
     calls = len(h.provider.calls)
     delete_turns(h, cid, 2, 1, "selected")
     with pytest.raises(CoreError):
@@ -738,7 +763,7 @@ async def test_rebuild_revalidates_job_after_another_partial_deletion(storage: S
     h.extractor.response["choices"][0]["message"]["content"] = selection()
     assert await h.memory.rebuild(BINDING) == 1
     assert json.loads(h.extractor.calls[0][1]["messages"][1]["content"]) == ["Synthetic rose"]
-    result = await h.memory.search(BINDING, "Synthetic")
+    result = written(h.memory.store, BINDING)
     assert len(result) == 1 and json.loads(result[0].text) == ["Synthetic rose"]
 
 
@@ -752,7 +777,9 @@ async def test_rebuild_failure_never_restores_deleted_memory_body(storage: Stora
     with pytest.raises(CoreError):
         await h.memory.rebuild(BINDING)
     assert storage.query("SELECT body FROM memories", ()) == [(None,)]
-    assert await h.memory.search(BINDING, "Synthetic") == ()
+    assert all(
+        "synthetic" not in memory.text.lower() for memory in written(h.memory.store, BINDING)
+    )
 
 
 async def test_tombstone_keeps_request_identifier_without_content_or_fingerprint(

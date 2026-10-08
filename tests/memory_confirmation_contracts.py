@@ -20,6 +20,7 @@ from digital_souls_core.privacy_classifier import LocalClassifier
 
 from .conversation_support import turn
 from .memory_support import selection
+from .postgres_memory_support import written
 from .privacy_support import BINDING, assessment, local_profile
 from .support import TOOL, FakeProvider, character, chunk, completion
 
@@ -277,7 +278,7 @@ async def test_accept_erases_existing_memory_and_never_restores_accepted_source(
     old_ref = SourceReference(cid, 1, 0)
     old = await harness.memory.extract(BINDING, (old_ref,))
     assert harness.memory.store.valid(BINDING, old)
-    assert await harness.memory.search(BINDING, "Synthetic") == old
+    assert written(harness.memory.store, BINDING) == old
     complete(
         harness,
         cid,
@@ -290,13 +291,17 @@ async def test_accept_erases_existing_memory_and_never_restores_accepted_source(
     assert accepted["revision"] == 3 and accepted["private_mode"] is True
     assert harness.conversation.read("synthetic", cid).messages == before.messages
     assert not harness.memory.store.valid(BINDING, old)
-    assert await harness.memory.search(BINDING, "Synthetic") == ()
+    assert all(
+        "synthetic" not in memory.text.lower() for memory in written(harness.memory.store, BINDING)
+    )
     response = harness.http.patch(
         f"{BASE}/{cid}", json={"expected_revision": 3, "private_mode": False}
     )
     assert response.status_code == 200
     assert not harness.memory.store.valid(BINDING, old)
-    assert await harness.memory.search(BINDING, "Synthetic") == ()
+    assert all(
+        "synthetic" not in memory.text.lower() for memory in written(harness.memory.store, BINDING)
+    )
     with pytest.raises(CoreError):
         await harness.memory.extract(BINDING, (SourceReference(cid, 2, 0),))
     assert harness.conversation.read("synthetic", cid).messages == before.messages

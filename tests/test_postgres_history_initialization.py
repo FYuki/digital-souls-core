@@ -14,6 +14,7 @@ from digital_souls_core.storage import StorageConfig, open_storage
 
 from . import test_postgres_stores
 from .postgres_history_support import history
+from .postgres_memory_support import written
 from .test_postgres_stores import BINDING, MESSAGES, Stores, raw_connection
 
 pytestmark = pytest.mark.postgres
@@ -27,7 +28,7 @@ def test_factory_shares_explicit_database_without_extracting(stores: Stores) -> 
     assert opened.memory.read(BINDING, created.conversation_id) == created
     opened.history.append(BINDING, created.conversation_id, "r1", "fp1", 0, MESSAGES, "stop")
     assert opened.memory.read(BINDING, created.conversation_id).messages == MESSAGES
-    assert opened.memory.search(BINDING, "synthetic", 10) == ()
+    assert all("synthetic" not in memory.text.lower() for memory in written(opened.memory, BINDING))
     assert opened.memory.pending(BINDING) == ()
 
 

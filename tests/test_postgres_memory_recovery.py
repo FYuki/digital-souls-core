@@ -5,7 +5,7 @@ import pytest
 from digital_souls_core.application import CoreError
 
 from . import postgres_memory_support
-from .postgres_memory_support import Stores, reopen, selection, setup, source
+from .postgres_memory_support import Stores, reopen, selection, setup, source, written
 from .privacy_support import BINDING
 
 stores = postgres_memory_support.stores
@@ -43,7 +43,7 @@ async def test_interrupted_outbox_consume_replays_atomically(stores: Stores, sta
         service.store.consume(BINDING, event)
     assert conversation.read("synthetic", refs[1].conversation_id) == remaining
     assert not service.store.valid(BINDING, old)
-    assert service.store.search(BINDING, "alpha") == ()
+    assert all("alpha" not in memory.text.lower() for memory in written(service.store, BINDING))
     assert service.store.events(BINDING) == (event,)
     assert service.store.pending(BINDING) == ()
     with stores.database.transaction(BINDING) as db:
@@ -63,7 +63,7 @@ async def test_interrupted_outbox_consume_replays_atomically(stores: Stores, sta
     provider.calls.clear()
     provider.response["choices"][0]["message"]["content"] = selection()
     assert await service.rebuild(BINDING) == 1
-    result = await service.search(BINDING, "beta")
+    result = written(service.store, BINDING)
     assert result[0].memory_id != old[0].memory_id
     assert result[0].sources[0].reference == refs[1] and result[0].sources[0].epoch == 0
     assert "alpha" not in result[0].text

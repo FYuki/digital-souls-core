@@ -58,12 +58,8 @@ def observe_queries(monkeypatch: pytest.MonkeyPatch) -> Iterator[Queries]:
 def invoke(
     stores: Stores, operation: str, job_id: str, expected: tuple[Memory, ...]
 ) -> tuple[Memory, ...] | bool:
-    if operation == "candidates":
-        return stores.memory.candidates(BINDING)
     if operation == "results":
         return stores.memory.results(BINDING, job_id)
-    if operation == "search":
-        return stores.memory.search(BINDING, "synthetic", limit=16)
     assert operation == "valid"
     return stores.memory.valid(BINDING, expected)
 
@@ -77,7 +73,7 @@ def selected(stores: Stores, refs: tuple[SourceReference, ...]) -> Candidate:
     )
 
 
-@pytest.mark.parametrize("operation", ["candidates", "results", "search", "valid"])
+@pytest.mark.parametrize("operation", ["results", "valid"])
 def test_read_statement_count_is_constant_for_one_ten_and_twenty_memories(
     stores: Stores, monkeypatch: pytest.MonkeyPatch, operation: str
 ) -> None:
@@ -95,9 +91,7 @@ def test_read_statement_count_is_constant_for_one_ten_and_twenty_memories(
         assert len(expected) == size and all(len(memory.sources) == 2 for memory in expected)
         with observe_queries(monkeypatch) as queries:
             result = invoke(stores, operation, job.job_id, expected)
-        assert result == (
-            True if operation == "valid" else expected[:16] if operation == "search" else expected
-        )
+        assert result == (True if operation == "valid" else expected)
         counts.append(len(queries.statements))
     # Include connection setup and scope-lock statements, not just data SELECTs.
     # The bound allows minor constant setup changes while rejecting N+1 growth.
@@ -141,12 +135,10 @@ def test_batch_preserves_memory_order_and_source_order_across_turns_and_position
         (newer.text, newer.sources),
         (older.text, older.sources),
     ]
-    assert stores.memory.candidates(BINDING) == results
-    assert stores.memory.search(BINDING, "synthetic") == results
     assert stores.memory.valid(BINDING, results)
 
 
-@pytest.mark.parametrize("operation", ["candidates", "results", "search", "valid"])
+@pytest.mark.parametrize("operation", ["results", "valid"])
 def test_batch_fetches_only_exact_conversation_revision_pairs(
     stores: Stores, monkeypatch: pytest.MonkeyPatch, operation: str
 ) -> None:
@@ -217,8 +209,6 @@ def test_batched_eligibility_and_valid_reject_a_changed_source(
     assert not stores.memory.valid(BINDING, independent + prior)
     assert stores.memory.valid(BINDING, independent)
     assert stores.memory.results(BINDING, job.job_id) == ()
-    assert stores.memory.candidates(BINDING) == independent
-    assert stores.memory.search(BINDING, "synthetic") == independent
 
 
 def test_empty_batch_preserves_vacuous_validity_and_fetches_no_source_body(
@@ -226,9 +216,7 @@ def test_empty_batch_preserves_vacuous_validity_and_fetches_no_source_body(
 ) -> None:
     seed(stores, "Synthetic unselected history.")
     with observe_queries(monkeypatch) as queries:
-        assert stores.memory.candidates(BINDING) == ()
         assert stores.memory.results(BINDING, "synthetic-unknown-job") == ()
-        assert stores.memory.search(BINDING, "synthetic") == ()
         assert stores.memory.valid(BINDING, ())
     assert queries.source_bodies == []
 
@@ -237,9 +225,7 @@ def test_distinct_source_pair_count_does_not_add_database_statements(
     stores: Stores, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     refs = tuple(seed(stores, f"Synthetic distinct source {index}.") for index in range(16))
-    counts: dict[str, list[int]] = {
-        name: [] for name in ("candidates", "results", "search", "valid")
-    }
+    counts: dict[str, list[int]] = {name: [] for name in ("results", "valid")}
     for size in (1, 8, 16):
         with stores.database.transaction(BINDING) as connection:
             connection.execute("DELETE FROM memories")

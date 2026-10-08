@@ -36,7 +36,7 @@ class LocalEmbeddingProfile(BaseModel):
 
 
 class LocalEmbedding:
-    """MemoryService supplies content authorization; this adapter owns local I/O only."""
+    """MemoryRetrieval supplies content authorization; this adapter owns local I/O only."""
 
     def __init__(self, profile: LocalEmbeddingProfile) -> None:
         # Revalidate even a profile created through model_copy/model_construct.

@@ -2,11 +2,14 @@
 
 from digital_souls_core.application import Inference
 from digital_souls_core.conversations import Conversations
-from digital_souls_core.history import SourceReference
+from digital_souls_core.history import Binding, SourceReference
 from digital_souls_core.local_extractor import LocalExtractor
 from digital_souls_core.memory import MemoryContext, MemoryService
-from digital_souls_core.postgres_db import PostgresDatabase
+from digital_souls_core.memory_contracts import Memory, MemoryStore
+from digital_souls_core.memory_retrieval import MemoryRetrieval
+from digital_souls_core.postgres_db import PostgresDatabase, key
 from digital_souls_core.postgres_memory import PostgresMemory
+from digital_souls_core.postgres_memory_records import PostgresMemoryRecords
 from digital_souls_core.privacy import PrivacyPolicy
 from digital_souls_core.privacy_classifier import LocalClassifier
 
@@ -14,6 +17,7 @@ from . import test_postgres_stores
 from .conversation_support import turn
 from .memory_support import selection as selection
 from .privacy_support import BINDING, assessment, local_profile
+from .record_retrieval_support import SyntheticEmbedding
 from .support import FakeProvider, character
 from .test_postgres_stores import Stores as Stores
 
@@ -76,7 +80,11 @@ def setup(
         policy,
         LocalExtractor(provider, local_profile(), model_digest="synthetic"),
     )
-    conversation.inference.memory_context = MemoryContext(service)
+    conversation.inference.memory_context = MemoryContext(
+        MemoryRetrieval(
+            PostgresMemoryRecords(stores.database), policy, embedding=SyntheticEmbedding()
+        )
+    )
     return service, conversation, provider
 
 
@@ -101,3 +109,17 @@ def assert_not_persisted(stores: Stores, marker: str) -> None:
         for (table,) in tables:
             rows = db.execute(sql.SQL("SELECT * FROM {}").format(sql.Identifier(table))).fetchall()
             assert marker not in repr(rows)
+
+
+def written(memory: MemoryStore, binding: Binding) -> tuple[Memory, ...]:
+    """Inspect write results only; never use a removed retrieval/fallback API.
+
+    Tests of extraction/rebuild need all completed job outputs. The SQL only
+    addresses jobs; the production results port rechecks output eligibility.
+    """
+    assert isinstance(memory, PostgresMemory)
+    with memory.database.transaction(binding) as db:
+        jobs = db.execute(
+            "SELECT id FROM memory_jobs WHERE binding=%s ORDER BY seq DESC", (key(binding),)
+        ).fetchall()
+    return tuple(m for (job_id,) in jobs for m in memory.results(binding, job_id))
