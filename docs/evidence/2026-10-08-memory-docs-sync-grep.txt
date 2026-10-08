@@ -1,0 +1,25 @@
+SPEC.md:94:| 部分文字列検索 | 撤去済み | ADR 0022 |
+docs/memory.md:59:embedding未接続時はstorageを読まず空結果を返します。部分文字列検索は撤去済みです。
+docs/adr/0017-memory-formation-admission.md:5:置換注記（2026-10-08）: [ADR 0022](0022-memory-retrieval-from-records.md)と[逐語記憶撤去の実施](../evidence/2026-10-08-verbatim-memory-removal.md)により、背景および後続境界で言及したMemoryService.extractと逐語の有限batch抽出は撤去済みです。構造化抽出・保存判定・形成jobは本ADRの後続実装として未実装のままです。
+docs/adr/0017-memory-formation-admission.md:138:- 既存の明示抽出API（`MemoryService.extract`）は、管理・試験用の経路として残すか、形成jobの
+docs/adr/0012-postgresql-storage.md:5:置換注記（2026-10-08）: [ADR 0016](0016-memory-kinds-and-records.md)・[ADR 0022](0022-memory-retrieval-from-records.md)と[逐語記憶撤去の実施](../evidence/2026-10-08-verbatim-memory-removal.md)により、PostgresMemory / MemoryStoreは撤去済みです。現行factoryはPostgresHistoryとPostgresMemoryRecords（MemoryRecordStore）を同じDBで構成し、StorageStores(history, records)を返します。schema版6では旧逐語3表を削除します。
+docs/adr/0012-postgresql-storage.md:21:SQLite実装を既存の選択肢として維持し、`PostgresHistory`・`PostgresMemory`をそれぞれ
+docs/adr/0012-postgresql-storage.md:22:HistoryStore・MemoryStore portのadapterとして追加します。SQL方言の違いはadapter内へ閉じ込め、
+docs/adr/0009-memory-context-references.md:5:置換注記（2026-10-08）: 原文の `user_evidence` 注入と Memory/source object の記述は、[ADR 0022](0022-memory-retrieval-from-records.md) の正本・保存文 context で置換します。一時参照名は維持します。
+docs/adr/0008-managed-structured-output.md:5:置換注記（2026-10-08）: [逐語記憶撤去の実施](../evidence/2026-10-08-verbatim-memory-removal.md)により、LocalExtractor・Extractionと旧抽出jobの承認経路は撤去済みです。LocalClassifier・Assessmentの固定構造化出力とprovenance検証は維持します。構造化記憶の抽出は[ADR 0017](0017-memory-formation-admission.md)の後続実装です。
+docs/adr/0008-managed-structured-output.md:15:管理されたLocalClassifierとLocalExtractorだけに、固定の`response_format.type=json_schema`と`json_schema.schema`を送る。schemaは既存のAssessment/Extractionから生成し、`strict=true`を指定する。呼び出し側の任意kwargsや公開APIには開放しない。通常の会話生成経路は変更しない。
+docs/adr/0022-memory-retrieval-from-records.md:59:保存 ID・UUID・record_id はモデルへ渡しません。逐語の `user_evidence` や引用範囲から切り出した原文は
+docs/adr/0022-memory-retrieval-from-records.md:67:- embedding 未接続時は storage を読まず空結果にします。部分文字列検索の fallback を廃止します。
+docs/adr/0022-memory-retrieval-from-records.md:70:- Python API の検索・context は非互換で作り直します。検索を `MemoryService` の書込・抽出から分離し、
+docs/adr/0022-memory-retrieval-from-records.md:77:[ADR 0010](0010-in-process-memory-search.md)の逐語候補と部分文字列 fallback、
+docs/adr/0010-in-process-memory-search.md:5:置換注記（2026-10-08）: 部分文字列検索 fallback、逐語 Memory からの候補取得と順位の対象は、[ADR 0022](0022-memory-retrieval-from-records.md) の Episode・Semantic（有効な Fact を添付）で置換します。
+docs/adr/0010-in-process-memory-search.md:15:[ADR 0007](0007-memory-provenance-and-revocation.md)の初期検索は、SQLite内の部分文字列一致と
+docs/adr/0010-in-process-memory-search.md:28:trusted起動コードが`MemoryService(..., embedding=trusted_embedder)`で明示注入した場合だけ
+docs/adr/0010-in-process-memory-search.md:29:意味検索を使います。未注入時はcasefold後の部分文字列一致と最新作成順を維持します。
+docs/adr/0010-in-process-memory-search.md:95:cancelは伝播します。`MemoryService.search`を直接呼ぶ場合は空結果へ変換せず、従来どおりエラーを返します。
+docs/adr/0011-local-memory-embedding.md:5:置換注記（2026-10-08）: embedding 未注入時に部分文字列検索を維持する記述は、[ADR 0022](0022-memory-retrieval-from-records.md) の storage を読まない空結果で置換します。
+docs/adr/0011-local-memory-embedding.md:15:接続範囲を拡張します。ADR 0010の検索認可・出典・撤回・保存境界と、未注入時の部分文字列検索を維持します。
+docs/adr/0011-local-memory-embedding.md:28:profileからadapterを作り、`MemoryService(..., embedding=adapter)`へ注入した場合だけ使用します。
+docs/adr/0011-local-memory-embedding.md:29:無効なadapterを注入した場合は検索を拒否し、部分文字列検索へfallbackしません。
+docs/adr/0011-local-memory-embedding.md:55:本文のmemory/local許可と意味分類は従来どおり`MemoryService`が担当します。adapterのscannerは
+docs/adr/0011-local-memory-embedding.md:59:本文・応答・例外文字列を公開エラーへ含めません。MemoryService経由では既存の汎用境界が
