@@ -2,19 +2,31 @@
 
 import asyncio
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .application import CoreError
-from .history import SourceReference
-from .memory_contracts import Memory, SourceVersion
+from .character import AccessScope
+from .history import Binding, SourceReference
+from .memory_contracts import SourceVersion
 from .memory_ranking import (
     EmbeddingSpace,
     MemoryEmbedding,
     RetrievalPolicy,
-    rank_memories,
+    rank_records,
     validate_embedding_space,
+)
+from .memory_record_store import RetrievalCandidate
+from .memory_records import (
+    Citation,
+    Episode,
+    EpisodeContext,
+    FiveW,
+    RecordState,
+    Speaker,
+    TemporalValue,
 )
 
 type Identifier = Annotated[str, Field(strict=True, pattern=r"^[a-z][a-z0-9-]{0,63}$")]
@@ -43,20 +55,34 @@ class _EvaluationItem(_FixtureModel):
 class EvaluationDocument(_EvaluationItem):
     source: EvaluationSource
 
-    def memory(self) -> Memory:
+    def candidate(self, *, created_at: datetime) -> RetrievalCandidate:
         source = self.source
-        return Memory(
-            self.id,
-            "semantic",
-            self.text,
-            (
-                SourceVersion(
-                    SourceReference(
-                        source.conversation_id, source.turn_revision, source.message_index
-                    ),
-                    source.epoch,
-                ),
+        binding = Binding(AccessScope(), "synthetic-evaluation")
+        citation = Citation(
+            binding,
+            SourceVersion(
+                SourceReference(source.conversation_id, source.turn_revision, source.message_index),
+                source.epoch,
             ),
+            Speaker.USER,
+            0,
+            len(self.text),
+        )
+        return RetrievalCandidate(
+            Episode(
+                episode_id=self.id,
+                version=1,
+                binding=binding,
+                normalized_text=self.text,
+                created_at=created_at,
+                last_user_mentioned_at=None,
+                state=RecordState.ACTIVE,
+                five_w=FiveW(predicate="synthetic fixture"),
+                experience_time=TemporalValue(),
+                experienced_at=None,
+                context=EpisodeContext.ACTUAL,
+                citations=(citation,),
+            )
         )
 
 
@@ -160,7 +186,7 @@ async def evaluate_memory_search(
     mode: EvaluationMode = "fixture",
     timeout_seconds: float = 15,
 ) -> EvaluationReport:
-    """Evaluate synthetic candidates with positive cosine, descending, using existing ranker.
+    """Evaluate synthetic canonical candidates using the product record ranker.
 
     Precision@k uses k as its denominator even when fewer results are returned.
     Recall/precision/MRR averages include answerable queries only; unanswerable
@@ -181,27 +207,34 @@ async def evaluate_memory_search(
     space = replace(validate_embedding_space(embedding.space))
     # Product ranking policy; only the returned count follows the requested k.
     policy = RetrievalPolicy(max_retrieved_memories=k, candidate_pool_size=max(k, 20))
-    memories = {document.id: document.memory() for document in fixture.documents}
+    records = {
+        document.id: document.candidate(
+            created_at=datetime(2026, 1, 1, tzinfo=UTC) - timedelta(seconds=index)
+        )
+        for index, document in enumerate(fixture.documents)
+    }
     rows: list[QueryEvaluation] = []
     embedding_calls = 0
     for query in fixture.queries:
         excluded = set(query.excluded_ids)
-        candidates = tuple(memories[mid] for mid in query.candidate_ids if mid not in excluded)
-        ranked: tuple[Memory, ...] = ()
+        candidates = tuple(records[mid] for mid in query.candidate_ids if mid not in excluded)
+        ranked: tuple[RetrievalCandidate, ...] = ()
         if candidates:
             try:
                 if replace(validate_embedding_space(embedding.space)) != space:
                     raise ValueError
                 async with asyncio.timeout(timeout_seconds):
-                    vectors = await embedding.embed((query.text, *(m.text for m in candidates)))
+                    vectors = await embedding.embed(
+                        (query.text, *(m.record.normalized_text for m in candidates))
+                    )
                 if replace(validate_embedding_space(embedding.space)) != space:
                     raise ValueError
-                ranked = rank_memories(candidates, vectors, space, policy)
+                ranked = rank_records(candidates, vectors, space, policy)
                 embedding_calls += 1
             except Exception:
                 raise CoreError(502, "memory_embedding_failed", "Memory embedding failed") from None
         relevant = set(query.relevant_ids)
-        ids = tuple(memory.memory_id for memory in ranked)
+        ids = tuple(memory.identifier for memory in ranked)
         hits = sum(mid in relevant for mid in ids)
         reciprocal = next((1 / rank for rank, mid in enumerate(ids, 1) if mid in relevant), 0.0)
         rows.append(

@@ -8,7 +8,7 @@ from psycopg import sql
 
 from digital_souls_core.postgres_db import PostgresDatabase
 from digital_souls_core.postgres_history import PostgresHistory
-from digital_souls_core.postgres_memory import PostgresMemory
+from digital_souls_core.postgres_memory_records import PostgresMemoryRecords
 
 from . import test_postgres_stores
 from . import turn_deletion_contracts as contracts
@@ -30,11 +30,8 @@ test_deletion_scopes_preserve_only_untargeted_history_and_memory = (
 test_whole_conversation_deletion_preserves_existing_notification_contract = (
     contracts.test_whole_conversation_deletion_preserves_existing_notification_contract
 )
-test_multisource_memory_rebuild_uses_only_remaining_turns = (
-    contracts.test_multisource_memory_rebuild_uses_only_remaining_turns
-)
-test_later_saved_and_new_user_turns_remain_extractable = (
-    contracts.test_later_saved_and_new_user_turns_remain_extractable
+test_later_saved_and_new_user_turns_allow_record_registration = (
+    contracts.test_later_saved_and_new_user_turns_allow_record_registration
 )
 test_partial_deletion_does_not_admit_retained_private_or_excluded_source = (
     contracts.test_partial_deletion_does_not_admit_retained_private_or_excluded_source
@@ -56,9 +53,6 @@ test_partial_deletion_rejects_same_inflight_http_completion = (
 )
 test_partial_deletion_invalidates_same_prepared_memory_context = (
     contracts.test_partial_deletion_invalidates_same_prepared_memory_context
-)
-test_partial_deletion_rejects_same_inflight_extraction = (
-    contracts.test_partial_deletion_rejects_same_inflight_extraction
 )
 test_remaining_dates_confirmation_states_and_receipts_survive_restart = (
     contracts.test_remaining_dates_confirmation_states_and_receipts_survive_restart
@@ -93,12 +87,6 @@ test_partial_deletion_cannot_change_another_binding = (
 test_repeated_partial_deletion_is_rejected_without_second_revision_change = (
     contracts.test_repeated_partial_deletion_is_rejected_without_second_revision_change
 )
-test_rebuild_revalidates_job_after_another_partial_deletion = (
-    contracts.test_rebuild_revalidates_job_after_another_partial_deletion
-)
-test_rebuild_failure_never_restores_deleted_memory_body = (
-    contracts.test_rebuild_failure_never_restores_deleted_memory_body
-)
 test_tombstone_keeps_request_identifier_without_content_or_fingerprint = (
     contracts.test_tombstone_keeps_request_identifier_without_content_or_fingerprint
 )
@@ -108,7 +96,7 @@ test_tombstone_keeps_request_identifier_without_content_or_fingerprint = (
 def storage(stores: Stores) -> Iterator[Storage]:
     def reopen() -> Harness:
         database = PostgresDatabase(stores.config)
-        return make_harness(PostgresHistory(database), PostgresMemory(database))
+        return make_harness(PostgresHistory(database), PostgresMemoryRecords(database))
 
     def query(statement: str, parameters: tuple[object, ...]) -> list[tuple[Any, ...]]:
         with stores.database.transaction(BINDING) as db:
@@ -144,6 +132,6 @@ def storage(stores: Stores) -> Iterator[Storage]:
                 for value in row
             )
 
-    value = make_harness(stores.history, stores.memory)
+    value = make_harness(stores.history, stores.records)
     with value.http:
         yield Storage(value, reopen, query, reject_delete, allow_delete, stored_values)

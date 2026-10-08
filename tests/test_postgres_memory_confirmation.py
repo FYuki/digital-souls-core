@@ -8,7 +8,8 @@ from digital_souls_core.application import CoreError
 from digital_souls_core.history import SourceReference
 from digital_souls_core.postgres_db import PostgresDatabase
 from digital_souls_core.postgres_history import PostgresHistory
-from digital_souls_core.postgres_memory import PostgresMemory
+from digital_souls_core.postgres_memory_records import PostgresMemoryRecords
+from digital_souls_core.postgres_schema import SCHEMA_VERSION
 
 from . import memory_confirmation_contracts as contracts
 from . import test_postgres_stores
@@ -19,6 +20,7 @@ from .memory_confirmation_contracts import (
     complete,
     make_harness,
 )
+from .postgres_record_support import events, register_sources
 from .test_postgres_stated_at import CID, install_v1
 from .test_postgres_stores import BINDING, Stores
 from .time_support import FIRST
@@ -43,8 +45,8 @@ test_decline_does_not_disable_private_mode = contracts.test_decline_does_not_dis
 test_decline_releases_only_target_and_preserves_explicit_exclusion = (
     contracts.test_decline_releases_only_target_and_preserves_explicit_exclusion
 )
-test_pending_source_is_not_current_for_memory_commit = (
-    contracts.test_pending_source_is_not_current_for_memory_commit
+test_pending_source_is_rejected_for_record_registration = (
+    contracts.test_pending_source_is_rejected_for_record_registration
 )
 test_refusal_signal_identifies_each_user_source_without_content = (
     contracts.test_refusal_signal_identifies_each_user_source_without_content
@@ -58,14 +60,14 @@ test_stale_and_repeated_confirmation_leave_state_unchanged = (
 test_tool_refusal_text_does_not_create_confirmation = (
     contracts.test_tool_refusal_text_does_not_create_confirmation
 )
-test_unanswered_source_is_rejected_before_extraction = (
-    contracts.test_unanswered_source_is_rejected_before_extraction
+test_unanswered_source_is_rejected_before_record_registration = (
+    contracts.test_unanswered_source_is_rejected_before_record_registration
 )
 
 
 @pytest.fixture
 def harness(stores: Stores) -> Iterator[Harness]:
-    value = make_harness(stores.history, stores.memory)
+    value = make_harness(stores.history, stores.records)
     with value.http:
         yield value
 
@@ -79,7 +81,7 @@ def test_pending_confirmation_and_receipt_survive_postgres_restart(
     first = complete(harness, cid, **changes)
     before = harness.conversation.read("synthetic", cid)
     database = PostgresDatabase(stores.config)
-    restored = make_harness(PostgresHistory(database), PostgresMemory(database))
+    restored = make_harness(PostgresHistory(database), PostgresMemoryRecords(database))
     with restored.http:
         assert restored.conversation.read("synthetic", cid) == before
         assert restored.http.get(f"{BASE}/{cid}").json()["memory_confirmations"] == [
@@ -87,7 +89,9 @@ def test_pending_confirmation_and_receipt_survive_postgres_restart(
         ]
         assert not restored.conversation.store.source_eligible(BINDING, SourceReference(cid, 1, 0))
         with pytest.raises(CoreError):
-            restored.memory.store.sources(BINDING, (SourceReference(cid, 1, 0),))
+            register_sources(
+                restored.records, restored.conversation.store, (SourceReference(cid, 1, 0),)
+            )
         assert complete(restored, cid, **changes) == first
         assert restored.provider.calls == []
         answer(restored, cid, 1, 0, False)
@@ -99,7 +103,9 @@ async def test_postgres_accept_rollback_preserves_memory_and_allows_retry(
 ) -> None:
     cid = harness.conversation.create("synthetic").conversation_id
     complete(harness, cid)
-    old = await harness.memory.extract(BINDING, (SourceReference(cid, 1, 0),))
+    old = register_sources(
+        harness.records, harness.conversation.store, (SourceReference(cid, 1, 0),)
+    )
     complete(
         harness,
         cid,
@@ -114,7 +120,7 @@ async def test_postgres_accept_rollback_preserves_memory_and_allows_retry(
             "$$ BEGIN RAISE EXCEPTION 'synthetic'; END $$"
         )
         db.execute(
-            "CREATE TRIGGER reject_revoke BEFORE UPDATE OF body ON memories "
+            "CREATE TRIGGER reject_revoke BEFORE UPDATE OF normalized_text ON memory_episodes "
             "FOR EACH ROW EXECUTE FUNCTION reject_revoke()"
         )
     response = harness.http.post(
@@ -128,17 +134,17 @@ async def test_postgres_accept_rollback_preserves_memory_and_allows_retry(
     )
     assert response.status_code >= 400
     assert harness.conversation.read("synthetic", cid) == before
-    assert harness.memory.store.valid(BINDING, old)
-    assert harness.memory.store.events(BINDING) == ()
+    assert harness.records.current(BINDING, old)
+    assert events(stores.records) == ()
     with stores.database.transaction(BINDING) as db:
-        row = db.execute("SELECT body FROM memories").fetchone()
-        assert row is not None and row[0] == old[0].text
-        db.execute("DROP TRIGGER reject_revoke ON memories")
+        row = db.execute("SELECT normalized_text FROM memory_episodes").fetchone()
+        assert row is not None and row[0] == old[0].record.normalized_text
+        db.execute("DROP TRIGGER reject_revoke ON memory_episodes")
         db.execute("DROP FUNCTION reject_revoke()")
     answer(harness, cid, 2, 0, True, turn_revision=2)
     with stores.database.transaction(BINDING) as db:
-        assert db.execute("SELECT body FROM memories").fetchall() == [(None,)]
-    assert not harness.memory.store.valid(BINDING, old)
+        assert db.execute("SELECT normalized_text FROM memory_episodes").fetchall() == [(None,)]
+    assert not harness.records.current(BINDING, old)
 
 
 @pytest.mark.parametrize("timestamp", [None, FIRST])
@@ -159,14 +165,15 @@ def test_postgres_v2_migration_keeps_old_dates_receipts_and_does_not_scan_histor
             ),
         )
     database = PostgresDatabase(stores.config)
-    restored = make_harness(PostgresHistory(database), PostgresMemory(database))
+    restored = make_harness(PostgresHistory(database), PostgresMemoryRecords(database))
+    with stores.database.transaction(BINDING) as db:
+        assert db.execute("SELECT version FROM schema_version").fetchall() == [(SCHEMA_VERSION,)]
     with restored.http:
         snapshot = restored.conversation.read("synthetic", CID)
         assert [m.content for m in snapshot.messages] == ["覚えないで", "Synthetic reply"]
         assert snapshot.memory_sources[0].reference == SourceReference(CID, 1, 0)
         assert snapshot.memory_sources[0].stated_at == timestamp
         assert restored.conversation.store.source_eligible(BINDING, SourceReference(CID, 1, 0))
-        evidence = restored.memory.store.sources(BINDING, (SourceReference(CID, 1, 0),))[0]
-        assert evidence.text == "覚えないで" and evidence.stated_at == timestamp
+        assert snapshot.memory_sources[0].stated_at == timestamp
         receipt = restored.conversation.store.receipt(BINDING, CID, "r1")
         assert receipt is not None and receipt.fingerprint == "original-fingerprint"

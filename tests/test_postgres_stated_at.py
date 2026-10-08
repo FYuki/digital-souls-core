@@ -9,10 +9,9 @@ from psycopg import Connection, sql
 
 from digital_souls_core.application import CoreError
 from digital_souls_core.contracts import Message
-from digital_souls_core.history import ConversationControls, SourceReference
+from digital_souls_core.history import ConversationControls
 from digital_souls_core.postgres_db import PostgresDatabase, key
 from digital_souls_core.postgres_history import PostgresHistory
-from digital_souls_core.postgres_memory import PostgresMemory, _evidence
 from digital_souls_core.postgres_schema import SCHEMA_VERSION
 
 from . import test_postgres_stores
@@ -50,7 +49,7 @@ def install_v1(stores: Stores) -> None:
         )
 
 
-def test_fixed_clock_reopen_snapshot_and_single_and_batch_evidence(stores: Stores) -> None:
+def test_fixed_clock_reopen_preserves_source_dates(stores: Stores) -> None:
     times = iter((FIRST.astimezone(timezone(timedelta(hours=-5))), SECOND))
     history = PostgresHistory(stores.database, clock=lambda: next(times))
     cid = history.create(BINDING).conversation_id
@@ -63,7 +62,7 @@ def test_fixed_clock_reopen_snapshot_and_single_and_batch_evidence(stores: Store
     history.controls(BINDING, cid, ConversationControls(expected_revision=1, archived=True))
     history.append(BINDING, cid, "r2", "fp2", 2, MESSAGES, "stop")
     assert history.append(BINDING, cid, "r1", "fp1", 0, messages, "stop") == receipt
-    memory = PostgresMemory(PostgresDatabase(stores.config), clock=lambda: SECOND)
+    memory = PostgresHistory(PostgresDatabase(stores.config), clock=lambda: SECOND)
     snapshot = memory.read(BINDING, cid)
     assert snapshot.messages == messages + MESSAGES
     assert [s.reference.turn_revision for s in snapshot.memory_sources] == [1, 1, 1, 3, 3]
@@ -72,21 +71,6 @@ def test_fixed_clock_reopen_snapshot_and_single_and_batch_evidence(stores: Store
         s.stated_at is not None and s.stated_at.utcoffset() == timedelta(0)
         for s in snapshot.memory_sources
     )
-    refs = (SourceReference(cid, 3, 0), SourceReference(cid, 1, 0))
-    evidence = memory.sources(BINDING, refs)
-    assert [e.stated_at for e in evidence] == [SECOND, FIRST]
-    # Public current/results consume _source_rows but discard Evidence metadata;
-    # observe the batch at its owner so dropped dates cannot hide behind True.
-    with memory.database.transaction(BINDING) as db:
-        rows = memory._source_rows(db, BINDING, refs)
-        batch = tuple(
-            _evidence(ref, rows[(ref.conversation_id, ref.turn_revision)]) for ref in refs
-        )
-    assert batch == evidence
-    assert [e.stated_at for e in batch] == [SECOND, FIRST]
-    job = memory.begin(BINDING, tuple(e.source for e in evidence), "synthetic-v1")
-    assert memory.current(BINDING, job.sources)
-    assert memory.begin(BINDING, job.sources, job.versions) == job
 
 
 def test_naive_clock_rolls_back_and_valid_retry_saves_timestamp(stores: Stores) -> None:
@@ -116,9 +100,9 @@ def test_default_clock_is_current_utc(stores: Stores) -> None:
     assert timestamp.utcoffset() == timedelta(0)
 
 
-def test_v1_migration_preserves_old_null_history_receipt_and_evidence(stores: Stores) -> None:
+def test_v1_migration_preserves_old_null_history_and_receipt(stores: Stores) -> None:
     install_v1(stores)
-    memory = PostgresMemory(PostgresDatabase(stores.config))
+    memory = PostgresHistory(PostgresDatabase(stores.config))
     with stores.database.transaction(BINDING) as db:
         assert db.execute("SELECT version FROM schema_version").fetchall() == [(SCHEMA_VERSION,)]
         assert db.execute("SELECT stated_at FROM turns").fetchall() == [(None,)]
@@ -129,10 +113,7 @@ def test_v1_migration_preserves_old_null_history_receipt_and_evidence(stores: St
     assert receipt is not None and receipt.fingerprint == "original-fingerprint"
     assert memory.append(BINDING, CID, "r1", "original-fingerprint", 0, MESSAGES, "stop") == receipt
     assert memory.read(BINDING, CID) == snapshot
-    evidence = memory.sources(BINDING, (SourceReference(CID, 1, 0),))[0]
-    assert evidence.stated_at is None and evidence.source.epoch == 0
-    assert evidence.text == MESSAGES[0].content
-    current = PostgresMemory(PostgresDatabase(stores.config), clock=lambda: FIRST)
+    current = PostgresHistory(PostgresDatabase(stores.config), clock=lambda: FIRST)
     current.append(BINDING, CID, "r2", "fp2", 1, MESSAGES, "stop")
     assert [s.stated_at for s in current.read(BINDING, CID).memory_sources] == [
         None,
@@ -190,7 +171,7 @@ def test_v1_migration_interruption_rolls_back_and_retries(
                 json.dumps([m.model_dump(exclude_none=True) for m in MESSAGES]),
             )
         ]
-    restored = PostgresMemory(PostgresDatabase(stores.config))
+    restored = PostgresHistory(PostgresDatabase(stores.config))
     assert restored.read(BINDING, CID).messages == MESSAGES
     with stores.database.transaction(BINDING) as db:
         assert db.execute("SELECT version FROM schema_version").fetchall() == [(SCHEMA_VERSION,)]

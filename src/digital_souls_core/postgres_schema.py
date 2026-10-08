@@ -9,7 +9,15 @@ from .postgres_record_revocation import revoke_records
 from .postgres_record_schema import COLUMNS, RECORD_DDL
 from .postgres_record_schema import CONSTRAINTS as RECORD_CONSTRAINTS
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
+
+# Tables present through version 5, used only to validate historical migration sources.
+LEGACY_VERBATIM_INDEXES = {("memory_source_lookup", "i")}
+LEGACY_VERBATIM_COLUMNS = {
+    "memory_jobs": ("seq", "id", "binding", "sources", "versions", "state"),
+    "memories": ("seq", "id", "binding", "job", "kind", "body", "state", "revoked_by"),
+    "memory_sources": ("seq", "binding", "memory", "conversation", "revision", "position", "epoch"),
+}
 
 TABLE_COLUMNS = {
     "schema_version": ("version",),
@@ -38,14 +46,31 @@ TABLE_COLUMNS = {
     ),
     "source_deletions": ("seq", "event", "binding", "conversation", "through_revision"),
     "memory_events": ("seq", "id", "binding", "conversation", "epoch", "reason", "processed"),
-    "memory_jobs": ("seq", "id", "binding", "sources", "versions", "state"),
-    "memories": ("seq", "id", "binding", "job", "kind", "body", "state", "revoked_by"),
-    "memory_sources": ("seq", "binding", "memory", "conversation", "revision", "position", "epoch"),
     "turn_tombstones": ("seq", "binding", "conversation", "request", "revision"),
     "turn_deletions": ("seq", "event", "binding", "conversation", "turn_revisions"),
 }
 
 # These are the keys and referential actions on which receipt and deletion guarantees rely.
+LEGACY_VERBATIM_CONSTRAINTS = {
+    ("memory_jobs", "memory_jobs_pkey"): "PRIMARY KEY (binding, id)",
+    ("memories", "memories_pkey"): "PRIMARY KEY (binding, id)",
+    (
+        "memories",
+        "memories_binding_job_fkey",
+    ): "FOREIGN KEY (binding, job) REFERENCES memory_jobs(binding, id)",
+    (
+        "memory_sources",
+        "memory_sources_pkey",
+    ): 'PRIMARY KEY (binding, memory, conversation, revision, "position")',
+    (
+        "memory_sources",
+        "memory_sources_binding_memory_fkey",
+    ): "FOREIGN KEY (binding, memory) REFERENCES memories(binding, id) ON DELETE CASCADE",
+    ("memory_jobs", "memory_jobs_seq_key"): "UNIQUE (seq)",
+    ("memories", "memories_seq_key"): "UNIQUE (seq)",
+    ("memory_sources", "memory_sources_seq_key"): "UNIQUE (seq)",
+}
+
 CONSTRAINTS = {
     ("schema_version", "schema_version_pkey"): "PRIMARY KEY (version)",
     ("conversations", "conversations_pkey"): "PRIMARY KEY (binding, id)",
@@ -63,22 +88,11 @@ CONSTRAINTS = {
     ),
     ("source_deletions", "source_deletions_pkey"): "PRIMARY KEY (event)",
     ("memory_events", "memory_events_pkey"): "PRIMARY KEY (id)",
-    ("memory_jobs", "memory_jobs_pkey"): "PRIMARY KEY (binding, id)",
-    ("memories", "memories_pkey"): "PRIMARY KEY (binding, id)",
-    (
-        "memories",
-        "memories_binding_job_fkey",
-    ): "FOREIGN KEY (binding, job) REFERENCES memory_jobs(binding, id)",
-    (
-        "memory_sources",
-        "memory_sources_pkey",
-    ): 'PRIMARY KEY (binding, memory, conversation, revision, "position")',
-    (
-        "memory_sources",
-        "memory_sources_binding_memory_fkey",
-    ): "FOREIGN KEY (binding, memory) REFERENCES memories(binding, id) ON DELETE CASCADE",
     ("turn_tombstones", "turn_tombstones_pkey"): "PRIMARY KEY (binding, conversation, request)",
-    ("turn_tombstones", "turn_tombstones_binding_conversation_fkey"): (
+    (
+        "turn_tombstones",
+        "turn_tombstones_binding_conversation_fkey",
+    ): (
         "FOREIGN KEY (binding, conversation) REFERENCES conversations(binding, id) "
         "ON DELETE CASCADE"
     ),
@@ -137,25 +151,6 @@ DDL = (
         id TEXT PRIMARY KEY, binding TEXT NOT NULL, conversation TEXT NOT NULL,
         epoch INTEGER NOT NULL, reason TEXT NOT NULL, processed BOOLEAN NOT NULL DEFAULT false
     )""",
-    """CREATE TABLE memory_jobs (
-        seq BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE,
-        id TEXT NOT NULL, binding TEXT NOT NULL, sources TEXT NOT NULL, versions TEXT NOT NULL,
-        state TEXT NOT NULL, PRIMARY KEY(binding,id)
-    )""",
-    """CREATE TABLE memories (
-        seq BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE,
-        id TEXT NOT NULL, binding TEXT NOT NULL, job TEXT NOT NULL, kind TEXT NOT NULL,
-        body TEXT, state TEXT NOT NULL, revoked_by TEXT,
-        PRIMARY KEY(binding,id), FOREIGN KEY(binding,job) REFERENCES memory_jobs(binding,id)
-    )""",
-    """CREATE TABLE memory_sources (
-        seq BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE,
-        binding TEXT NOT NULL, memory TEXT NOT NULL, conversation TEXT NOT NULL,
-        revision INTEGER NOT NULL, position INTEGER NOT NULL, epoch INTEGER NOT NULL,
-        PRIMARY KEY(binding,memory,conversation,revision,position),
-        FOREIGN KEY(binding,memory) REFERENCES memories(binding,id) ON DELETE CASCADE
-    )""",
-    "CREATE INDEX memory_source_lookup ON memory_sources(binding,conversation)",
     *TURN_DELETION_DDL,
     *RECORD_DDL,
     f"INSERT INTO schema_version(version) VALUES ({SCHEMA_VERSION})",
@@ -179,13 +174,6 @@ def revoke(
         "INSERT INTO memory_events(id,binding,conversation,epoch,reason) VALUES (%s,%s,%s,%s,%s)",
         (event, binding, conversation, epoch, reason),
     )
-    db.execute(
-        "UPDATE memories SET body=NULL,state='revoked',revoked_by=%s "
-        "WHERE binding=%s AND state='active' AND id IN "
-        "(SELECT memory FROM memory_sources WHERE binding=%s AND conversation=%s)",
-        (event, binding, binding, conversation),
-    )
-
     revoke_records(db, binding, conversation, event)
 
 
@@ -201,12 +189,4 @@ def revoke_turns(
         "INSERT INTO memory_events(id,binding,conversation,epoch,reason) VALUES (%s,%s,%s,%s,%s)",
         (event, binding, conversation, epoch, "turn_delete"),
     )
-    db.execute(
-        "UPDATE memories SET body=NULL,state='revoked',revoked_by=%s "
-        "WHERE binding=%s AND state='active' AND id IN "
-        "(SELECT memory FROM memory_sources WHERE binding=%s AND conversation=%s "
-        "AND revision=ANY(%s))",
-        (event, binding, binding, conversation, list(revisions)),
-    )
-
     revoke_records(db, binding, conversation, event, revisions)

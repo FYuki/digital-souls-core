@@ -545,11 +545,11 @@ def test_revocation_dependencies_fact_all_versions_and_non_resurrection(
         head = port.head(BINDING, record_ref.kind, record_ref.record_id)
         assert head is not None and head.state == RecordState.SUSPENDED
     assert port.get(BINDING, RecordKind.EPISODE, "e2") == e2
-    event = stores.memory.events(BINDING)[0]
+    from .postgres_record_support import events
+
+    event = events(stores.records)[0]
     assert set(port.affected(BINDING, event)) == {reference(r) for r in (e, f, f2, s, link)}
     assert port.affected(OTHER, event) == ()
-    stores.memory.consume(BINDING, event)
-    assert set(port.affected(BINDING, event)) == {reference(r) for r in (e, f, f2, s, link)}
     with pytest.raises(CoreError):
         port.register(BINDING, original, "v1")
     with pytest.raises(CoreError):

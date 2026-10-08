@@ -1,4 +1,3 @@
-import json
 import os
 import time
 from collections.abc import Callable, Iterator
@@ -18,10 +17,11 @@ from digital_souls_core.application import CoreError
 from digital_souls_core.character import AccessScope
 from digital_souls_core.contracts import Message
 from digital_souls_core.history import Binding, ConversationControls, SourceReference
-from digital_souls_core.memory_contracts import Candidate, Memory, MemoryJob
 from digital_souls_core.postgres_db import PostgresConfig, PostgresDatabase
 from digital_souls_core.postgres_history import PostgresHistory
-from digital_souls_core.postgres_memory import PostgresMemory
+from digital_souls_core.postgres_memory_records import PostgresMemoryRecords
+
+from .postgres_record_support import events, register_sources
 
 pytestmark = pytest.mark.postgres
 BINDING = Binding(AccessScope(), "synthetic")
@@ -53,7 +53,7 @@ class Stores:
     config: PostgresConfig
     database: PostgresDatabase
     history: PostgresHistory
-    memory: PostgresMemory
+    records: PostgresMemoryRecords
 
 
 @pytest.fixture
@@ -78,8 +78,8 @@ def stores() -> Iterator[Stores]:
     database = PostgresDatabase(config)
     try:
         history = PostgresHistory(database)
-        memory = PostgresMemory(database)
-        yield Stores(config, database, history, memory)
+        records = PostgresMemoryRecords(database)
+        yield Stores(config, database, history, records)
     finally:
         # The only dropped object is this fixture's freshly generated schema.
         with raw_connection(config) as connection:
@@ -102,27 +102,6 @@ def seed(stores: Stores, text: str = "I like synthetic tea.") -> SourceReference
         "stop",
     )
     return SourceReference(conversation.conversation_id, 1, 0)
-
-
-def candidate(stores: Stores, job: MemoryJob) -> Candidate:
-    evidence = stores.memory.sources(BINDING, tuple(source.reference for source in job.sources))
-    return Candidate(
-        "semantic", job.sources, json.dumps([item.text for item in evidence], ensure_ascii=False)
-    )
-
-
-def prepare(stores: Stores, refs: tuple[SourceReference, ...]) -> tuple[MemoryJob, Candidate]:
-    evidence = stores.memory.sources(BINDING, refs)
-    job = stores.memory.begin(BINDING, tuple(item.source for item in evidence), "synthetic-v1")
-    return job, candidate(stores, job)
-
-
-def remember(stores: Stores, refs: tuple[SourceReference, ...]) -> tuple[Memory, ...]:
-    job, selected = prepare(stores, refs)
-    stores.memory.commit(BINDING, job, (selected,))
-    result = stores.memory.results(BINDING, job.job_id)
-    assert len(result) == 1
-    return result
 
 
 def revoke(history: PostgresHistory, ref: SourceReference, action: str) -> None:
@@ -218,13 +197,13 @@ def test_private_turn_and_explicit_exclusions_remain_ineligible_after_reopening(
     for ref in (SourceReference(conversation, 1, 0), SourceReference(conversation, 3, 0)):
         assert not history.source_eligible(BINDING, ref)
         with pytest.raises(CoreError):
-            stores.memory.sources(BINDING, (ref,))
-    assert stores.memory.sources(BINDING, (SourceReference(conversation, 5, 0),))
+            register_sources(stores.records, history, (ref,))
+    assert history.source_eligible(BINDING, SourceReference(conversation, 5, 0))
 
 
 def test_archive_controls_and_stale_cas_preserve_memory(stores: Stores) -> None:
     ref = seed(stores)
-    memories = remember(stores, (ref,))
+    memories = register_sources(stores.records, stores.history, (ref,))
     with pytest.raises(CoreError) as error:
         stores.history.controls(
             BINDING,
@@ -232,14 +211,14 @@ def test_archive_controls_and_stale_cas_preserve_memory(stores: Stores) -> None:
             ConversationControls(expected_revision=0, private_mode=True),
         )
     assert error.value.code == "revision_conflict"
-    assert stores.memory.events(BINDING) == ()
+    assert events(stores.records) == ()
     updated = stores.history.controls(
         BINDING, ref.conversation_id, ConversationControls(expected_revision=1, archived=True)
     )
     assert updated.archived and updated.revision == 2
     assert stores.history.list(BINDING) == []
     assert stores.history.list(BINDING, include_archived=True) == [ref.conversation_id]
-    assert written(stores.memory, BINDING) == memories
+    assert stores.records.retrievable(BINDING) == memories
 
 
 @pytest.mark.parametrize(
@@ -251,13 +230,11 @@ def test_archive_controls_and_stale_cas_preserve_memory(stores: Stores) -> None:
         replace(BINDING, character_id="other"),
     ],
 )
-def test_scope_isolation_covers_history_memory_jobs_and_outboxes(
+def test_scope_isolation_covers_history_records_and_outboxes(
     stores: Stores, other: Binding
 ) -> None:
     ref = seed(stores)
-    job, selected = prepare(stores, (ref,))
-    stores.memory.commit(BINDING, job, (selected,))
-    memories = stores.memory.results(BINDING, job.job_id)
+    memories = register_sources(stores.records, stores.history, (ref,))
     assert stores.history.list(other) == []
     assert stores.history.receipt(other, ref.conversation_id, "synthetic-request") is None
     assert not stores.history.source_eligible(other, ref)
@@ -265,41 +242,16 @@ def test_scope_isolation_covers_history_memory_jobs_and_outboxes(
         stores.history.read(other, ref.conversation_id)
     with pytest.raises(CoreError):
         stores.history.append(other, ref.conversation_id, "r2", "fp2", 1, MESSAGES, "stop")
-    with pytest.raises(CoreError):
-        stores.memory.sources(other, (ref,))
-    with pytest.raises(CoreError):
-        stores.memory.commit(other, job, (selected,))
+    assert stores.records.retrievable(other) == ()
+    assert not stores.records.current(other, memories)
     stores.history.delete(other, ref.conversation_id)
     assert stores.history.read(BINDING, ref.conversation_id).revision == 1
-    assert all("tea" not in memory.text.lower() for memory in written(stores.memory, other))
-    assert stores.memory.results(other, job.job_id) == ()
-    assert stores.memory.pending(other) == ()
-    assert not stores.memory.current(other, job.sources)
-    assert not stores.memory.valid(other, memories)
     stores.history.delete(BINDING, ref.conversation_id)
-    event = stores.memory.events(BINDING)[0]
+    assert len(events(stores.records)) == 1
     deletion = stores.history.deletions(BINDING)[0]
-    stores.memory.consume(other, event)
     stores.history.acknowledge_deletion(other, deletion.event_id)
-    assert stores.memory.events(BINDING) == (event,)
     assert stores.history.deletions(BINDING) == (deletion,)
-    assert stores.memory.events(other) == () and stores.history.deletions(other) == ()
-
-
-def test_memory_provenance_reopen_and_canonical_retry(stores: Stores) -> None:
-    refs = (seed(stores, "抹茶 synthetic tea %_"), seed(stores, "Synthetic mint."))
-    job, selected = prepare(stores, refs)
-    same = stores.memory.begin(BINDING, tuple(reversed(job.sources)), job.versions)
-    assert same.job_id == job.job_id and same.sources == job.sources
-    stores.memory.commit(BINDING, job, (selected,))
-    memory = PostgresMemory(PostgresDatabase(stores.config))
-    memory.commit(BINDING, job, (selected,))
-    results = memory.results(BINDING, job.job_id)
-    assert len(results) == 1
-    assert results[0].sources == job.sources and all(source.epoch == 0 for source in job.sources)
-    assert set(source.reference for source in results[0].sources) == set(refs)
-    assert written(memory, BINDING) == results
-    assert memory.pending(BINDING) == ()
+    assert stores.history.deletions(other) == ()
 
 
 @pytest.mark.parametrize("role", ["assistant", "tool"])
@@ -312,92 +264,8 @@ def test_non_user_source_is_not_memory_evidence(stores: Stores, role: str) -> No
     )
     stores.history.append(BINDING, conversation, "r1", "fp1", 0, (message, MESSAGES[-1]), "stop")
     with pytest.raises(CoreError) as error:
-        stores.memory.sources(BINDING, (SourceReference(conversation, 1, 0),))
+        register_sources(stores.records, stores.history, (SourceReference(conversation, 1, 0),))
     assert error.value.code == "memory_source_invalid"
-
-
-@pytest.mark.parametrize("action", ["private", "delete"])
-def test_multisource_revocation_purges_body_and_rebuilds_only_original_epochs(
-    stores: Stores, action: str
-) -> None:
-    refs = (seed(stores, "Synthetic tea."), seed(stores, "Synthetic mint."))
-    memories = remember(stores, refs)
-    revoke(stores.history, refs[0], action)
-    if action == "private":
-        stores.history.controls(
-            BINDING,
-            refs[0].conversation_id,
-            ConversationControls(expected_revision=2, private_mode=False),
-        )
-        assert stores.history.source_eligible(BINDING, refs[0])
-    assert not stores.memory.valid(BINDING, memories)
-    assert all("synthetic" not in memory.text.lower() for memory in written(stores.memory, BINDING))
-    with stores.database.transaction(BINDING) as connection:
-        assert connection.execute("SELECT body,state FROM memories").fetchall() == [
-            (None, "revoked")
-        ]
-    memory = PostgresMemory(PostgresDatabase(stores.config))
-    events = memory.events(BINDING)
-    assert len(events) == 1
-    memory.consume(BINDING, events[0])
-    memory.consume(BINDING, events[0])
-    assert memory.events(BINDING) == ()
-    jobs = memory.pending(BINDING)
-    assert len(jobs) == 1
-    assert tuple(source.reference for source in jobs[0].sources) == (refs[1],)
-    memory.commit(BINDING, jobs[0], (candidate(stores, jobs[0]),))
-    rebuilt = written(memory, BINDING)
-    assert len(rebuilt) == 1 and rebuilt[0].memory_id != memories[0].memory_id
-    assert all("tea" not in memory.text.lower() for memory in written(memory, BINDING))
-    if action == "private":
-        fresh = remember(stores, (refs[0],))
-        assert fresh[0].sources[0].epoch == 1
-        assert fresh[0].memory_id != memories[0].memory_id
-
-
-def test_rebase_never_restores_a_revoked_original_source(stores: Stores) -> None:
-    refs = tuple(seed(stores, f"Synthetic plant {index}.") for index in range(3))
-    original, _ = prepare(stores, refs)
-    stores.history.delete(BINDING, refs[0].conversation_id)
-    remaining = stores.memory.rebase(BINDING, original)
-    assert remaining is not None and len(remaining.sources) == 2
-    assert stores.memory.rebase(BINDING, original) is None
-    stores.history.delete(BINDING, refs[1].conversation_id)
-    last = stores.memory.rebase(BINDING, remaining)
-    assert last is not None and tuple(source.reference for source in last.sources) == (refs[2],)
-    stores.memory.commit(BINDING, last, (candidate(stores, last),))
-    results = stores.memory.results(BINDING, last.job_id)
-    assert len(results) == 1 and results[0].sources == last.sources
-    assert stores.memory.pending(BINDING) == ()
-
-
-def test_candidate_mismatch_rolls_back_prior_candidate_and_keeps_job_retryable(
-    stores: Stores,
-) -> None:
-    job, valid = prepare(stores, (seed(stores),))
-    invalid = replace(valid, text=json.dumps(["Synthetic unsupported inference."]))
-    with pytest.raises(CoreError) as error:
-        stores.memory.commit(BINDING, job, (valid, invalid))
-    assert error.value.code == "memory_denied"
-    assert stores.memory.results(BINDING, job.job_id) == ()
-    assert stores.memory.pending(BINDING) == (job,)
-    stores.memory.commit(BINDING, job, (valid,))
-    assert len(stores.memory.results(BINDING, job.job_id)) == 1
-
-
-def test_failed_attempt_cannot_retire_or_commit_successor(stores: Stores) -> None:
-    job, selected = prepare(stores, (seed(stores),))
-    stores.memory.fail(BINDING, job)
-    successor = stores.memory.begin(BINDING, job.sources, job.versions)
-    assert successor.job_id != job.job_id
-    stores.memory.fail(BINDING, job)
-    with pytest.raises(CoreError):
-        stores.memory.commit(BINDING, job, (selected,))
-    assert stores.memory.pending(BINDING) == (successor,)
-    stores.memory.commit(BINDING, successor, (selected,))
-    stores.memory.fail(BINDING, successor)
-    assert len(stores.memory.results(BINDING, successor.job_id)) == 1
-    assert stores.memory.pending(BINDING) == ()
 
 
 def test_unknown_schema_version_is_preserved_and_rejected(stores: Stores) -> None:
@@ -417,12 +285,12 @@ def test_unknown_schema_version_is_preserved_and_rejected(stores: Stores) -> Non
     [
         "ALTER TABLE turns DROP CONSTRAINT turns_binding_conversation_fkey",
         "ALTER TABLE turns DROP CONSTRAINT turns_binding_conversation_revision_key",
-        "ALTER TABLE memories ALTER COLUMN body TYPE varchar",
+        "ALTER TABLE memory_episodes ALTER COLUMN normalized_text TYPE varchar",
         "ALTER TABLE conversations ALTER COLUMN private_mode SET DEFAULT true",
         "ALTER TABLE turns ALTER COLUMN messages DROP NOT NULL",
         "CREATE VIEW unexpected_view AS SELECT 1 AS value",
         "DROP TABLE source_deletions",
-        "ALTER TABLE memories ADD COLUMN unexpected text",
+        "ALTER TABLE memory_episodes ADD COLUMN unexpected text",
     ],
 )
 def test_changed_schema_contract_is_rejected_without_rewriting_data(
@@ -442,7 +310,7 @@ def test_failed_revocation_rolls_back_history_memory_and_outboxes_together(
     stores: Stores, monkeypatch: pytest.MonkeyPatch, action: str
 ) -> None:
     ref = seed(stores)
-    memories = remember(stores, (ref,))
+    memories = register_sources(stores.records, stores.history, (ref,))
     original_revoke = postgres_schema.revoke
 
     def abort_after_revoke(
@@ -461,9 +329,9 @@ def test_failed_revocation_rolls_back_history_memory_and_outboxes_together(
     snapshot = stores.history.read(BINDING, ref.conversation_id)
     assert snapshot.revision == 1 and not snapshot.private_mode
     assert stores.history.source_eligible(BINDING, ref)
-    assert written(stores.memory, BINDING) == memories
-    assert stores.memory.valid(BINDING, memories)
-    assert stores.memory.events(BINDING) == ()
+    assert stores.records.retrievable(BINDING) == memories
+    assert stores.records.current(BINDING, memories)
+    assert events(stores.records) == ()
     assert stores.history.deletions(BINDING) == ()
 
 
@@ -489,34 +357,19 @@ def test_concurrent_revision_cas_commits_exactly_one_turn(stores: Stores) -> Non
     assert snapshot.revision == 1 and snapshot.messages == MESSAGES
 
 
-def test_concurrent_memory_retries_share_one_job_and_result(stores: Stores) -> None:
-    ref = seed(stores)
-    evidence = stores.memory.sources(BINDING, (ref,))
-    memories = [PostgresMemory(PostgresDatabase(stores.config)) for _ in range(2)]
-    barrier = Barrier(2)
-
-    def commit(index: int) -> str:
-        barrier.wait(timeout=3)
-        job = memories[index].begin(BINDING, (evidence[0].source,), "synthetic-v1")
-        selected = Candidate("semantic", job.sources, json.dumps([evidence[0].text]))
-        memories[index].commit(BINDING, job, (selected,))
-        return job.job_id
-
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        jobs = list(executor.map(commit, range(2)))
-    assert jobs[0] == jobs[1]
-    assert len(stores.memory.results(BINDING, jobs[0])) == 1
-
-
 @pytest.mark.parametrize("action", ["private", "delete"])
 @pytest.mark.parametrize("first", ["commit", "revoke"])
 def test_concurrent_revocation_and_commit_serialize_and_leave_no_visible_memory(
     stores: Stores, monkeypatch: pytest.MonkeyPatch, action: str, first: str
 ) -> None:
     ref = seed(stores)
-    job, selected = prepare(stores, (ref,))
+    from digital_souls_core.memory_record_store import RecordBatch
+
+    from .postgres_record_support import source_episode
+
+    selected = source_episode(stores.history, (ref,))
     commit_db, revoke_db = PostgresDatabase(stores.config), PostgresDatabase(stores.config)
-    memory, history = PostgresMemory(commit_db), PostgresHistory(revoke_db)
+    records, history = PostgresMemoryRecords(commit_db), PostgresHistory(revoke_db)
     first_db, second_db = (commit_db, revoke_db) if first == "commit" else (revoke_db, commit_db)
     entered, release, connected = Event(), Event(), Event()
     backend_pids: list[int] = []
@@ -544,7 +397,7 @@ def test_concurrent_revocation_and_commit_serialize_and_leave_no_visible_memory(
 
     def commit() -> str:
         try:
-            memory.commit(BINDING, job, (selected,))
+            records.register(BINDING, RecordBatch(episodes=(selected,)), "fixture-v1")
             return "committed"
         except CoreError as error:
             return error.code
@@ -579,18 +432,14 @@ def test_concurrent_revocation_and_commit_serialize_and_leave_no_visible_memory(
             release.set()
         outcomes = {leading.result(timeout=5), following.result(timeout=5)}
     assert outcomes == {"revoked", "committed" if first == "commit" else "memory_source_invalid"}
-    assert all("tea" not in memory.text.lower() for memory in written(stores.memory, BINDING))
-    assert stores.memory.results(BINDING, job.job_id) == ()
+    assert stores.records.retrievable(BINDING) == ()
     with stores.database.transaction(BINDING) as connection:
         assert (
-            connection.execute("SELECT body FROM memories WHERE body IS NOT NULL").fetchall() == []
+            connection.execute(
+                "SELECT normalized_text FROM memory_episodes WHERE normalized_text IS NOT NULL"
+            ).fetchall()
+            == []
         )
-    assert len(stores.memory.events(BINDING)) == 1
+    assert len(events(stores.records)) == 1
     if action == "delete":
         assert len(stores.history.deletions(BINDING)) == 1
-
-
-def written(memory: PostgresMemory, binding: Binding) -> tuple[Memory, ...]:
-    from .postgres_memory_support import written as outputs
-
-    return outputs(memory, binding)

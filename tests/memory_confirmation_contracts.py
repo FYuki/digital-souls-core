@@ -12,15 +12,12 @@ from digital_souls_core.application import CoreError, Inference
 from digital_souls_core.character import AccessScope, Profile
 from digital_souls_core.conversations import Conversations, request_fingerprint
 from digital_souls_core.history import Binding, HistoryStore, SourceReference
-from digital_souls_core.local_extractor import LocalExtractor
-from digital_souls_core.memory import MemoryService
-from digital_souls_core.memory_contracts import MemoryStore, SourceVersion
+from digital_souls_core.memory_record_store import MemoryRecordStore
 from digital_souls_core.privacy import PrivacyPolicy
 from digital_souls_core.privacy_classifier import LocalClassifier
 
 from .conversation_support import turn
-from .memory_support import selection
-from .postgres_memory_support import written
+from .postgres_record_support import register_sources
 from .privacy_support import BINDING, assessment, local_profile
 from .support import TOOL, FakeProvider, character, chunk, completion
 
@@ -30,17 +27,15 @@ BASE = "/v1/characters/synthetic/conversations"
 @dataclass
 class Harness:
     conversation: Conversations
-    memory: MemoryService
+    records: MemoryRecordStore
     provider: FakeProvider
-    extractor: FakeProvider
     policy: PrivacyPolicy
     http: TestClient
 
 
-def make_harness(history: HistoryStore, memory: MemoryStore) -> Harness:
-    provider, extractor, classifier = FakeProvider(), FakeProvider(), FakeProvider()
+def make_harness(history: HistoryStore, records: MemoryRecordStore) -> Harness:
+    provider, classifier = FakeProvider(), FakeProvider()
     classifier.response["choices"][0]["message"]["content"] = assessment()
-    extractor.response["choices"][0]["message"]["content"] = selection()
     policy = PrivacyPolicy(LocalClassifier(classifier, local_profile(), model_digest="synthetic"))
     policy.configure({BINDING: frozenset({"history", "local", "external", "memory"})})
     char = character("synthetic")
@@ -49,14 +44,10 @@ def make_harness(history: HistoryStore, memory: MemoryStore) -> Harness:
     )
     inference = Inference((char,), provider, privacy=policy)
     conversation = Conversations(inference, history, policy)
-    service = MemoryService(
-        memory, policy, LocalExtractor(extractor, local_profile(), model_digest="synthetic")
-    )
     return Harness(
         conversation,
-        service,
+        records,
         provider,
-        extractor,
         policy,
         TestClient(
             create_app(inference, history_store=history, history_policy=policy),
@@ -210,7 +201,8 @@ def test_assistant_refusal_quotes_and_history_do_not_hold_new_user(
     assert "memory_confirmation" not in data
     ref = SourceReference(cid, 2, 0)
     assert harness.conversation.store.source_eligible(BINDING, ref)
-    assert harness.memory.store.sources(BINDING, (ref,))[0].text == "Synthetic hello"
+    formed = register_sources(harness.records, harness.conversation.store, (ref,))
+    assert json.loads(formed[0].record.normalized_text) == ["Synthetic hello"]
 
 
 def test_tool_refusal_text_does_not_create_confirmation(harness: Harness) -> None:
@@ -229,15 +221,13 @@ def test_tool_refusal_text_does_not_create_confirmation(harness: Harness) -> Non
     assert "memory_confirmation" not in data
 
 
-async def test_unanswered_source_is_rejected_before_extraction(harness: Harness) -> None:
+async def test_unanswered_source_is_rejected_before_record_registration(harness: Harness) -> None:
     cid = harness.conversation.create("synthetic").conversation_id
     complete(harness, cid, messages=[{"role": "user", "content": "覚えないで"}])
     ref = SourceReference(cid, 1, 0)
+    assert not harness.conversation.store.source_eligible(BINDING, ref)
     with pytest.raises(CoreError):
-        harness.memory.store.sources(BINDING, (ref,))
-    with pytest.raises(CoreError):
-        await harness.memory.extract(BINDING, (ref,))
-    assert harness.extractor.calls == []
+        register_sources(harness.records, harness.conversation.store, (ref,))
 
 
 async def test_decline_releases_only_target_and_preserves_explicit_exclusion(
@@ -260,13 +250,13 @@ async def test_decline_releases_only_target_and_preserves_explicit_exclusion(
         {"turn_revision": 1, "message_index": 2},
     ]
     assert harness.conversation.store.source_eligible(BINDING, refs[0])
-    formed = await harness.memory.extract(BINDING, (refs[0],))
-    assert json.loads(formed[0].text) == [texts[0]]
+    formed = register_sources(harness.records, harness.conversation.store, (refs[0],))
+    assert json.loads(formed[0].record.normalized_text) == [texts[0]]
     answer(harness, cid, 2, 1, False)
     for ref in refs[1:]:
         assert not harness.conversation.store.source_eligible(BINDING, ref)
         with pytest.raises(CoreError):
-            harness.memory.store.sources(BINDING, (ref,))
+            register_sources(harness.records, harness.conversation.store, (ref,))
     assert [m.content for m in harness.conversation.read("synthetic", cid).messages[:3]] == texts
 
 
@@ -276,9 +266,9 @@ async def test_accept_erases_existing_memory_and_never_restores_accepted_source(
     cid = harness.conversation.create("synthetic").conversation_id
     complete(harness, cid)
     old_ref = SourceReference(cid, 1, 0)
-    old = await harness.memory.extract(BINDING, (old_ref,))
-    assert harness.memory.store.valid(BINDING, old)
-    assert written(harness.memory.store, BINDING) == old
+    old = register_sources(harness.records, harness.conversation.store, (old_ref,))
+    assert harness.records.current(BINDING, old)
+    assert harness.records.retrievable(BINDING) == old
     complete(
         harness,
         cid,
@@ -290,20 +280,22 @@ async def test_accept_erases_existing_memory_and_never_restores_accepted_source(
     accepted = answer(harness, cid, 2, 0, True, turn_revision=2)
     assert accepted["revision"] == 3 and accepted["private_mode"] is True
     assert harness.conversation.read("synthetic", cid).messages == before.messages
-    assert not harness.memory.store.valid(BINDING, old)
+    assert not harness.records.current(BINDING, old)
     assert all(
-        "synthetic" not in memory.text.lower() for memory in written(harness.memory.store, BINDING)
+        "synthetic" not in memory.record.normalized_text.lower()
+        for memory in harness.records.retrievable(BINDING)
     )
     response = harness.http.patch(
         f"{BASE}/{cid}", json={"expected_revision": 3, "private_mode": False}
     )
     assert response.status_code == 200
-    assert not harness.memory.store.valid(BINDING, old)
+    assert not harness.records.current(BINDING, old)
     assert all(
-        "synthetic" not in memory.text.lower() for memory in written(harness.memory.store, BINDING)
+        "synthetic" not in memory.record.normalized_text.lower()
+        for memory in harness.records.retrievable(BINDING)
     )
     with pytest.raises(CoreError):
-        await harness.memory.extract(BINDING, (SourceReference(cid, 2, 0),))
+        register_sources(harness.records, harness.conversation.store, (SourceReference(cid, 2, 0),))
     assert harness.conversation.read("synthetic", cid).messages == before.messages
 
 
@@ -377,7 +369,7 @@ def test_decline_does_not_disable_private_mode(harness: Harness) -> None:
     assert after["private_mode"] is True
     assert not harness.conversation.store.source_eligible(BINDING, SourceReference(cid, 1, 0))
     with pytest.raises(CoreError):
-        harness.memory.store.sources(BINDING, (SourceReference(cid, 1, 0),))
+        register_sources(harness.records, harness.conversation.store, (SourceReference(cid, 1, 0),))
 
 
 async def test_confirmation_invalidates_inflight_completion(
@@ -434,8 +426,9 @@ def test_resolved_confirmation_retry_keeps_receipt_dates_and_does_not_rehold(
     assert harness.conversation.store.source_eligible(BINDING, SourceReference(cid, 1, 0))
 
 
-def test_pending_source_is_not_current_for_memory_commit(harness: Harness) -> None:
+def test_pending_source_is_rejected_for_record_registration(harness: Harness) -> None:
     cid = harness.conversation.create("synthetic").conversation_id
     complete(harness, cid, messages=[{"role": "user", "content": "覚えないで"}])
-    version = SourceVersion(SourceReference(cid, 1, 0), 0)
-    assert not harness.memory.store.current(BINDING, (version,))
+    assert not harness.conversation.store.source_eligible(BINDING, SourceReference(cid, 1, 0))
+    with pytest.raises(CoreError):
+        register_sources(harness.records, harness.conversation.store, (SourceReference(cid, 1, 0),))

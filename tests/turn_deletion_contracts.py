@@ -9,15 +9,14 @@ import httpx
 import pytest
 
 from digital_souls_core.application import CoreError
-from digital_souls_core.character import AccessScope, Profile
+from digital_souls_core.character import AccessScope
 from digital_souls_core.contracts import CompletionInput, Message
 from digital_souls_core.history import Binding, SourceReference
 from digital_souls_core.memory import MemoryContext
 
 from .conversation_support import PausedProvider, turn
 from .memory_confirmation_contracts import BASE, Harness, answer, complete
-from .memory_support import selection
-from .postgres_memory_support import written
+from .postgres_record_support import events, register_sources
 from .privacy_support import BINDING
 from .support import CALL, TOOL, completion
 
@@ -75,7 +74,7 @@ async def test_deletion_scopes_preserve_only_untargeted_history_and_memory(
     texts = ("Synthetic tea", "Synthetic mint", "Synthetic rose")
     cid = seed(h, texts)
     refs = tuple(SourceReference(cid, n, 0) for n in (1, 2, 3))
-    memories = [await h.memory.extract(BINDING, (ref,)) for ref in refs]
+    memories = [register_sources(h.records, h.conversation.store, (ref,)) for ref in refs]
     result = delete_turns(h, cid, 3, 2, scope)
     assert result["conversation_id"] == cid and result["revision"] == 4
     assert set(result["turn_revisions"]) == set(range(1, 4)) - set(remaining)
@@ -89,12 +88,15 @@ async def test_deletion_scopes_preserve_only_untargeted_history_and_memory(
     assert storage.query("SELECT revision FROM turns ORDER BY revision", ()) == [
         (n,) for n in remaining
     ]
-    bodies = dict(storage.query("SELECT id,body FROM memories", ()))
+    bodies = dict(storage.query("SELECT id,normalized_text FROM memory_episodes", ()))
     for n, old in enumerate(memories, start=1):
-        assert h.memory.store.valid(BINDING, old) == (n in remaining)
-        assert bodies[old[0].memory_id] == (old[0].text if n in remaining else None)
-    assert {m.memory_id for m in written(h.memory.store, BINDING)} == {
-        memories[n - 1][0].memory_id for n in remaining
+        assert h.records.current(BINDING, old) == (n in remaining)
+        if n in remaining:
+            assert bodies[old[0].identifier] == old[0].record.normalized_text
+        else:
+            assert bodies[old[0].identifier] is None
+    assert {m.identifier for m in h.records.retrievable(BINDING)} == {
+        memories[n - 1][0].identifier for n in remaining
     }
 
 
@@ -103,53 +105,24 @@ async def test_whole_conversation_deletion_preserves_existing_notification_contr
 ) -> None:
     h = storage.harness
     cid = seed(h, ("Synthetic tea", "Synthetic mint", "Synthetic rose"))
-    old = await h.memory.extract(BINDING, (SourceReference(cid, 2, 0),))
+    old = register_sources(h.records, h.conversation.store, (SourceReference(cid, 2, 0),))
     assert h.http.delete(f"{BASE}/{cid}").status_code == 204
     assert h.http.delete(f"{BASE}/{cid}").status_code == 204
     assert h.http.get(f"{BASE}/{cid}").status_code == 404
     assert storage.query("SELECT revision FROM turns", ()) == []
-    assert storage.query("SELECT body FROM memories", ()) == [(None,)]
-    assert not h.memory.store.valid(BINDING, old)
+    assert storage.query("SELECT normalized_text FROM memory_episodes", ()) == [(None,)]
+    assert not h.records.current(BINDING, old)
     notices = h.conversation.store.deletions(BINDING)
     assert len(notices) == 1
     assert notices[0].conversation_id == cid and notices[0].through_revision == 3
 
 
-async def test_multisource_memory_rebuild_uses_only_remaining_turns(storage: Storage) -> None:
-    h = storage.harness
-    texts = ("Synthetic tea", "Synthetic mint", "Synthetic rose")
-    cid = seed(h, texts)
-    refs = tuple(SourceReference(cid, n, 0) for n in (1, 2, 3))
-    h.extractor.response["choices"][0]["message"]["content"] = selection([0, 1, 2])
-    old = await h.memory.extract(BINDING, refs)
-    delete_turns(h, cid, 3, 2, "selected")
-    assert storage.query("SELECT body FROM memories", ()) == [(None,)]
-    assert all(
-        "synthetic" not in memory.text.lower() for memory in written(h.memory.store, BINDING)
-    )
-    events = h.memory.store.events(BINDING)
-    assert len(events) == 1
-    h.memory.store.consume(BINDING, events[0])
-    h.memory.store.consume(BINDING, events[0])
-    jobs = h.memory.store.pending(BINDING)
-    assert len(jobs) == 1
-    assert tuple(s.reference for s in jobs[0].sources) == (refs[0], refs[2])
-    h.extractor.calls.clear()
-    h.extractor.response["choices"][0]["message"]["content"] = selection([0, 1])
-    assert await h.memory.rebuild(BINDING) == 1
-    rebuilt = written(h.memory.store, BINDING)
-    assert len(rebuilt) == 1 and rebuilt[0].memory_id != old[0].memory_id
-    assert json.loads(rebuilt[0].text) == [texts[0], texts[2]]
-    assert json.loads(h.extractor.calls[0][1]["messages"][1]["content"]) == [texts[0], texts[2]]
-    assert await h.memory.rebuild(BINDING) == 0
-
-
-async def test_later_saved_and_new_user_turns_remain_extractable(storage: Storage) -> None:
+async def test_later_saved_and_new_user_turns_allow_record_registration(storage: Storage) -> None:
     h = storage.harness
     cid = seed(h, ("Synthetic tea", "Synthetic mint", "Synthetic rose"))
     delete_turns(h, cid, 3, 2, "selected")
-    saved = await h.memory.extract(BINDING, (SourceReference(cid, 3, 0),))
-    assert json.loads(saved[0].text) == ["Synthetic rose"]
+    saved = register_sources(h.records, h.conversation.store, (SourceReference(cid, 3, 0),))
+    assert json.loads(saved[0].record.normalized_text) == ["Synthetic rose"]
     complete(
         h,
         cid,
@@ -157,10 +130,10 @@ async def test_later_saved_and_new_user_turns_remain_extractable(storage: Storag
         expected_revision=4,
         messages=[{"role": "user", "content": "Synthetic fern"}],
     )
-    fresh = await h.memory.extract(BINDING, (SourceReference(cid, 5, 0),))
-    assert json.loads(fresh[0].text) == ["Synthetic fern"]
+    fresh = register_sources(h.records, h.conversation.store, (SourceReference(cid, 5, 0),))
+    assert json.loads(fresh[0].record.normalized_text) == ["Synthetic fern"]
     with pytest.raises(CoreError):
-        await h.memory.extract(BINDING, (SourceReference(cid, 2, 0),))
+        register_sources(h.records, h.conversation.store, (SourceReference(cid, 2, 0),))
 
 
 @pytest.mark.parametrize("private", [False, True])
@@ -194,8 +167,7 @@ async def test_partial_deletion_does_not_admit_retained_private_or_excluded_sour
     delete_turns(h, cid, revision, 1, "selected")
     assert not h.conversation.store.source_eligible(BINDING, retained)
     with pytest.raises(CoreError):
-        await h.memory.extract(BINDING, (retained,))
-    assert h.extractor.calls == []
+        register_sources(h.records, h.conversation.store, (retained,))
 
 
 @pytest.mark.parametrize(
@@ -381,7 +353,6 @@ async def test_partial_deletion_rejects_same_inflight_completion(
 async def test_partial_deletion_invalidates_same_prepared_memory_context(storage: Storage) -> None:
     h = storage.harness
     cid = seed(h, ("Synthetic tea", "Synthetic rose"))
-    await h.memory.extract(BINDING, (SourceReference(cid, 1, 0),))
     inference = h.conversation.inference
     from dataclasses import replace
 
@@ -389,14 +360,11 @@ async def test_partial_deletion_invalidates_same_prepared_memory_context(storage
     from digital_souls_core.memory_record_store import RecordBatch
     from digital_souls_core.memory_records import Citation, Speaker
     from digital_souls_core.memory_retrieval import MemoryRetrieval
-    from digital_souls_core.postgres_memory import PostgresMemory
-    from digital_souls_core.postgres_memory_records import PostgresMemoryRecords
 
     from .record_retrieval_support import SyntheticEmbedding
     from .test_memory_record_store_contract import episode
 
-    assert isinstance(h.memory.store, PostgresMemory)
-    records = PostgresMemoryRecords(h.memory.store.database)
+    records = h.records
     c = Citation(BINDING, SourceVersion(SourceReference(cid, 1, 0), 0), Speaker.USER, 0, 5)
     records.register(
         BINDING,
@@ -404,7 +372,7 @@ async def test_partial_deletion_invalidates_same_prepared_memory_context(storage
         "fixture-v1",
     )
     inference.memory_context = MemoryContext(
-        MemoryRetrieval(records, h.memory.policy, embedding=SyntheticEmbedding())
+        MemoryRetrieval(records, h.policy, embedding=SyntheticEmbedding())
     )
     prepared = await inference.prepare(
         "synthetic",
@@ -420,32 +388,6 @@ async def test_partial_deletion_invalidates_same_prepared_memory_context(storage
     with pytest.raises(CoreError):
         inference.check(prepared)
     assert len(h.provider.calls) == calls
-
-
-async def test_partial_deletion_rejects_same_inflight_extraction(
-    storage: Storage,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    h = storage.harness
-    cid = seed(h, ("Synthetic tea", "Synthetic rose"))
-    started, release = asyncio.Event(), asyncio.Event()
-    original = h.extractor.complete
-
-    async def waiting(profile: Profile, payload: dict[str, Any]) -> dict[str, Any]:
-        started.set()
-        await release.wait()
-        return await original(profile, payload)
-
-    monkeypatch.setattr(h.extractor, "complete", waiting)
-    task = asyncio.create_task(h.memory.extract(BINDING, (SourceReference(cid, 1, 0),)))
-    try:
-        await asyncio.wait_for(started.wait(), 5)
-        delete_turns(h, cid, 2, 1, "selected")
-    finally:
-        release.set()
-        result = await asyncio.gather(task, return_exceptions=True)
-    assert isinstance(result[0], CoreError)
-    assert storage.query("SELECT body FROM memories", ()) == []
 
 
 def test_remaining_dates_confirmation_states_and_receipts_survive_restart(storage: Storage) -> None:
@@ -551,7 +493,7 @@ def test_invalid_deletion_leaves_all_state_unchanged(
     )
     assert response.status_code == status
     assert h.conversation.read("synthetic", cid) == before
-    assert h.memory.store.events(BINDING) == ()
+    assert events(h.records) == ()
 
 
 def test_partial_deletion_remains_available_after_consent_revocation(storage: Storage) -> None:
@@ -569,7 +511,7 @@ async def test_failed_delete_rolls_back_revision_history_memory_and_allows_retry
 ) -> None:
     h = storage.harness
     cid = seed(h, ("Synthetic tea", "Synthetic rose"))
-    old = await h.memory.extract(BINDING, (SourceReference(cid, 1, 0),))
+    old = register_sources(h.records, h.conversation.store, (SourceReference(cid, 1, 0),))
     before = h.conversation.read("synthetic", cid)
     receipt = h.conversation.store.receipt(BINDING, cid, "r1")
     storage.reject_delete()
@@ -585,15 +527,16 @@ async def test_failed_delete_rolls_back_revision_history_memory_and_allows_retry
         assert response.status_code >= 500
         assert h.conversation.read("synthetic", cid) == before
         assert h.conversation.store.receipt(BINDING, cid, "r1") == receipt
-        assert h.memory.store.valid(BINDING, old)
-        assert h.memory.store.events(BINDING) == ()
+        assert h.records.current(BINDING, old)
+        assert events(h.records) == ()
         assert cast(TurnDeletionConsumer, h.conversation.store).turn_deletions(BINDING) == ()
-        assert storage.query("SELECT body FROM memories", ()) == [(old[0].text,)]
+        body = storage.query("SELECT normalized_text FROM memory_episodes", ())[0][0]
+        assert body == old[0].record.normalized_text
     finally:
         storage.allow_delete()
     delete_turns(h, cid, 2, 1, "selected")
     assert storage.query("SELECT revision FROM turns", ()) == [(2,)]
-    assert storage.query("SELECT body FROM memories", ()) == [(None,)]
+    assert storage.query("SELECT normalized_text FROM memory_episodes", ()) == [(None,)]
 
 
 def test_natural_language_does_not_delete_history(storage: Storage) -> None:
@@ -745,43 +688,6 @@ def test_repeated_partial_deletion_is_rejected_without_second_revision_change(
     assert h.conversation.read("synthetic", cid) == before
 
 
-async def test_rebuild_revalidates_job_after_another_partial_deletion(storage: Storage) -> None:
-    h = storage.harness
-    cid = seed(h, ("Synthetic tea", "Synthetic mint", "Synthetic rose"))
-    refs = tuple(SourceReference(cid, n, 0) for n in (1, 2, 3))
-    h.extractor.response["choices"][0]["message"]["content"] = selection([0, 1, 2])
-    await h.memory.extract(BINDING, refs)
-    delete_turns(h, cid, 3, 2, "selected")
-    for event in h.memory.store.events(BINDING):
-        h.memory.store.consume(BINDING, event)
-    retained_job = h.memory.store.pending(BINDING)[0]
-    assert tuple(s.reference for s in retained_job.sources) == (refs[0], refs[2])
-    delete_turns(h, cid, 4, 1, "selected")
-    with pytest.raises(CoreError):
-        await h.memory.run(BINDING, retained_job)
-    h.extractor.calls.clear()
-    h.extractor.response["choices"][0]["message"]["content"] = selection()
-    assert await h.memory.rebuild(BINDING) == 1
-    assert json.loads(h.extractor.calls[0][1]["messages"][1]["content"]) == ["Synthetic rose"]
-    result = written(h.memory.store, BINDING)
-    assert len(result) == 1 and json.loads(result[0].text) == ["Synthetic rose"]
-
-
-async def test_rebuild_failure_never_restores_deleted_memory_body(storage: Storage) -> None:
-    h = storage.harness
-    cid = seed(h, ("Synthetic tea", "Synthetic rose"))
-    h.extractor.response["choices"][0]["message"]["content"] = selection([0, 1])
-    await h.memory.extract(BINDING, (SourceReference(cid, 1, 0), SourceReference(cid, 2, 0)))
-    delete_turns(h, cid, 2, 1, "selected")
-    h.extractor.error = RuntimeError("Synthetic extraction failure")
-    with pytest.raises(CoreError):
-        await h.memory.rebuild(BINDING)
-    assert storage.query("SELECT body FROM memories", ()) == [(None,)]
-    assert all(
-        "synthetic" not in memory.text.lower() for memory in written(h.memory.store, BINDING)
-    )
-
-
 async def test_tombstone_keeps_request_identifier_without_content_or_fingerprint(
     storage: Storage,
 ) -> None:
@@ -789,7 +695,7 @@ async def test_tombstone_keeps_request_identifier_without_content_or_fingerprint
     cid = seed(h, ("Synthetic kept rose", "Synthetic removed cactus"))
     receipt = h.conversation.store.receipt(BINDING, cid, "r2")
     assert receipt is not None
-    await h.memory.extract(BINDING, (SourceReference(cid, 2, 0),))
+    register_sources(h.records, h.conversation.store, (SourceReference(cid, 2, 0),))
     delete_turns(h, cid, 2, 2, "selected")
     values = storage.stored_values()
     assert "r2" in values
