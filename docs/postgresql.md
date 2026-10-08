@@ -5,7 +5,8 @@ SQLiteは撤去済みです。
 PostgreSQLへの接続はtrusted起動コードで明示します。
 PostgreSQLは空の専用schemaを初期化して使います。データを移す機能はありません。
 通常の`create_app()`は保存無効のままで、設定ファイルを置いただけでは接続・保存・記憶抽出を始めません。
-設計は[ADR 0012](adr/0012-postgresql-storage.md)を参照してください。
+接続設計は[ADR 0012](adr/0012-postgresql-storage.md)、現行の正本と検索は
+[ADR 0016](adr/0016-memory-kinds-and-records.md)・[ADR 0022](adr/0022-memory-retrieval-from-records.md)を参照してください。
 
 ## ローカルDockerでの起動
 
@@ -80,6 +81,7 @@ DBと利用roleは運用者が事前に用意します。CoreがDB・role・Post
 
 ```python
 from pathlib import Path
+from digital_souls_core.memory_retrieval import MemoryRetrieval
 from digital_souls_core.storage import StorageConfig, open_storage
 
 config = StorageConfig.model_validate_json(
@@ -90,16 +92,17 @@ stores = open_storage(config)
 
 # inferenceと現在のpolicyはtrusted起動側で明示構成済み。
 # create_app(inference, history_store=stores.history, history_policy=policy)
-# MemoryService(stores.memory, policy, extractor)
+# MemoryRetrieval(stores.records, policy, embedding=trusted_embedder)
 ```
 
 `StorageConfig`は必須の`backend: "postgresql"`と必須の`postgres`だけを受け付けます。
 型の暗黙変換、未知field、他のbackend、接続設定の欠落・不正はfail-closedで拒否します。
 
-`StorageStores`は同じbackendのhistory/memory portをまとめて返します。historyとmemoryを別DBへ
-任意に分ける設定は提供しません。`open_storage`の明示呼出しにはDB初期化の副作用がありますが、
-履歴経路へstore/policyを注入する操作と記憶抽出の明示呼出しは別です。履歴を保存しただけで
-正本会話を意味記憶へ取り込まず、既存stateless APIにも自動保存を追加しません。
+`StorageStores` は同じDBの `history: HistoryStore` と `records: MemoryRecordStore` を返します。
+factoryは `PostgresHistory` と `PostgresMemoryRecords` を構成し、別DBに分ける設定は提供しません。
+`open_storage` の明示呼出しには初期化・旧版移行の副作用があります。
+履歴経路へのstore/policy注入、正本の明示登録、embeddingの注入は別操作です。
+構造化抽出・形成jobは未実装で、履歴保存だけで記憶形成を始めません。stateless APIは自動保存しません。
 
 ## PostgreSQL設定
 
@@ -128,25 +131,28 @@ schema・password・scopeを指定する機能はありません。DB接続権�
 
 ## 初期化と復旧境界
 
-`PostgresDatabase(config).initialize()`は専用schemaを初期化し、History/Memory adapterの構築時にも
+`PostgresDatabase(config).initialize()`は専用schemaを初期化し、PostgresHistory/PostgresMemoryRecords adapterの構築時にも
 同じ処理を使います。schema単位のtransaction advisory lockを取り、存在しなければschemaを作り、
-空schemaへtableとversion 5を原子的に登録します。turnの`stated_at`はnullableな`TIMESTAMPTZ`で、
-新規turn保存時のUTC日時を保存します。trustedコードでadapterの時計を注入でき、既定は保存時の
-現在時刻です。snapshotとEvidenceは保存値をUTCで復元します（[履歴API](history-api.md)）。
+空schemaへtableとversion 6を原子的に登録します。turnの`stated_at`はnullableな`TIMESTAMPTZ`で、
+新規turn保存時のUTC日時を保存します。trustedコードで履歴adapterの時計を注入でき、既定は保存時の
+現在時刻です。snapshotは保存値をUTCで復元します（[履歴API](history-api.md)）。
 
 既存Core schemaはtable集合・列名/型/null/default/identity・PK/FK/UNIQUE制約・versionを照合します。不一致や途中のschemaは拒否し、
-不正schemaを自動修復しません。正常なversion 1〜4は各版の定義で厳密検証した後、同じtransactionで
-必要な段階を経てversion 5へ移行し、各段階で新版を検証します。version 1→2で`turns.stated_at`、
-2→3で`turns.memory_confirmation`（既定値`{}`）、3→4で`turn_tombstones`・`turn_deletions`、4→5で下記の正本表を追加します。
+不正schemaを自動修復しません。正常なversion 1〜5は各版の定義で厳密検証した後、同じtransactionで
+必要な段階を経てversion 6へ移行し、各段階で新版を検証します。version 1→2で`turns.stated_at`、
+2→3で`turns.memory_confirmation`（既定値`{}`）、3→4で`turn_tombstones`・`turn_deletions`、
+4→5で下記の正本表を追加します。5→6では `memory_sources` → `memories` → `memory_jobs` の順に
+旧逐語3表を削除し、`memory_source_lookup` も所有表と共に削除します。逐語記憶を正本へ移送しません。
 version 1の旧turnの`stated_at`はNULLのまま補完せず、確認列追加時は既存行に`{}`を設定します。
-履歴・receipt・fingerprint・source epochを保持します。未知versionは拒否します。
-移行途中の失敗は列とversionをまとめてrollbackし、再実行できます。
+履歴・receipt・fingerprint・source epoch・確認保留・往復削除の印と通知・正本・`memory_events` を
+保持します。5→6は保持対象表の全行・全列を変更しません。未知versionは拒否します。
+移行途中の失敗は追加列・表・DROP・versionをまとめてrollbackし、再実行できます。
 この確認を、DBの全設定・権限・任意の改変の監査とは扱いません。
 初期化途中の失敗ではtransactionをrollbackし、正常な空状態から再実行できる境界を持ちます。
 初期化先に既存データを移送しません。
 
 各storage操作は接続を作り、transactionでcommit/rollback後にcloseします。read/writeとも
-Binding単位で直列化し、分類器や抽出器のawait中はtransactionを持ち越しません。
+Binding単位で直列化し、分類器やembeddingのawait中はtransactionを持ち越しません。
 競合・再試行・source撤回は既存のrevision/epoch/receipt契約を使います。接続・timeout・SQL障害を
 内容なしのstorageエラーとして返し、別backendへ自動切替しません。
 
@@ -155,11 +161,13 @@ Binding単位で直列化し、分類器や抽出器のawait中はtransactionを
 [会話操作](history-api.md)と[記憶操作](memory.md)の意味は保存先に依存させません。
 指定発話は履歴へ残しながら記憶対象から除き、private thread由来のsourceを使いません。
 private化と履歴削除は、派生memory本文のNULL化、epoch/通知の更新を同じtransactionで確定します。
-consumer停止中も旧本文を検索できず、private解除や遅いcommitで旧記憶を復活させません。
+再生成が未実装の期間も旧本文を検索できず、private解除や遅い登録で旧記憶を復活させません。
 archiveは一覧から隠すだけで、記憶sourceの条件を変えません。
 
-Bindingのsubject/client/audience/characterを全操作で照合し、Memory/sourceのID・epoch・抽出provenanceを
-保持します。複数sourceの撤回後は残る適格sourceから再構築し、旧本文を再構築入力にしません。
+Bindingのsubject/client/audience/characterを全操作で照合し、正本のID・版・引用のrevision/epochを
+保持します。出典撤回は正本と依存結果を即時に停止し、本文を消去します。
+撤回イベントと影響記録は保持しますが、消費・再生成のAPIは提供しません。
+形成が実装されるまで残る適格sourceから再生成しない期間を許容します。
 この分離はapplicationのport契約であり、DB管理者に対する秘匿やRLS・公開multi-tenant認証の実装ではありません。
 
 削除は取得停止と派生本文の論理的消去です。PostgreSQLの旧tuple、WAL、backup、snapshot、物理媒体の
@@ -193,11 +201,11 @@ PostgreSQLの管理運用、dogfoodへの切替、既存データの移送、私
 backend試験の成功をこれらの完了として扱わず、正確なrevision・環境・結果は日付付き証跡に残します。
 
 
-## 正本記憶のschema（version 5）
+## 正本記憶のschema（version 6）
 
 `MemoryRecordStore` の PostgreSQL 実装は `PostgresMemoryRecords(database)` で明示構築します。
-既存のhistoryと同じ `PostgresDatabase` を渡します。`open_storage`・逐語記憶の `MemoryStore`・
-検索経路の注入は変更しません。domain契約と操作は[記憶の正本](memory.md#記憶の正本の保存port)を参照してください。
+履歴と同じ `PostgresDatabase` を渡します。`open_storage` はこのadapterを `stores.records` として
+返し、`MemoryRetrieval` が検索に使います。正本表は版5で導入済みで、版6でも維持します。domain契約と操作は[記憶の正本](memory.md#記憶の正本の保存port)を参照してください。
 
 各新表の `seq` は BIGINT identity / UNIQUE、`binding` は NOT NULL TEXT です。
 記録表の共通列は `id`（TEXT）、`version`（INTEGER、1以上）、`state`（active / suspended）、
@@ -231,7 +239,8 @@ backend試験の成功をこれらの完了として扱わず、正確なrevisio
 `memory_events` に binding + id のUNIQUEを追加し、影響記録の別Bindingへのevent参照も拒否します。
 型付き日時範囲とJSONBの対応はadapterで算出し、契約試験で照合します。期間検索の索引は追加しません。
 
-4→5は既存表の行を変更せず、履歴・逐語記憶・確認状態・往復削除の印を保持します。
+歴史的な4→5は正本表を追加して既存行を保持する段階です。現行版6では、続く5→6で旧逐語3表を
+削除し、履歴・確認状態・往復削除の印・通知と正本表を保持します。版6に旧3表が残る場合は拒否します。
 新版の新規作成と、各旧版の厳密検証・段階移行・新版の厳密検証は一つのtransactionです。
 新表も `TABLE_COLUMNS`・型/null/default/identity・PK/UNIQUE/FK/CHECK・relation集合で検証し、
 不正schemaを自動修復しません。途中失敗はDDLとversionをrollbackし、再試行できます。

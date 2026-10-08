@@ -2,6 +2,8 @@
 
 Status: Accepted
 
+実施注記（2026-10-08）: [逐語記憶撤去の証跡](../evidence/2026-10-08-verbatim-memory-removal.md)のschema版6で既存の逐語記憶を新形式へ移送せず削除しました。Episode・Fact・Semanticの正本登録・版・撤回は実装済みで、検索は[ADR 0022](0022-memory-retrieval-from-records.md)の正本を使います。形成・保存判定・保存文生成は未実装です。本文の「現行Core」は決定時点の背景として保持します。
+
 一部を[ADR 0021](0021-postgresql-only-storage.md)のPostgreSQL一本化で置き換えます（「影響と移行」でSQLiteとPostgreSQLの両adapterに同じ契約試験を用意する方針）。
 
 日付: 2026-10-06

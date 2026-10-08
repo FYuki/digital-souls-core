@@ -30,19 +30,19 @@ Coreで共有するドメインの語彙と概念モデルです。製品の範�
 | Working Memory / 作業記憶 | 現在の入力・目的・処理中の文脈。長期保存しない | 概念：[ADR 0016](docs/adr/0016-memory-kinds-and-records.md) |
 | Conversation History / 会話履歴 | 同じ会話を継続するための履歴。別の会話から検索しない。長期記憶とは別 | 実装済み：ADR 0004 |
 | Long-term Memory / 長期記憶 | 会話を越えて参照する記憶の総称。Episodic・Semantic・Reflective・Proceduralを含む | 一部：ADR 0016 |
-| Episode / エピソード記憶 | 所有キャラクターが何を経験したか。経験の5W（必須はWhatの述語のみ）と経験日時を持つ。「話を聞いた」も経験 | 未実装：ADR 0016 |
-| Fact / 関連事実 | 経験で得た、話題の対象についての情報・申告内容。独立したIDを持ち、Episodeから参照する。検証済みの真実やSemanticの正本ではない | 未実装：ADR 0016 |
-| Fact Merge / Fact Update | 別々のFactを同じ出来事として版付きのIDで結ぶ処理／対象が明確な補足・訂正でFactの内容版を更新する処理 | 未実装：[ADR 0017](docs/adr/0017-memory-formation-admission.md) |
-| Semantic Memory / 意味記憶 | 知識として採用した事実・概念・傾向。形成方法は明示命題の直接抽出（DIRECT_EXTRACTION）と経験からの一般化（EXPERIENCE_DERIVED） | 未実装：ADR 0016 |
+| Episode / エピソード記憶 | 所有キャラクターが何を経験したか。経験の5W（必須はWhatの述語のみ）と経験日時を持つ。「話を聞いた」も経験 | 一部（正本の型・登録・撤回・検索は実装済み、形成は未実装）：ADR 0016、[ADR 0022](docs/adr/0022-memory-retrieval-from-records.md) |
+| Fact / 関連事実 | 経験で得た、話題の対象についての情報・申告内容。独立したIDを持ち、Episodeから参照する。検証済みの真実やSemanticの正本ではない | 一部（正本・内容版・参照・撤回は実装済み、形成・照合は未実装）：ADR 0016 |
+| Fact Merge / Fact Update | 別々のFactを同じ出来事として版付きのIDで結ぶ処理／対象が明確な補足・訂正でFactの内容版を更新する処理 | 一部（Factの内容版更新は実装済み、発話照合・別Fact統合は未実装）：[ADR 0017](docs/adr/0017-memory-formation-admission.md) |
+| Semantic Memory / 意味記憶 | 知識として採用した事実・概念・傾向。形成方法は明示命題の直接抽出（DIRECT_EXTRACTION）と経験からの一般化（EXPERIENCE_DERIVED） | 一部（両形成種別の正本・根拠検証・撤回・検索は実装済み、形成は未実装）：ADR 0016、ADR 0022 |
 | Reflective Memory / Reflection / 内省 | 本人が経験をどう意味づけたか。Semanticとは別の正本で、通常会話へ直接注入しない | 未実装：ADR 0020 |
 | Procedural Memory / Skill / 手続き記憶 | どう実行するかの記憶。実行・対話の結果から学習し、実行時に参照する | 未実装：ADR 0016 |
 | Candidate / 候補 | LLM等が生成し、privacy・根拠・schema・policyの検証前のデータ。検証を通ったものだけを自動で保存する | 概念：ADR 0016 |
 | 保存判定（admission） | 候補をDENY_SENSITIVE・DENY_USER_REQUEST・ABSTAIN_UNKNOWN・NOT_MEMORY_WORTHY・ALLOW_STRUCTUREDに決定論的に分類する処理 | 未実装：ADR 0017 |
-| stated_at / experienced_at / 対象日時 | 元発言の日時／キャラクターが経験を得た日時／話題の出来事の日時。互いに補完しない | 一部（stated_atは実装済み、experienced_at・対象日時は未実装）：ADR 0016 |
-| last_user_mentioned_at / TOUCH | ユーザーが最後に明示的に言及した日時／再言及時にこの日時だけを更新する処理。検索の同順位の並べ替えに使う | 未実装：[ADR 0018](docs/adr/0018-memory-retrieval-context.md) |
-| 派生index | 正本から再構築できる検索用の索引。現行は呼出し中だけの一時vector | 一部：[ADR 0010](docs/adr/0010-in-process-memory-search.md) |
+| stated_at / experienced_at / 対象日時 | 元発言の日時／キャラクターが経験を得た日時／話題の出来事の日時。互いに補完しない | 一部（stated_atの保存、experienced_at・部分日時の保持は実装済み、相対日時解釈は未実装）：ADR 0016 |
+| last_user_mentioned_at / TOUCH | ユーザーが最後に明示的に言及した日時／再言及時にこの日時だけを更新する処理。検索の同順位の並べ替えに使う | 一部（日時の永続化・順位利用は実装済み、TOUCHは未実装）：[ADR 0018](docs/adr/0018-memory-retrieval-context.md)、ADR 0022 |
+| 派生index | 正本から再構築できる検索用の索引。現行はEpisode・Semanticの保存文から作る呼出し中だけの一時vector。永続indexは未実装 | 一部：ADR 0022 |
 | Consolidation / 記憶整理 | 同種の既存記憶をKEEP・MERGE・SUPERSEDE等の型付き計画で整理する処理。一般化やFact統合とは別 | 未実装：ADR 0017 |
-| Invalidation / 失効 | 根拠の訂正・削除・撤回で、依存する記憶・派生結果を即時に利用停止し、残る根拠から再評価する処理 | 一部（source撤回のみ）：[ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
+| Invalidation / 失効 | 根拠の訂正・削除・撤回で、依存する記憶・派生結果を即時に利用停止し、残る根拠から再評価する処理 | 一部（正本・依存結果の撤回、本文消去・参照版検証は実装済み、再評価・再生成は未実装）：[ADR 0019](docs/adr/0019-memory-correction-invalidation.md) |
 | Forgetting / 忘却 | 記憶内容の削除ではなく、想起しにくくなること。必要性が確認できた段階で詳細化する | 概念のみ |
 
 ## 人格と状態

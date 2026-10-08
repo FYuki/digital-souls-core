@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+置換注記（2026-10-08）: [ADR 0016](0016-memory-kinds-and-records.md)・[ADR 0022](0022-memory-retrieval-from-records.md)と[逐語記憶撤去の実施](../evidence/2026-10-08-verbatim-memory-removal.md)により、PostgresMemory / MemoryStoreは撤去済みです。現行factoryはPostgresHistoryとPostgresMemoryRecords（MemoryRecordStore）を同じDBで構成し、StorageStores(history, records)を返します。schema版6では旧逐語3表を削除します。
+
 一部を[ADR 0021](0021-postgresql-only-storage.md)のPostgreSQL一本化で置き換えます（SQLite実装を選択肢として維持する方針、`StorageConfig.backend`の選択肢。接続・保存・privacy・撤回の契約は維持）。
 
 日付: 2026-10-05

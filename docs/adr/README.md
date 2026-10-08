@@ -38,3 +38,7 @@ ADR 0015〜0020は、2026-10-06のユーザー決定とPR #67のレビューを�
 - [ADR 0022: 記憶の検索を Episode・Fact・Semantic の正本へ切り替える](0022-memory-retrieval-from-records.md)
 
 ADR 0021のSQLite撤去は Epic #79（[Issue #88](https://github.com/FYuki/digital-souls-core/issues/88)）で完了しました。本文は決定時点の履歴を保持します。
+
+記憶検索はADR 0022の正本へ切替済みで、逐語記憶の書込・抽出・再構成経路は撤去済みです。
+schema版6の削除・保持範囲は[撤去の証跡](../evidence/2026-10-08-verbatim-memory-removal.md)、
+現行APIは[記憶API](../memory.md)を参照してください。ADR本文と既存証跡は当時の背景・判断を保持します。

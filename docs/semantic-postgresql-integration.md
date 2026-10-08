@@ -2,27 +2,28 @@
 
 [意味検索](memory.md)と[PostgreSQL backend](postgresql.md)を同時に選択できます。
 store の変更で検索方式を切り替えず、trusted 起動コードが保存先と embedding を別々に明示します。
-履歴保存・記憶抽出・検索は既存の permission、source、policy、設定世代の境界を維持します。
+履歴保存・正本登録・検索は既存の permission、source、policy、設定世代の境界を維持します。
 
 ## 起動側で必要な接続
 
 ```python
 from digital_souls_core.local_embedding import LocalEmbedding, LocalEmbeddingProfile
-from digital_souls_core.memory import MemoryContext, MemoryService
+from digital_souls_core.memory import MemoryContext
+from digital_souls_core.memory_retrieval import MemoryRetrieval
 from digital_souls_core.storage import StorageConfig, open_storage
 
-# trusted起動側が検証した設定・policy・extractor・inferenceを用意する。
+# trusted起動側が検証した設定・LocalClassifierを持つpolicy・inferenceを用意する。
 # storage_config: StorageConfig (backend="postgresql"、専用schemaを明示)
 # embedding_profile: LocalEmbeddingProfile (有効化は確認済みendpointだけ)
 # Coreの通常起動はこの処理を自動実行しない。
 stores = open_storage(storage_config)
-memory = MemoryService(
-    stores.memory, policy, extractor,
+retrieval = MemoryRetrieval(
+    stores.records, policy,
     embedding=LocalEmbedding(embedding_profile),
 )
-inference.memory_context = MemoryContext(memory)
+inference.memory_context = MemoryContext(retrieval)
 # create_app(inference, history_store=stores.history, history_policy=policy)
-# 抽出は明示された適格なsourceだけを選び、await memory.extract(binding, refs)で開始する。
+# 自動形成・構造化抽出は未実装。登録はtrusted callerが保存判定を済ませたRecordBatchだけを渡す。
 ```
 
 設定例は[PostgreSQL](../examples/storage.postgresql.example.json)と
@@ -30,17 +31,19 @@ inference.memory_context = MemoryContext(memory)
 embedding profile は既定無効であり、実モデルと endpoint の確認なしに有効化しません。
 `StorageConfig` の読込みや保存先の変更だけで、正本履歴を自動抽出しません。
 
-PostgreSQL の候補検索は同じ Binding の現在も適格な記憶だけを返します。
+PostgreSQL の候補検索はBinding完全一致で有効なEpisode・Semanticの現行版だけを返し、
+Episodeへ有効なFactを添付します。embedding未接続時はstorageを読まず空結果です。
 embedding へ送る前・完了後・context送信直前に source と設定を再検証します。
 vector は呼出し内だけの一時値で、pgvector、永続 index、共有 cache は不要です。
-由来 ref/epoch/provenance は元の記憶へ保持し、本文と保存 ID のモデル向け表現を混同しません。
+正本の版・引用のref/epochは内部guardへ保持します。モデル向けには保存文・部分日時・Factと
+一時参照名を渡し、逐語引用・保存IDは注入しません。旧抽出・再構成APIは撤去済みです。
 
 ## 配備前に決める事項
 
 1. 対象プロセスと同じ環境から接続できる PostgreSQL 18 の loopback / Unix socket、専用 DB・role・schema を確定する。
 2. 既存 role で対象 DB の CONNECT と専用 schema の作成・利用ができるかを確認する。新しい role・資格情報・権限が必要なら、その変更を別途承認してから用意する。
 3. trusted 起動側で `StorageConfig` を明示注入し、PG* の暗黙設定やホームの `.pgpass` に依存しない接続を構成する。
-4. 履歴保存と memory permission、分類器・抽出器を現行 policy に結び付ける。履歴だけを有効化しても記憶抽出は始めない。
+4. 履歴保存とmemory/local permission、分類器を同じ現行policyに結び付ける。正本登録はtrusted callerの保存判定が前提で、履歴保存だけで形成を始めない。
 5. embedding 対応モデル・digest・alias・次元・pooling・専用 endpoint と資源割当を決め、明示 profile を構成する。
 6. 実モデルによる[検索品質評価](memory-evaluation.md)と配備先の動作確認を別途実施する。
 

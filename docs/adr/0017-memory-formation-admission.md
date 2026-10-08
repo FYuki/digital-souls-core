@@ -2,6 +2,8 @@
 
 Status: Accepted
 
+置換注記（2026-10-08）: [ADR 0022](0022-memory-retrieval-from-records.md)と[逐語記憶撤去の実施](../evidence/2026-10-08-verbatim-memory-removal.md)により、背景および後続境界で言及したMemoryService.extractと逐語の有限batch抽出は撤去済みです。構造化抽出・保存判定・形成jobは本ADRの後続実装として未実装のままです。
+
 日付: 2026-10-06
 
 Accepted日: 2026-10-07
