@@ -1,0 +1,1610 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "synonym-warm-drink-ja",
+      "category": "synonym",
+      "relevant_ids": [
+        "tea-preference"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "tea-preference"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "紅茶"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "paraphrase-weekend-ja",
+      "category": "paraphrase",
+      "relevant_ids": [
+        "weekend-cycle"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "weekend-cycle"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "自転車"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "cross-language-herb",
+      "category": "cross_language",
+      "relevant_ids": [
+        "windowsill-mint"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "windowsill-mint"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "ミント"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "unrelated-observatory",
+      "category": "unrelated",
+      "relevant_ids": [],
+      "forbidden_ids": [],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "negated-coffee-preference",
+      "category": "negation",
+      "relevant_ids": [
+        "coffee-dislike"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "coffee-dislike"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "コーヒーが苦手",
+          "飲みません"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "updated-morning-drink",
+      "category": "update",
+      "relevant_ids": [
+        "morning-drink"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [
+        "morning-drink-fact"
+      ],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "morning-drink"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "ほうじ茶"
+        ],
+        "forbidden_facts": [
+          "緑茶を飲"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "multisource-picnic",
+      "category": "multisource",
+      "relevant_ids": [
+        "picnic-items"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "picnic-items"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "サンドイッチ",
+          "麦茶"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "multisource-partial-revocation",
+      "category": "multisource_revocation",
+      "relevant_ids": [
+        "remaining-food-only"
+      ],
+      "forbidden_ids": [
+        "old-combined"
+      ],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "remaining-food-only"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "サンドイッチ"
+        ],
+        "forbidden_facts": [
+          "りんごジュース"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "private-source",
+      "category": "private",
+      "relevant_ids": [
+        "private-source-visible"
+      ],
+      "forbidden_ids": [
+        "private-source-hidden"
+      ],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "private-source-visible"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "青"
+        ],
+        "forbidden_facts": [
+          "紫"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "excluded-source",
+      "category": "excluded",
+      "relevant_ids": [
+        "excluded-source-visible"
+      ],
+      "forbidden_ids": [
+        "excluded-source-hidden"
+      ],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "excluded-source-visible"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "青"
+        ],
+        "forbidden_facts": [
+          "紫"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "deleted-source",
+      "category": "deleted_source",
+      "relevant_ids": [
+        "deleted-source-visible"
+      ],
+      "forbidden_ids": [
+        "deleted-source-hidden"
+      ],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "deleted-source-visible"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "青"
+        ],
+        "forbidden_facts": [
+          "紫"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "deleted-memory",
+      "category": "deleted_memory",
+      "relevant_ids": [
+        "current-notebook"
+      ],
+      "forbidden_ids": [
+        "removed-notebook"
+      ],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "current-notebook"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "青"
+        ],
+        "forbidden_facts": [
+          "紫"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "binding-character",
+      "category": "binding_character",
+      "relevant_ids": [
+        "binding-character-own"
+      ],
+      "forbidden_ids": [
+        "binding-character-other"
+      ],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "binding-character-own"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "りんご"
+        ],
+        "forbidden_facts": [
+          "ぶどう"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "binding-subject",
+      "category": "binding_subject",
+      "relevant_ids": [
+        "binding-subject-own"
+      ],
+      "forbidden_ids": [
+        "binding-subject-other"
+      ],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "binding-subject-own"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "りんご"
+        ],
+        "forbidden_facts": [
+          "ぶどう"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "binding-client",
+      "category": "binding_client",
+      "relevant_ids": [
+        "binding-client-own"
+      ],
+      "forbidden_ids": [
+        "binding-client-other"
+      ],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "binding-client-own"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "りんご"
+        ],
+        "forbidden_facts": [
+          "ぶどう"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "long-text-explicit-detail",
+      "category": "long_text",
+      "relevant_ids": [
+        "long-note-memory"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "long-note-memory"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "橙"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "post-search-revocation",
+      "category": "after_search",
+      "relevant_ids": [
+        "post-search-revocation-memory"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": false,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "blocked",
+        "required_facts": [],
+        "forbidden_facts": [
+          "紅茶"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "post-answer-revocation",
+      "category": "after_answer",
+      "relevant_ids": [
+        "post-answer-revocation-memory"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "post-answer-revocation-memory"
+        ]
+      },
+      "answer": {
+        "behavior": "blocked",
+        "required_facts": [],
+        "forbidden_facts": [
+          "紅茶"
+        ],
+        "discarded": true
+      }
+    },
+    {
+      "id": "source-epoch-changed",
+      "category": "epoch_change",
+      "relevant_ids": [],
+      "forbidden_ids": [
+        "old-epoch-memory"
+      ],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [
+          "紅茶"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "synonym-02",
+      "category": "synonym",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "鉛筆"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "synonym-03",
+      "category": "synonym",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "スニーカー"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "synonym-04",
+      "category": "synonym",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "自転車"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "synonym-05",
+      "category": "synonym",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "歴史小説"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "synonym-06",
+      "category": "synonym",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "黄色い傘"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "synonym-07",
+      "category": "synonym",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "りんご"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "synonym-08",
+      "category": "synonym",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "金魚"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "synonym-09",
+      "category": "synonym",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "ジャズ"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "synonym-10",
+      "category": "synonym",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "図書館"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "paraphrase-02",
+      "category": "paraphrase",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "庭を散歩"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "paraphrase-03",
+      "category": "paraphrase",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "目覚まし時計を二つ"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "paraphrase-04",
+      "category": "paraphrase",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "青いしおり"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "paraphrase-05",
+      "category": "paraphrase",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "クッキー"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "paraphrase-06",
+      "category": "paraphrase",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "壁のカレンダー"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "paraphrase-07",
+      "category": "paraphrase",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "扇風機"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "paraphrase-08",
+      "category": "paraphrase",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "直後"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "paraphrase-09",
+      "category": "paraphrase",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "折り紙"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "paraphrase-10",
+      "category": "paraphrase",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "夕焼け"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "cross-language-02",
+      "category": "cross_language",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "フルート"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "cross-language-03",
+      "category": "cross_language",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "海岸"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "cross-language-04",
+      "category": "cross_language",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "かぼちゃ"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "cross-language-05",
+      "category": "cross_language",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "ユリ"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "cross-language-06",
+      "category": "cross_language",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "赤"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "cross-language-07",
+      "category": "cross_language",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "scarves"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "cross-language-08",
+      "category": "cross_language",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "Tuesday"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "cross-language-09",
+      "category": "cross_language",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "autumn"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "cross-language-10",
+      "category": "cross_language",
+      "relevant_ids": [
+        "target"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "target"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "mountains"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "unrelated-02",
+      "category": "unrelated",
+      "relevant_ids": [],
+      "forbidden_ids": [],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "unrelated-03",
+      "category": "unrelated",
+      "relevant_ids": [],
+      "forbidden_ids": [],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "unrelated-04",
+      "category": "unrelated",
+      "relevant_ids": [],
+      "forbidden_ids": [],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "unrelated-05",
+      "category": "unrelated",
+      "relevant_ids": [],
+      "forbidden_ids": [],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "unrelated-06",
+      "category": "unrelated",
+      "relevant_ids": [],
+      "forbidden_ids": [],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "unrelated-07",
+      "category": "unrelated",
+      "relevant_ids": [],
+      "forbidden_ids": [],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "unrelated-08",
+      "category": "unrelated",
+      "relevant_ids": [],
+      "forbidden_ids": [],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "unrelated-09",
+      "category": "unrelated",
+      "relevant_ids": [],
+      "forbidden_ids": [],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "unrelated-10",
+      "category": "unrelated",
+      "relevant_ids": [],
+      "forbidden_ids": [],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "valid-fact-attachment",
+      "category": "fact_attachment",
+      "relevant_ids": [
+        "trip-episode"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [
+        "destination-fact"
+      ],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "trip-episode"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "星町"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "stale-fact-link",
+      "category": "fact_version",
+      "relevant_ids": [
+        "trip-episode"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [
+        "destination-fact"
+      ],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "trip-episode"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [],
+        "forbidden_facts": [
+          "星町",
+          "月町"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "revoked-fact-source",
+      "category": "fact_revocation",
+      "relevant_ids": [
+        "trip-episode"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [
+        "destination-fact"
+      ],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "trip-episode"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [],
+        "forbidden_facts": [
+          "星町"
+        ],
+        "discarded": false
+      }
+    },
+    {
+      "id": "direct-semantic",
+      "category": "semantic_direct",
+      "relevant_ids": [
+        "quiet-preference"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "quiet-preference"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "静かな"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "derived-semantic",
+      "category": "semantic_derived",
+      "relevant_ids": [
+        "quiet-preference"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "quiet-preference"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "静かな"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "equivalent-band-order",
+      "category": "equivalent_order",
+      "relevant_ids": [
+        "tie-a",
+        "tie-b",
+        "tie-c",
+        "tie-d",
+        "tie-null"
+      ],
+      "forbidden_ids": [],
+      "no_match": false,
+      "expected_order": [
+        "tie-a",
+        "tie-b",
+        "tie-c",
+        "tie-d",
+        "tie-null"
+      ],
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": [
+          "tie-a",
+          "tie-b",
+          "tie-c",
+          "tie-d",
+          "tie-null"
+        ]
+      },
+      "answer": {
+        "behavior": "grounded",
+        "required_facts": [
+          "春茶",
+          "夏茶",
+          "秋茶",
+          "冬茶",
+          "花茶"
+        ],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "below-threshold",
+      "category": "threshold",
+      "relevant_ids": [],
+      "forbidden_ids": [],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    }
+  ]
+}
