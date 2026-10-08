@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+置換注記（2026-10-08）: 部分文字列検索 fallback、逐語 Memory からの候補取得と順位の対象は、[ADR 0022](0022-memory-retrieval-from-records.md) の Episode・Semantic（有効な Fact を添付）で置換します。
+
 一部を[ADR 0015 §3「Coreの既存決定との優先関係」](0015-memory-model-reorganization.md#3-coreの既存決定との優先関係)の記憶モデル再編で置き換えます（検索の順位と障害時の扱い。ADR 0018を参照）。
 
 一部を[ADR 0021](0021-postgresql-only-storage.md)のPostgreSQL一本化で置き換えます（SQLiteから候補を取得する記述とSQLite rowid。検索の認可・出典・撤回の境界は維持）。
