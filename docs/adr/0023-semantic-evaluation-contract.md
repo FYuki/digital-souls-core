@@ -8,6 +8,11 @@ Accepted日: 2026-10-09
 
 根拠: 2026-10-08 のユーザー決定（[Epic #111 の V1〜V7](https://github.com/FYuki/digital-souls-core/issues/111)）。
 
+> 置換注記（2026-10-09、[Issue #120](https://github.com/FYuki/digital-souls-core/issues/120)）：
+> 「実行・合否」の実モデルにおける同等帯の全順序一致と、回答dispatchの順序を含むID完全一致は、
+> 2026-10-09のユーザー決定により「上位5件に1位にあるべき記憶が含まれる」判定へ置き換えました。
+> 詳細は末尾の「合否判定の置換注記」を参照してください。該当箇所の本文は履歴として保持します。
+
 ## 背景
 
 [ADR 0022](0022-memory-retrieval-from-records.md)で、検索候補とcontextはEpisode・Semanticの正本と有効なFactへ切り替わりました。
