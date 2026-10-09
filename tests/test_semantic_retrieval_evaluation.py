@@ -3,6 +3,7 @@
 import copy
 import json
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -352,10 +353,91 @@ def test_ninety_percent_boundary_is_inclusive_but_one_gate_failure_is_global() -
     )
     rows[index] = score_case(gold(rows[index].id), o)
     summary = aggregate_run(DATA, tuple(rows))
-    assert summary.passed and summary.categories["synonym"].rate == 0.9
+    assert not summary.passed and summary.categories["synonym"].rate == 0.9
+    assert not summary.gates_passed  # Missing top-one is now a mandatory failure.
     index = next(i for i, row in enumerate(rows) if row.id == "synonym-03")
     o = observation(rows[index].id).model_copy(update={"scores": {"target": 0.53}})
     rows[index] = score_case(gold(rows[index].id), o)
     summary = aggregate_run(DATA, tuple(rows))
     assert summary.categories["synonym"].rate == 0.9
     assert not summary.gates_passed and not summary.passed
+
+
+@pytest.mark.parametrize("mode", ["fixture", "local_model"])
+def test_retrieval_order_gate_depends_on_mode(mode: Literal["fixture", "local_model"]) -> None:
+    g = gold("equivalent-band-order")
+    o = observation(g.id).model_copy(update={"retrieved_ids": tuple(reversed(g.relevant_ids))})
+    row = score_case(g, o, mode=mode)
+    assert row.gates["top_one"]
+    assert row.passed == (mode == "local_model")
+    assert ("expected_order" in row.gates) == (mode == "fixture")
+
+
+def test_local_retrieval_accepts_extra_but_missing_top_one_fails() -> None:
+    g = gold("synonym-02")
+    o = observation(g.id).model_copy(
+        update={
+            "retrieved_ids": ("distractor", "target"),
+            "fact_ids": {"distractor": (), "target": ()},
+            "scores": {"distractor": 1.0, "target": 1.0},
+            "verified_ids": ("distractor", "target"),
+        }
+    )
+    assert score_case(g, o, mode="local_model").passed
+    o = o.model_copy(
+        update={
+            "retrieved_ids": ("distractor",),
+            "fact_ids": {"distractor": ()},
+            "scores": {"distractor": 1.0},
+        }
+    )
+    row = score_case(g, o, mode="local_model")
+    assert not row.gates["top_one"] and not row.passed
+
+
+def test_local_order_report_is_rescored_using_report_mode() -> None:
+    from digital_souls_core.semantic_retrieval_evaluation import validate_report
+
+    rows = []
+    for g in DATA.expectations.cases:
+        o = observation(g.id)
+        if g.expected_order:
+            o = o.model_copy(update={"retrieved_ids": tuple(reversed(g.expected_order))})
+        rows.append(score_case(g, o, mode="local_model"))
+    run = aggregate_run(DATA, tuple(rows), mode="local_model")
+    report = valid_report().model_copy(
+        update={"mode": "local_model", "quality_evidence": True, "runs": (run, run, run)}
+    )
+    validate_report(report, DATA, 3)
+    with pytest.raises(ValueError):
+        validate_report(
+            report.model_copy(update={"mode": "fixture", "quality_evidence": False}), DATA, 3
+        )
+
+
+def test_top_one_alone_does_not_replace_relevant_subset_quality() -> None:
+    g = gold("equivalent-band-order")
+    assert g.expected_order
+    identifier = g.expected_order[0]
+    o = observation(g.id).model_copy(
+        update={
+            "retrieved_ids": (identifier,),
+            "fact_ids": {identifier: ()},
+            "scores": {identifier: 1.0},
+            "verified_ids": (identifier,),
+        }
+    )
+    row = score_case(g, o, mode="local_model")
+    assert row.gates["top_one"]
+    assert not row.quality_passed and not row.passed
+
+
+@pytest.mark.parametrize("mode", ["fixture", "local_model"])
+def test_no_match_gates_are_unchanged_in_both_modes(
+    mode: Literal["fixture", "local_model"],
+) -> None:
+    g = gold("unrelated-observatory")
+    o = observation(g.id)
+    assert score_case(g, o, mode=mode).passed
+    row = score_case(g, o.model_copy(update={"eligible_above_threshold": 1}), mode=mode)
+    assert row.gates["top_one"] and not row.gates["no_match"] and not row.passed

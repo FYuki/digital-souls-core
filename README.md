@@ -32,8 +32,8 @@ Coreは記憶の正本と検証、機微情報の流出防止ゲート、イン�
 現行の記憶APIは[記憶API](docs/memory.md)、開発規約は[CONTRIBUTING](CONTRIBUTING.md)で管理します。
 保存は既定拒否・明示注入のままで、私的な実会話を自動で取り込みません。
 現行形式の分類・形成・検索・回答の実モデル品質は未受入です。
-正本へ合成登録した検索・回答の実モデル評価は各3回実施済みで、いずれもFAILです
-（[実モデル証跡](docs/evidence/2026-10-09-semantic-real-model-evaluation.md)）。
+正本へ合成登録した検索・回答の実モデル評価は上位5件包含の基準で各3回再実施済みで、いずれもFAILです
+（[実モデル証跡](docs/evidence/2026-10-09-semantic-real-model-evaluation-top5.md)）。
 
 最初の[キャラクター推論API](docs/api.md)をPython/FastAPI/LiteLLMで実装しています。
 通常チャットと外部Agentのtool call往復に対応する小範囲のChat Completions APIです。

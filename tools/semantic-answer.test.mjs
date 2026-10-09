@@ -49,9 +49,9 @@ function observation(c, responses = fixtures) {
   return {id:c.id,answer:blocked || discarded ? null : responses[c.id].answer,
     dispatch_valid:!blocked,dispatch_memory_ids:dispatches.get(c.id),dispatched:!blocked,discarded,context_empty:empty};
 }
-function exported(responses = fixtures) {
+function exported(responses = fixtures, adjust = o => o) {
   const { configuration } = require('../evals/semantic/config.cjs');
-  const observations = cases.map(c => observation(c,responses));
+  const observations = cases.map(c => adjust(observation(c,responses)));
   const run = python({operation:'batch',observations});
   const config = configuration('fixture');
   return {config, results:{version:3, stats:{successes:run.cases.filter(r => r.passed).length,
@@ -213,4 +213,27 @@ test('error answer input fixture cannot become a no_memory success', async () =>
   row.response = {error:invalidFixtures.error['synonym-02'].error};
   row.failureReason = 2;
   assert.throws(() => inspectReport(raw,{mode:'fixture',identity}));
+});
+
+
+test('report gate rescores top-five inclusion and accepts reordered extra IDs', async () => {
+  const {inspectReport} = await import('../evals/semantic/report_gate.mjs');
+  const raw = exported(fixtures, o => {
+    if (o.id === 'synonym-02') o.dispatch_memory_ids = ['extra', 'target'];
+    if (o.id === 'equivalent-band-order') o.dispatch_memory_ids.reverse();
+    return o;
+  });
+  assert.equal(inspectReport(raw,{mode:'fixture',identity}).passed,true);
+  const missing = exported(fixtures, o => {
+    if (o.id === 'synonym-02') o.dispatch_memory_ids = ['extra'];
+    return o;
+  });
+  const run = inspectReport(missing,{mode:'fixture',identity});
+  assert.equal(run.gates_passed,false);
+  assert.equal(run.cases.find(c => c.id === 'synonym-02').gates.dispatch,false);
+  const forged = structuredClone(raw);
+  forged.results.results.find(r => r.vars.case_id === 'synonym-02')
+    .response.output = JSON.stringify({observation:{...observation(cases.find(c => c.id === 'synonym-02')),
+      dispatch_memory_ids:['extra']},identity});
+  assert.throws(() => inspectReport(forged,{mode:'fixture',identity}));
 });

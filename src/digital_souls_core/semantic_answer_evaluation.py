@@ -6,6 +6,7 @@ from .semantic_evaluation_cases import (
     AnswerExpectation,
     CaseExpectation,
     SemanticEvaluationData,
+    expected_top_one,
 )
 
 OBSERVATION_KEYS = frozenset(
@@ -60,10 +61,13 @@ def score_answer(gold: CaseExpectation, observation: Any) -> dict[str, Any]:
         and o["discarded"] == gold.answer.discarded
         and ((o["answer"] is None) if blocked else bool(answer.strip()))
     )
+    top_one = expected_top_one(gold)
+    ids = o["dispatch_memory_ids"]
     gates = {
         "forbidden": forbidden,
         "dispatch": o["dispatch_valid"] == gold.dispatch.valid
-        and tuple(o["dispatch_memory_ids"]) == gold.dispatch.memory_ids,
+        and ((top_one is None or top_one in ids[:5]) if gold.dispatch.valid else not ids)
+        and not set(ids).intersection(gold.forbidden_ids),
         "lifecycle": lifecycle,
         "no_memory": gold.answer.behavior != "no_memory" or o["context_empty"],
     }

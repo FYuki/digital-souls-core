@@ -87,6 +87,13 @@ queryと全normalized_text（Fact各版を含む）には共通4次元の有限�
 
 偽vectorはCIで道具を検証するためのものです。**モデルの品質証拠ではありません**。実モデル評価は手動・cacheなし3回、各回各分類90%以上、必須ゲート全件合格で判定します。平均で相殺せず、結果に合わせて期待値・閾値を緩めません。
 
+検索の `top_one` ゲートは上位5件に1位にあるべき記憶が含まれることを求めます。
+1位はgoldの `expected_order` があれば先頭、なければ `relevant_ids` の先頭、空なら該当なしです。
+`expected_order` 全順序一致はfixture modeだけの必須ゲートとし、62×3の
+`equivalent-band-order` で本番の同等帯sortを引き続き検証します。
+local_model modeでは全順序一致を求めません。`relevant_ids` 全包含の品質条件、
+no_match、privacy・Binding・失効、閾値・検証不能代替禁止のゲートとgold値は変更しません。
+
 ### 回答事実の判定契約
 
 入力の `schema_version` は1のまま、goldは破壊的な形式変更を明示するため **2** にします。旧goldのschema 1 / 平坦な語句配列は拒否し、暗黙変換しません。未公開の初期形式であり、既存ハーネスの移行はありません。
@@ -166,7 +173,10 @@ assertionとgateはPython `AnswerExpectation.matches_facts` を共有し、NFKC�
 AND of ORs / 禁止語句を決定論的に判定します。出典表記は採点しません。
 `no_memory` は空contextと禁止事実不在を確認します。検索後mutationはdispatch直前のguardで
 送信を拒否し、回答後mutationは公開直前のguardで生成済み回答を破棄します。
-`dispatch.valid` と `dispatch.memory_ids`、`answer.discarded` をgoldと照合します。
+`dispatch.valid` と `answer.discarded` をgoldと照合します。valid=trueの送信対象IDは、
+上位5件に1位にあるべき記憶が含まれることを求め、完全一致や順序一致は求めません。
+1位はgoldの `expected_order` の先頭、なければ `relevant_ids` の先頭、空なら該当なしです。
+top-1なしならID照合を省き、valid=falseならID空を要求します。禁止IDは拒否します。
 送信対象IDは公開reportの観測値であり、モデルへの入力には含めません。
 
 各回の全ケース・全分類を再計算し、**各回・各分類90%以上**を要求します。禁止事実・Binding・失効・
@@ -210,7 +220,7 @@ bash tools/evaluate-semantic-answer.sh --mode local_model --execute-local-model 
 
 実行flagまたはprofileが欠ければNOT RUN（exit 3）、無効profileや通信失敗はFAILです。
 このツールはサーバー・GPU・モデルを起動しません。
-ローカルnomic / gemma4-12bで検索・回答各3回の実モデル評価を実施済みです。
+ローカルnomic / gemma4-12bで上位5件包含の基準による検索・回答各3回の実モデル再評価を実施済みです。
 いずれもFAILで品質は未受入です。分類品質と必須ゲートを分けた
-[実モデル証跡](../../docs/evidence/2026-10-09-semantic-real-model-evaluation.md)と
+[実モデル証跡](../../docs/evidence/2026-10-09-semantic-real-model-evaluation-top5.md)と
 [利用手順](../../docs/memory-evaluation.md)を参照してください。

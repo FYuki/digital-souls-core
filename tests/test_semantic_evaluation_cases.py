@@ -508,3 +508,23 @@ def test_answer_fact_matching_normalizes_unicode(answer: str) -> None:
         )
     )
     assert gold.matches_facts(answer)
+
+
+@pytest.mark.parametrize(
+    "identifier",
+    [
+        g.id
+        for g in load_evaluation_cases(
+            ROOT / "cases.json", ROOT / "expectations.json"
+        ).expectations.cases
+    ],
+)
+def test_top_one_derivation_agrees_with_all_fixed_dispatch_gold(identifier: str) -> None:
+    from digital_souls_core.semantic_evaluation_cases import expected_top_one
+
+    data = load_evaluation_cases(ROOT / "cases.json", ROOT / "expectations.json")
+    g = next(g for g in data.expectations.cases if g.id == identifier)
+    expected = (g.expected_order or g.relevant_ids or (None,))[0]
+    assert expected_top_one(g) == expected
+    if g.dispatch.memory_ids:
+        assert expected_top_one(g) == g.dispatch.memory_ids[0]

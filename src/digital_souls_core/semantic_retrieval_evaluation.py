@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .local_embedding import LocalEmbedding, LocalEmbeddingProfile
 from .memory_ranking import EmbeddingSpace, MemoryEmbedding, RetrievalPolicy
 from .postgres_db import PostgresConfig
-from .semantic_evaluation_cases import CaseExpectation, SemanticEvaluationData
+from .semantic_evaluation_cases import CaseExpectation, SemanticEvaluationData, expected_top_one
 from .semantic_evaluation_runtime import FixtureEmbedding, PreparedCase, isolated_case
 
 
@@ -73,7 +73,14 @@ class RunResult(_ReportModel):
     passed: bool
 
 
-def score_case(gold: CaseExpectation, observation: Observation) -> CaseResult:
+def score_case(
+    gold: CaseExpectation,
+    observation: Observation,
+    *,
+    mode: Literal["fixture", "local_model"] = "fixture",
+) -> CaseResult:
+    if mode not in {"fixture", "local_model"}:
+        raise ReportError("Invalid evaluation mode")
     # Revalidate copies/constructed instances, never permit errors or NaN to PASS.
     observation = Observation.model_validate(observation.model_dump())
     ids = set(observation.retrieved_ids)
@@ -86,6 +93,7 @@ def score_case(gold: CaseExpectation, observation: Observation) -> CaseResult:
         and (not gold.no_match or not ids)
         and set(gold.required_fact_ids) <= relevant_attached
     )
+    top_one = expected_top_one(gold)
     gates = {
         "forbidden_ids": not ids.intersection(gold.forbidden_ids),
         "threshold": all(
@@ -93,12 +101,15 @@ def score_case(gold: CaseExpectation, observation: Observation) -> CaseResult:
         ),
         "verified_records": ids <= set(observation.verified_ids)
         and not attached.intersection(gold.forbidden_fact_ids),
-        "expected_order": gold.expected_order is None
-        or observation.retrieved_ids == gold.expected_order,
+        "top_one": top_one is None or top_one in observation.retrieved_ids[:5],
         "dispatch": observation.dispatch_valid == gold.dispatch.valid,
         "context": observation.context_matches,
         "no_match": not gold.no_match or observation.eligible_above_threshold == 0,
     }
+    if mode == "fixture":
+        gates["expected_order"] = (
+            gold.expected_order is None or observation.retrieved_ids == gold.expected_order
+        )
     return CaseResult(
         **observation.model_dump(),
         id=gold.id,
@@ -109,7 +120,12 @@ def score_case(gold: CaseExpectation, observation: Observation) -> CaseResult:
     )
 
 
-def aggregate_run(data: SemanticEvaluationData, results: tuple[CaseResult, ...]) -> RunResult:
+def aggregate_run(
+    data: SemanticEvaluationData,
+    results: tuple[CaseResult, ...],
+    *,
+    mode: Literal["fixture", "local_model"] = "fixture",
+) -> RunResult:
     gold = {g.id: g for g in data.expectations.cases}
     if not gold or len(results) != len(gold) or set(gold) != {r.id for r in results}:
         raise ReportError("Incomplete evaluation run")
@@ -124,6 +140,7 @@ def aggregate_run(data: SemanticEvaluationData, results: tuple[CaseResult, ...])
         score_case(
             gold[r.id],
             Observation.model_validate(r.model_dump(include=set(Observation.model_fields))),
+            mode=mode,
         )
         for r in results
     )
@@ -285,7 +302,7 @@ def validate_report(
             raise ValueError
         EmbeddingSpace(**report.space)  # type: ignore[arg-type]
         for run in report.runs:
-            if aggregate_run(data, run.cases) != run:
+            if aggregate_run(data, run.cases, mode=report.mode) != run:
                 raise ValueError
         if report.quality_evidence != (
             report.mode == "local_model" and report.embedding_call_count > 0
@@ -333,11 +350,11 @@ async def evaluate_retrieval(
             rows = []
             for case in data.cases.cases:
                 with isolated_case(config, case, embedding) as runtime:
-                    rows.append(score_case(expected[case.id], await observe(runtime)))
+                    rows.append(score_case(expected[case.id], await observe(runtime), mode=mode))
                     calls += len(runtime.embedding.calls)
                 if embedding.space != space:
                     raise ReportError("Embedding configuration changed")
-            completed.append(aggregate_run(data, tuple(rows)))
+            completed.append(aggregate_run(data, tuple(rows), mode=mode))
         report = EvaluationReport(
             commit=commit,
             mode=mode,

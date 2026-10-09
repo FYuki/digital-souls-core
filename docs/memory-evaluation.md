@@ -4,7 +4,7 @@
 検索はPython、回答はpromptfoo 0.117.2を使って測定します。
 入力・gold・分類・移行対応・語句判定の限界は [評価README](../evals/semantic/README.md)、
 本番の検索・context契約は [記憶API](memory.md) と [ADR 0022](adr/0022-memory-retrieval-from-records.md) が正本です。
-[実モデル証跡](evidence/2026-10-09-semantic-real-model-evaluation.md) に今回の3回の結果を記録しています。
+[実モデル証跡](evidence/2026-10-09-semantic-real-model-evaluation-top5.md) に今回の3回の結果を記録しています。
 品質は未受入です。fixtureの成功をモデル品質の合格にせず、実モデルのFAILも記録します。
 
 ## 評価経路と固定データ
@@ -102,8 +102,14 @@ long_textの失敗があれば設定値と失敗を記録します。運用設�
 
 | 対象 | 分類別の品質条件（各回90%以上） | 必須ゲート（各ケース全件合格） |
 | --- | --- | --- |
-| 検索 | relevant IDの全包含、該当なしの空結果、relevant Episodeへの必須Fact添付 | forbidden IDs/Fact不在、閾値未満混入0、正本検証、期待順序一致、dispatch guard、context一致、no_match時の閾値以上適格候補0 |
-| 回答 | grounded回答の全必須事実グループを満たす | 禁止事実不在、dispatch有効性と送信対象IDの一致、送信/公開拒否と破棄、no_memoryの空context |
+| 検索 | relevant IDの全包含、該当なしの空結果、relevant Episodeへの必須Fact添付 | forbidden IDs/Fact不在、閾値未満混入0、正本検証、上位5件へのtop-1包含（fixtureは全順序一致も必須）、dispatch guard、context一致、no_match時の閾値以上適格候補0 |
+| 回答 | grounded回答の全必須事実グループを満たす | 禁止事実不在、dispatch有効性一致と送信上位5件へのtop-1包含（無効時はID空）、送信/公開拒否と破棄、no_memoryの空context |
+
+top-1はgoldの `expected_order` があればその先頭、なければ `relevant_ids` の先頭、空なら該当なしです。
+期待値は変更しません。検索の `top_one` は両modeで必須、`expected_order` はfixtureだけに残し、
+実モデルの品質ゲートには含めません。fixtureの62×3ではequivalent-band-orderの全順序を検証します。
+回答は両modeで順序・余分な非禁止IDを問わず包含で判定し、top-1なしならID照合を省きます。
+禁止ID・事実、valid=falseのID空、no_memoryの空context、lifecycleは維持します。
 
 品質率は `quality_passed` の割合です。必須ゲートと分けて集計するため、分類品質100%でも
 必須ゲート違反があればFAILです。全体件数の割合や3回平均で、90%未達の回・分類を相殺しません。
