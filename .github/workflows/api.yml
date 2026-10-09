@@ -30,8 +30,10 @@ jobs:
         run: |
           bash -n tools/start-llamacpp.sh
           bash -n tools/test-postgres.sh
-          uv run --no-sync ruff check src tests tools/evaluate-memory-search.py
-          uv run --no-sync ruff format --check src tests tools/evaluate-memory-search.py
+          bash -n tools/with-test-postgres.sh
+          bash -n tools/evaluate-semantic-retrieval.sh
+          uv run --no-sync ruff check src tests tools/evaluate-semantic-retrieval.py
+          uv run --no-sync ruff format --check src tests tools/evaluate-semantic-retrieval.py
           uv run --no-sync mypy
       - name: Required unit tests (no network)
         run: uv run --no-sync pytest -m ut -q
@@ -65,5 +67,5 @@ jobs:
           uv sync --frozen
       - name: Validate local PostgreSQL Compose syntax
         run: docker compose -f compose.postgresql.json config --no-interpolate --quiet
-      - name: Required isolated PostgreSQL storage contracts
+      - name: Required isolated PostgreSQL storage and semantic evaluation contracts
         run: bash tools/test-postgres.sh

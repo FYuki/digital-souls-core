@@ -1,29 +1,31 @@
 # 合成データによる意味検索評価
 
 [記憶検索](memory.md)の順位付けを、明示的な正解IDを持つ合成corpusで測定します。
-既定は偽embeddingを使うoffline実行です。実モデルの評価には、運用者が明示したローカルprofileを使います。
-どちらも合成セット内の結果を報告するだけで、モデルの採用や「品質が良好」という判定は行いません。
+既定は偽embeddingと使い捨てPostgreSQLを使う実行です。実モデルの評価には、運用者が明示したローカルprofileを使います。
+各回・各分類90%以上と必須ゲート違反0件で合否を判定します。偽embeddingの合格はモデル品質の証拠ではありません。
 実モデル・GPU・dogfoodへの接続と実測は、このsliceではNOT RUNです。
 
-## 通信なしの再現手順
+## 使い捨て PostgreSQL での実行
 
 リポジトリの固定toolchainを用意し、通常のlocked installが完了した環境で実行します。
 ハーネス自体がモデル・依存・認証情報を取得することはありません。
 
 ```sh
-uv run --no-sync python tools/evaluate-memory-search.py
+bash tools/evaluate-semantic-retrieval.sh --runs 3
 ```
 
-既定では[配布fixture](../tests/fixtures/memory-retrieval-evaluation.json)を使い、`k=2`のJSON reportを
-標準出力へ返します。`mode`は`fixture`、`quality_evidence`はfalseです。
-fixtureに書かれたvectorで順位付けと指標の実装を確認するため、良い数値でもモデル品質の証拠になりません。
+[cases.json](../evals/semantic/cases.json) と [expectations.json](../evals/semantic/expectations.json) の62ケースを、
+本番の `MemoryRetrieval` / `MemoryContext` で3回実行します。JSON report は標準出力、`--output /absolute/path/report.json` でファイルへ保存できます。
+`mode=fixture`、`quality_evidence=false` です。DBはdigest固定・ネットワークなし・Unix socket接続で、実行後に削除します。
+Pythonはhostで動くため、明示profileのloopback embedding endpointへ接続できます。
 
-fixtureとkを明示する場合は次の形式です。
+privacy分類器は本番 `LocalClassifier` のprovider応答のみ合成のNOT_SENSITIVEとし、`classifier=synthetic` を記録します。
+scanner・PrivacyPolicyは本番経路を通します。分類器の品質は対象外で、SPEC §3.2の記憶判断評価で扱います。
+決定・実行順は [ADR 0023](adr/0023-semantic-evaluation-contract.md) と [評価データREADME](../evals/semantic/README.md) を参照してください。
 
-```sh
-uv run --no-sync python tools/evaluate-memory-search.py \
-  --fixture tests/fixtures/memory-retrieval-evaluation.json --k 2
-```
+詳細な利用文書は [Issue #115](https://github.com/FYuki/digital-souls-core/issues/115) で同期します。
+下記の「fixtureと検索範囲」以降は旧評価の参考説明で、新reportの仕様ではありません。
+旧ツール・fixtureは撤去済みで、実行方法はこの節と次節を使います。
 
 ## 明示profileによるローカル実測
 
@@ -32,8 +34,8 @@ uv run --no-sync python tools/evaluate-memory-search.py \
 用意し、`enabled=true`を明示します。例ファイルの値が稼働中サービスに対応するとは扱いません。
 
 ```sh
-uv run --no-sync python tools/evaluate-memory-search.py \
-  --profile /absolute/path/to/approved-embedding-profile.json --k 2
+bash tools/evaluate-semantic-retrieval.sh --runs 3 \
+  --profile /absolute/path/to/approved-embedding-profile.json
 ```
 
 `--profile`を渡した場合だけ`LocalEmbedding`を読み込み、queryと候補の合成本文をそのloopback endpointへ
@@ -50,7 +52,7 @@ server設定を確認してください。既存chat用gemmaモデル・portと�
 `backend_identity_verified=false`を併記します。model digestはprofileの宣言であり、接続先が実際にその
 モデルを使った証明ではありません。実世界の検索精度・privacy分類精度や品質合格を意味しません。
 
-## fixtureと検索範囲
+## fixtureと検索範囲（旧評価・#115で同期予定）
 
 fixtureはJSONで、`dataset_type`は`synthetic`、versionとdimensionsを持ちます。
 
@@ -69,7 +71,7 @@ local modeではfixtureの偽vectorを品質値として使わず、実adapter�
 
 JSON fixtureの形式は維持し、合成本文を `Episode.normalized_text` として持つ `RetrievalCandidate` と
 citationを作り、製品の `rank_records` で順位付けします。保存・形成を行うハーネスではありません。
-この最小追従後の評価再設計は[PR #51](https://github.com/FYuki/digital-souls-core/pull/51)で別途行います。
+この旧評価は[Issue #113](https://github.com/FYuki/digital-souls-core/issues/113)で本番検索ハーネスへ置換しました。
 
 このハーネスは合成の候補・正解集合を直接扱います。`excluded_ids`の除去は評価入力の制御で、
 実際のprivate thread、発話除外、削除transaction、Binding、privacy分類の結合試験を置き換えません。

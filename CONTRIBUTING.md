@@ -85,8 +85,8 @@ lint、format-check、静的型検査、UT、IT1、パッケージのbuild・ins
 
 ```sh
 uv sync --frozen
-uv run --no-sync ruff check src tests tools/evaluate-memory-search.py
-uv run --no-sync ruff format --check src tests tools/evaluate-memory-search.py
+uv run --no-sync ruff check src tests tools/evaluate-semantic-retrieval.py
+uv run --no-sync ruff format --check src tests tools/evaluate-semantic-retrieval.py
 uv run --no-sync mypy
 uv run --no-sync pytest -m ut -q
 uv run --no-sync pytest -m it1 -q
