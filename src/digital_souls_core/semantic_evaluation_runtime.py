@@ -31,6 +31,7 @@ from .privacy_classifier import LocalClassifier
 from .privacy_scan import POLICY_VERSION
 from .semantic_evaluation_cases import (
     EvaluationCase,
+    EvaluationCases,
     EvaluationEpisode,
     EvaluationFact,
     EvaluationSemantic,
@@ -91,12 +92,13 @@ def synthetic_policy(case: EvaluationCase) -> tuple[PrivacyPolicy, Profile]:
 
 
 class FixtureEmbedding:
-    def __init__(self, data: SemanticEvaluationData) -> None:
+    def __init__(self, data: SemanticEvaluationData | EvaluationCases) -> None:
+        cases = data.cases if isinstance(data, SemanticEvaluationData) else data
         self.space = EmbeddingSpace(
-            "synthetic", "semantic-cases-v1", data.cases.dimensions, "fixture-no-cache"
+            "synthetic", "semantic-cases-v1", cases.dimensions, "fixture-no-cache"
         )
         self._vectors = {}
-        for case in data.cases.cases:
+        for case in cases.cases:
             self._vectors[case.query] = case.query_vector
             for record in (
                 *case.episodes,

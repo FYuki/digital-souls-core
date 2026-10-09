@@ -1,0 +1,8 @@
+{
+  "name": "digital-souls-core-semantic-evals",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Core本番経路の合成回答評価（製品依存には含めない）",
+  "engines": { "node": "24.19.0" },
+  "devDependencies": { "promptfoo": "0.117.2" }
+}

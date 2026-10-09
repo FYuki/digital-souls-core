@@ -131,3 +131,70 @@ queryと全normalized_text（Fact各版を含む）には共通4次元の有限�
 短い語も全件確認しました。`private-source` / `excluded-source` / `deleted-source` / `deleted-memory` の必須 `青` は「青い」「青色」を包含します。禁止 `紫` は単独の色名による失効情報の漏洩も拒否するため維持します。「紫外線」「紫陽花」でも誤検出する限界がありますが、これらの事実は合成会話・記憶に存在せず正解候補へ加えません。語境界・文意の判定を行わない方式では、単独の「紫」を漏洩として検出しつつ全ての複合語を除くことはできません。`青` / `赤` / `橙` / `秋` / `山` も他語を包含し得ます。色・季節・題材を問うケースの最小事実として採用し、完全な意味判定と同一視しません。
 
 同じ理由で「コーヒーと紅茶が苦手」は必須のコーヒーを含むためこの語句判定だけでは拒否できません。紅茶全体を禁止すると「紅茶は好きで、コーヒーが苦手」という正しい回答を拒否し、特定の否定句だけを禁止しても語順差を網羅できません。監督の指示に従い、このケースはコーヒーだけを必須とし、禁止関係の完全検出を主張しません。否定や時間的関係を含む語句一致は、自然言語の真偽・矛盾を完全には判定できません。
+
+## 回答評価（Issue #114、promptfoo 0.117.2）
+
+Python依存は増やさず、このディレクトリの `package.json` / `package-lock.json` だけで
+promptfoo **0.117.2** を固定します。Nodeは `.node-version`、uvは0.8.22です。
+
+```sh
+uv sync --locked
+(cd evals/semantic && npm ci --no-audit --no-fund)
+node --test --test-reporter=./tools/required-tests-reporter.mjs tools/*.test.mjs
+bash tools/evaluate-semantic-answer.sh --runs 3 --output /dev/shm/semantic-answer-report.json
+```
+
+fixture が既定です。`with-test-postgres.sh` のnetworkなし使い捨てPostgreSQLへ、#113と同じ
+`isolated_case` で合成履歴・正本を登録します。本番 `MemoryRetrieval`（本番設定）、
+`MemoryContext`、`Inference.prepare` のchat組み立てと `Inference.check` を通します。
+分類器の **provider応答だけ** は合成NOT_SENSITIVEで、reportに `classifier=synthetic` を残します。
+回答は `answer-fixtures.json` の独立した入力をProvider portで返すfakeです。fakeがcontextから
+回答を生成するわけではなく、この成功はモデル品質の証拠になりません（`quality_evidence=false`）。
+
+[characters.json](characters.json) と [evaluation.card.json](evaluation.card.json) は最小system promptの
+固定した合成キャラクターです。ケースの検索Bindingへcharacter IDだけを合わせます。
+既存Mioriカードは読み込みません。モデルにはqueryと本番が生成したcontextだけを渡し、
+providerは `cases.json` だけを入力として検証します。goldはassertion / report bridgeのみが読みます。
+
+assertionとgateはPython `AnswerExpectation.matches_facts` を共有し、NFKC→casefoldの
+AND of ORs / 禁止語句を決定論的に判定します。出典表記は採点しません。
+`no_memory` は空contextと禁止事実不在を確認します。検索後mutationはdispatch直前のguardで
+送信を拒否し、回答後mutationは公開直前のguardで生成済み回答を破棄します。
+`dispatch.valid` と `dispatch.memory_ids`、`answer.discarded` をgoldと照合します。
+送信対象IDは公開reportの観測値であり、モデルへの入力には含めません。
+
+各回の全ケース・全分類を再計算し、**各回・各分類90%以上**を要求します。禁止事実・Binding・失効・
+dispatch・破棄の必須ゲートは平均で相殺しません。0件、欠落、重複、unknown ID、実行error、
+非有限score、skip、cache利用、欠落assertion、採点metadataと再採点の不一致を拒否します。
+promptfooの平均score・終了コードだけでは合格にしません。
+
+`invalid-answer-fixtures.json` は禁止語句混入、必須事実欠落（synonym 8/10）、provider errorの
+独立した不正入力です。Python/PostgreSQLとJS試験でgateがFAILになることを検証します。
+全実行経路を手動確認する場合は `--fixture-variant forbidden|missing|error` を付けられます。
+いずれも期待する終了結果はFAILであり、必須CIの正常fixtureと区別してください。
+
+通信・保存境界：runnerは資格情報・proxy・libpq環境・dotenv・Node設定を子プロセスへ継承しません。
+必要な専用PostgreSQL socket変数とPATHだけを渡し、HOME / dotenv / promptfoo保存先を専用0700一時領域へ
+置きます。NodeのHTTP/TCP/TLS/UDP/DNS/fetchを拒否し、telemetry・更新確認・共有・remote生成・cacheを
+無効にします。fixture providerもIP socket接続を拒否し、DBは明示Unix socketだけを使います。
+固定版は `--no-write` だとJSON exportの結果が空になるため、このflagは使いません。
+内部DB・raw exportは一時領域に生成し、終了時に削除します。本文・query・回答全文を公開reportや
+証跡へ出しません。reportにはcommit/dirty、mode、classifier、profileの機密情報を除いたモデル識別、
+embedding space、本番検索設定、入力/gold/カード/fixtureのSHA-256、promptfoo版、各回の結果と分類集計を残します。
+モデル識別は設定値で、実backendの同一性を独立検証した証拠ではありません。
+
+### 明示的な実モデル実行（#115で実施、今回 NOT RUN）
+
+[answer-profile.example.json](answer-profile.example.json) は無効な例です。
+git管理外の絶対パスのprofileで、トップレベル `enabled`、embeddingの `enabled`、
+chatの `external_send_allowed` を明示的に有効にします。embeddingのmodel/digest/dimensionsと
+既存管理loopback endpointを実設定へ合わせてください。Coreの既存 `LocalEmbedding` と
+`LiteLLMProvider` / llama.cppのgemma4-12b経路を使い、資格情報を要する経路へfallbackしません。
+
+```sh
+bash tools/evaluate-semantic-answer.sh --mode local_model --execute-local-model \
+  --profile /absolute/path/answer.local.json --runs 3 --output /dev/shm/semantic-answer-real.json
+```
+
+実行flagまたはprofileが欠ければNOT RUN（exit 3）、無効profileや通信失敗はFAILです。
+このツールはサーバー・GPU・モデルを起動しません。実モデル品質・文書同期は #115 の範囲です。

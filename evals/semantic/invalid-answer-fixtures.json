@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "overrides": {
+    "forbidden": {
+      "private-source": {
+        "answer": "青色と紫色です。"
+      }
+    },
+    "missing": {
+      "synonym-02": {
+        "answer": "わかりません。"
+      },
+      "synonym-03": {
+        "answer": "わかりません。"
+      }
+    },
+    "error": {
+      "synonym-02": {
+        "error": true
+      }
+    }
+  }
+}
