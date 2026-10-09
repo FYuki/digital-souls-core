@@ -101,7 +101,7 @@ Episode・SemanticのIDは版1で登録し、同一IDの内容版追加はFact�
 | 語彙による補完、自己申告の現在値補完、矛盾の注意 | 未実装 | ADR 0018 |
 | 有効期限・policy versionの互換による除外 | 未実装 | ADR 0018 |
 | 永続的な派生index | 未実装 | ADR 0015 |
-| 本番検索・contextによる意味検索・回答評価（Python / promptfoo） | ハーネス実装・実モデル各3回実施済み。検索・回答ともFAIL、品質未受入 | [ADR 0023](docs/adr/0023-semantic-evaluation-contract.md)、[実モデル証跡](docs/evidence/2026-10-09-semantic-real-model-evaluation.md) |
+| 本番検索・contextによる意味検索・回答評価（Python / promptfoo） | ハーネス実装・実モデル各3回実施済み。検索・回答ともFAIL、品質未受入 | [ADR 0023](docs/adr/0023-semantic-evaluation-contract.md)、[実モデル証跡](docs/evidence/2026-10-09-semantic-real-model-evaluation-top5.md) |
 | モデル向けcontextの一時参照名、送信直前の再検証 | 実装済み（保存文・部分日時・Factを渡し、逐語引用と保存IDは渡さない） | [ADR 0009](docs/adr/0009-memory-context-references.md)、ADR 0022 |
 
 embedding未接続時はstorageを読まず空結果を返します。Factは独立のembedding候補にしません。
@@ -176,10 +176,10 @@ Coreの実装Issueへ移して管理します。
   利用までを確認する。訂正後の内容を使い、削除・無効化した内容を使わないことも確認する。
   実行commit、モデル・設定、シナリオ、期待値、結果、未検証事項を記録する。
 
-正本へ合成登録したnomic / gemma4-12bの検索・回答評価はcacheなし各3回実施済み、いずれもFAIL。
-検索は日英・無関係・閾値分類の品質未達と該当なし・期待順序ゲート違反、
+正本へ合成登録したnomic / gemma4-12bの検索・回答評価は、上位5件包含の基準でcacheなし各3回再実施済み、いずれもFAIL。
+検索は日英・無関係・閾値分類の品質未達とtop-1欠落・該当なしゲート違反、
 回答は日英分類の品質未達とdispatch・空contextゲート違反があり、品質は未受入です。
-各回・分類・ケースの結果と制約は[実モデル証跡](docs/evidence/2026-10-09-semantic-real-model-evaluation.md)にあります。
+各回・分類・ケースの結果と制約は[実モデル証跡](docs/evidence/2026-10-09-semantic-real-model-evaluation-top5.md)にあります。
 分類器品質・形成〜利用の実環境IT2/STは未実施です。
 
 ## 4. 決定事項と要決定事項

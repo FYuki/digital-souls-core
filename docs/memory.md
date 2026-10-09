@@ -7,8 +7,8 @@ Episode・Fact・Semanticの正本と、それを利用する検索・会話cont
 旧逐語記憶の抽出・書込・再構成は撤去済みで、schema版6で旧3表を削除します。
 構造化記憶の形成（抽出・保存判定・保存文生成）と形成jobは未実装です。
 現行の分類・形成・検索・回答の実モデル品質は未受入です。
-合成正本の本番検索・contextによる実モデル評価は検索・回答各3回実施済み、いずれもFAILです。
-[証跡](evidence/2026-10-09-semantic-real-model-evaluation.md)と
+合成正本の本番検索・contextによる実モデル評価は上位5件包含の基準で検索・回答各3回再実施済み、いずれもFAILです。
+[証跡](evidence/2026-10-09-semantic-real-model-evaluation-top5.md)と
 [評価手順](memory-evaluation.md)を参照してください。分類器品質と形成〜利用の実環境受入は未実施です。
 
 ## 接続と操作

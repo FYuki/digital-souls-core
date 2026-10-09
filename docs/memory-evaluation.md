@@ -4,7 +4,7 @@
 検索はPython、回答はpromptfoo 0.117.2を使って測定します。
 入力・gold・分類・移行対応・語句判定の限界は [評価README](../evals/semantic/README.md)、
 本番の検索・context契約は [記憶API](memory.md) と [ADR 0022](adr/0022-memory-retrieval-from-records.md) が正本です。
-[実モデル証跡](evidence/2026-10-09-semantic-real-model-evaluation.md) に今回の3回の結果を記録しています。
+[実モデル証跡](evidence/2026-10-09-semantic-real-model-evaluation-top5.md) に今回の3回の結果を記録しています。
 品質は未受入です。fixtureの成功をモデル品質の合格にせず、実モデルのFAILも記録します。
 
 ## 評価経路と固定データ

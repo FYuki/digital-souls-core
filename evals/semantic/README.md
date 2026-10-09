@@ -220,7 +220,7 @@ bash tools/evaluate-semantic-answer.sh --mode local_model --execute-local-model 
 
 実行flagまたはprofileが欠ければNOT RUN（exit 3）、無効profileや通信失敗はFAILです。
 このツールはサーバー・GPU・モデルを起動しません。
-ローカルnomic / gemma4-12bで検索・回答各3回の実モデル評価を実施済みです。
+ローカルnomic / gemma4-12bで上位5件包含の基準による検索・回答各3回の実モデル再評価を実施済みです。
 いずれもFAILで品質は未受入です。分類品質と必須ゲートを分けた
-[実モデル証跡](../../docs/evidence/2026-10-09-semantic-real-model-evaluation.md)と
+[実モデル証跡](../../docs/evidence/2026-10-09-semantic-real-model-evaluation-top5.md)と
 [利用手順](../../docs/memory-evaluation.md)を参照してください。
