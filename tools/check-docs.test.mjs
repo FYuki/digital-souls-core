@@ -81,7 +81,11 @@ function localPostgresCompose() {
 
 test('local PostgreSQL uses the isolated fixture image and digest', () => {
   const compose = localPostgresCompose();
-  const fixtureScript = readFileSync(new URL('./test-postgres.sh', import.meta.url), 'utf8');
+  const fixtureScript = readFileSync(new URL('./with-test-postgres.sh', import.meta.url), 'utf8');
+  for (const wrapper of ['test-postgres.sh', 'evaluate-semantic-retrieval.sh']) {
+    const script = readFileSync(new URL(`./${wrapper}`, import.meta.url), 'utf8');
+    assert.match(script, /with-test-postgres\.sh/);
+  }
   const image = fixtureScript.match(/image='([^']+)'/)[1];
   assert.deepEqual(Object.keys(compose.services), ['postgres']);
   assert.equal(compose.services.postgres.image, image);

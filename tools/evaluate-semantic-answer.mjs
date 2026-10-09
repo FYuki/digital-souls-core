@@ -1,0 +1,149 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { inspectReport, finalizeReport } from '../evals/semantic/report_gate.mjs';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const directory = path.join(root,'evals/semantic');
+const require = createRequire(import.meta.url);
+const { python } = require('../evals/semantic/bridge.cjs');
+
+export function cleanEnvironment(temp, options, inherited = process.env) {
+  const env = {
+    PATH: inherited.PATH, HOME: temp, TMPDIR: temp, LANG:'C.UTF-8',
+    LITELLM_LOCAL_MODEL_COST_MAP:'True', DOTENV_CONFIG_PATH:path.join(temp,'empty.env'),
+    PROMPTFOO_CONFIG_DIR:path.join(temp,'promptfoo'), PROMPTFOO_DISABLE_TELEMETRY:'1',
+    PROMPTFOO_DISABLE_UPDATE:'1', PROMPTFOO_DISABLE_SHARING:'1',
+    PROMPTFOO_DISABLE_REDTEAM_REMOTE_GENERATION:'1', PROMPTFOO_CACHE_ENABLED:'false',
+    DSC_ANSWER_MODE:options.mode,
+  };
+  for (const name of ['SOCKET','PORT','DATABASE','USER']) {
+    const key = `DSC_TEST_POSTGRES_${name}`;
+    if (inherited[key]) env[key] = inherited[key];
+  }
+  if (options.profile) env.DSC_ANSWER_PROFILE = options.profile;
+  if (options.variant) env.DSC_ANSWER_VARIANT = options.variant;
+  return env;
+}
+export function classifyLog(log) {
+  const patterns = {
+    'native-cleanup-hook-abort': /RemoveEnvironmentCleanupHook[\s\S]*Assertion failed: \(env\) != nullptr/,
+    'native-binding-missing': /Could not locate the bindings file|Cannot find module.*better_sqlite3/,
+    'python-timeout': /Command timed out|Python.*timed out/i,
+    'assertion-timeout': /Script execution timed out|ETIMEDOUT|Answer scoring bridge failed/i,
+    'sqlite-busy': /SQLITE_BUSY|database is locked/i,
+    'sqlite-error': /SQLITE_[A-Z_]+/,
+    'provider-error': /answer_evaluation_failed|Error running Python script/,
+    'network-blocked': /network access is disabled/,
+    'output-write': /ENOSPC|EACCES|EROFS/,
+    'worker-error': /worker.*(?:error|exit)|ERR_WORKER/i,
+  };
+  const matches = Object.entries(patterns).filter(([,pattern]) => pattern.test(log)).map(([name]) => name);
+  return matches.length ? matches : [log.trim() ? 'unclassified' : 'empty'];
+}
+export function command(args, options, logs) {
+  return new Promise(resolve => {
+    const stdout = fs.openSync(logs.stdout,'wx',0o600);
+    const stderr = fs.openSync(logs.stderr,'wx',0o600);
+    const child = spawn(process.execPath,args,{...options,stdio:['ignore','pipe','pipe']});
+    child.stdout.on('data',chunk => fs.writeSync(stdout,chunk));
+    child.stderr.on('data',chunk => fs.writeSync(stderr,chunk));
+    let spawnError = null;
+    child.once('error',error => { spawnError = ['ENOENT','EACCES','EAGAIN'].includes(error.code) ? error.code : 'spawn-error'; });
+    // close guarantees the process and its stdio have finished before reading export/logs.
+    child.once('close',(code,signal) => {
+      fs.closeSync(stdout);
+      fs.closeSync(stderr);
+      resolve({code,signal,spawn_error:spawnError});
+    });
+  });
+}
+export async function main(argv = process.argv.slice(2)) {
+  let temp;
+  let output;
+  let stage = "configuration";
+  let keepPrivate = false;
+  let manifest;
+  let toolchain;
+  const runs = [];
+  const executions = [];
+  try {
+    const options = {mode:'fixture',runs:3};
+    for (let i = 0; i < argv.length; i++) {
+      const name = argv[i];
+      if (name === '--execute-local-model') options.execute = true;
+      else if (name === '--keep-private-artifacts') keepPrivate = true;
+      else {
+        if (!['--mode','--runs','--profile','--output','--fixture-variant'].includes(name) || !argv[i+1]) throw new Error('arguments');
+        const value = argv[++i];
+        if (name === '--mode') options.mode = value;
+        if (name === '--runs') options.runs = Number(value);
+        if (name === '--profile') options.profile = path.resolve(value);
+        if (name === '--output') output = path.resolve(value);
+        if (name === '--fixture-variant') options.variant = value;
+      }
+    }
+    if (!['fixture','local_model'].includes(options.mode) || !Number.isSafeInteger(options.runs) || options.runs < 1) throw new Error('arguments');
+    if (options.mode === 'local_model' && (!options.execute || !options.profile)) {
+      process.stdout.write('{"status":"NOT RUN","reason":"explicit execution and profile required"}\n');
+      return 3;
+    }
+    if (options.mode === 'fixture' && (options.profile || options.execute)) throw new Error('fixture-profile');
+    if (options.variant && (options.mode !== 'fixture' || !['forbidden','missing','error'].includes(options.variant))) throw new Error('fixture-variant');
+    const pkg = require('../evals/semantic/node_modules/promptfoo/package.json');
+    if (pkg.version !== '0.117.2') throw new Error('promptfoo-version');
+    const promptfooRequire = createRequire(require.resolve('../evals/semantic/node_modules/promptfoo/package.json'));
+    const sqlite = promptfooRequire('better-sqlite3/package.json');
+    if (sqlite.version !== '13.0.3') throw new Error('sqlite-version');
+    toolchain = {node:process.versions.node,promptfoo_sqlite:sqlite.version};
+    stage = "manifest";
+    manifest = python({operation:'manifest',mode:options.mode,profile:options.profile});
+    const identity = Object.fromEntries(Object.entries(manifest).filter(([key]) => !['schema_version','commit','case_version','promptfoo_version'].includes(key)));
+    temp = fs.mkdtempSync(path.join(os.tmpdir(),'core-answer-'));
+    fs.chmodSync(temp,0o700);
+    fs.writeFileSync(path.join(temp,'empty.env'),'');
+    const env = cleanEnvironment(temp,options);
+    for (let n = 1; n <= options.runs; n++) {
+      const raw = path.join(temp,`run-${n}.json`);
+      const logs = {stdout:path.join(temp,`run-${n}.stdout`),stderr:path.join(temp,`run-${n}.stderr`)};
+      stage = "promptfoo-export";
+      const result = await command([
+        '--require',path.join(directory,'network_guard.cjs'),
+        path.join(directory,'node_modules/promptfoo/dist/src/main.js'),'eval',
+        '--config',path.join(directory,'config.cjs'),'--no-cache','--no-progress-bar',
+        '--env-file',path.join(temp,'empty.env'),'--output',raw,
+      ],{cwd:temp,env},logs);
+      const diagnostic = {run:n,attempts:1,exit_code:result.code,signal:result.signal,spawn_error:result.spawn_error,
+        raw_present:fs.existsSync(raw),
+        stdout_classes:classifyLog(fs.readFileSync(logs.stdout,'utf8')),
+        stderr_classes:classifyLog(fs.readFileSync(logs.stderr,'utf8'))};
+      executions.push(diagnostic);
+      // Assertion failures can be quality failures; execution errors cannot.
+      if (![0,100].includes(result.code) || !diagnostic.raw_present) {
+        throw new Error('promptfoo-export');
+      }
+      stage = "report-gate";
+      runs.push(inspectReport(JSON.parse(fs.readFileSync(raw,'utf8')),{mode:options.mode,identity}));
+      process.stderr.write(`answer ${options.mode} run ${n}: ${runs.at(-1).passed ? 'PASS' : 'FAIL'} (${runs.at(-1).cases.length} cases)\n`);
+    }
+    const report = {...finalizeReport(manifest,runs,options.runs),toolchain,executions};
+    const encoded = JSON.stringify(report,null,2)+'\n';
+    if (output) fs.writeFileSync(output,encoded,{mode:0o600});
+    else process.stdout.write(encoded);
+    return report.passed ? 0 : 1;
+  } catch (error) {
+    // Reasons are structural identifiers only; never print raw SDK or promptfoo text.
+    const reason = /^[a-z-]+$/.test(error?.message || '') ? error.message : 'inconsistent-data';
+    if (executions.length) process.stderr.write(`promptfoo diagnostic: ${JSON.stringify(executions.at(-1))}\n`);
+    if (output && manifest) fs.writeFileSync(output,JSON.stringify({...manifest,toolchain,runs,executions,
+      passed:false,failure:{stage,reason}},null,2)+'\n',{mode:0o600});
+    process.stderr.write(`回答評価 FAIL (${stage}: ${reason})。\n`);
+    return 1;
+  } finally {
+    if (temp && keepPrivate) process.stderr.write(`private artifacts (0700): ${temp}\n`);
+    else if (temp) fs.rmSync(temp,{recursive:true,force:true});
+  }
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = await main();

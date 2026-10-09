@@ -1,0 +1,20 @@
+{
+  "enabled": false,
+  "chat": {
+    "profile_id": "local-answer-example",
+    "model": "openai/gemma4-12b",
+    "transport": "llamacpp_chat",
+    "api_base": "http://127.0.0.1:18080/v1",
+    "external_send_allowed": false,
+    "timeout_seconds": 60
+  },
+  "embedding": {
+    "profile_id": "local-embedding-example",
+    "model": "nomic-embed-text-v2-moe",
+    "model_digest": "REPLACE-WITH-VERIFIED-DIGEST",
+    "dimensions": 768,
+    "api_base": "http://127.0.0.1:18081/v1",
+    "timeout_seconds": 15,
+    "enabled": false
+  }
+}

@@ -1,109 +1,150 @@
-# 合成データによる意味検索評価
+# 本番経路による意味検索・回答評価
 
-[記憶検索](memory.md)の順位付けを、明示的な正解IDを持つ合成corpusで測定します。
-既定は偽embeddingを使うoffline実行です。実モデルの評価には、運用者が明示したローカルprofileを使います。
-どちらも合成セット内の結果を報告するだけで、モデルの採用や「品質が良好」という判定は行いません。
-実モデル・GPU・dogfoodへの接続と実測は、このsliceではNOT RUNです。
+[ADR 0023](adr/0023-semantic-evaluation-contract.md) の固定した合成62ケースで、
+検索はPython、回答はpromptfoo 0.117.2を使って測定します。
+入力・gold・分類・移行対応・語句判定の限界は [評価README](../evals/semantic/README.md)、
+本番の検索・context契約は [記憶API](memory.md) と [ADR 0022](adr/0022-memory-retrieval-from-records.md) が正本です。
+[実モデル証跡](evidence/2026-10-09-semantic-real-model-evaluation-top5.md) に今回の3回の結果を記録しています。
+品質は未受入です。fixtureの成功をモデル品質の合格にせず、実モデルのFAILも記録します。
 
-## 通信なしの再現手順
+## 評価経路と固定データ
 
-リポジトリの固定toolchainを用意し、通常のlocked installが完了した環境で実行します。
-ハーネス自体がモデル・依存・認証情報を取得することはありません。
+[cases.json](../evals/semantic/cases.json) は入力schema 1、
+[expectations.json](../evals/semantic/expectations.json) はgold schema 2です。
+goldの分類・正解ID・禁止ID・期待順序・回答事実をモデルの入力へ含めません。
+モデル依存の synonym / paraphrase / cross_language / unrelated は各10件、全26分類62件です。
+評価結果を見る前に固定したケース・期待値・カード・プロンプトを使い、結果に合わせて変更しません。
+
+各ケースはnetworkなし・公開portなし・digest固定の使い捨てPostgreSQL内で隔離します。
+合成履歴を公開HistoryStore操作でappendし、Episode・Fact・EpisodeFactLink・Semanticを
+`MemoryRecordStore.register` へ直接登録します。private化・出典削除・Fact更新等も公開操作を使います。
+本番 `MemoryRetrieval` / `MemoryContext` を通し、回答は `Inference.prepare` / `Inference.check` とProvider portを使います。
+逐語データや正本IDをモデル向けcontextへ注入する別経路は追加しません。
+
+本番設定は候補20、最大5、relevance閾値0.54、同等帯0.002です。
+unit vectorの二乗L2距離から `1/(1+sqrt(distance))` を求めます。
+同等帯は `last_user_mentioned_at DESC NULLS LAST → created_at DESC → id ASC` で並べます。
+Factは独立候補ではなく、有効なFactをEpisodeへ添付します。
+検索ハーネスはembedding入出力からrelevanceを独立検算し、順位付け自体は製品へ任せます。
+
+privacyは本番scanner・LocalClassifier・PrivacyPolicyを通しますが、分類器のprovider応答だけは
+合成NOT_SENSITIVEです。`classifier=synthetic` と記録し、分類器品質は評価対象外です。
+合成正本の直接登録は、会話から形成・保存・検索・利用までの実環境IT2/ST受入を置き換えません。
+
+## 準備とmode
+
+固定toolchainはuv 0.8.22、Python 3.12.3、Node 24.19.0です。
+[開発規約](../CONTRIBUTING.md) に従い、依存取得にはネットワークが必要です。
+評価ツールはモデル・GPU・サーバー・資格情報を用意しません。
 
 ```sh
-uv run --no-sync python tools/evaluate-memory-search.py
+uv sync --locked
+(cd evals/semantic && npm ci --no-audit --no-fund)
 ```
 
-既定では[配布fixture](../tests/fixtures/memory-retrieval-evaluation.json)を使い、`k=2`のJSON reportを
-標準出力へ返します。`mode`は`fixture`、`quality_evidence`はfalseです。
-fixtureに書かれたvectorで順位付けと指標の実装を確認するため、良い数値でもモデル品質の証拠になりません。
+回答の依存はnpm lockでpromptfoo 0.117.2と内部DBのbetter-sqlite3 13.0.3を固定します。
+`.npmrc` はinstall scriptを全て無効にし、同梱N-API bindingを使用します。
+対応bindingがない環境はFAILであり、自動でbuild/download scriptを許可しません。
 
-fixtureとkを明示する場合は次の形式です。
+| mode | embedding / 回答 | 品質証拠 |
+| --- | --- | --- |
+| `fixture`（既定） | 固定偽vector / 独立した回答fixtureをProvider portで返すfake | `quality_evidence=false`。道具の検証だけ |
+| `local_model` | 明示したLocalEmbedding / llama.cpp Chat profile | 実モデルの合成セット測定。品質合格やbackend真正性とは別 |
+
+検索はprofile指定時だけlocal_model、回答はmode・実行flag・profileを全て明示したときだけlocal_modelです。
+回答のflag/profile不足はNOT RUN（exit 3）。無効profile・通信・不正応答・実行errorはFAILです。
+fixtureへfallbackしません。検索local_modelでもembedding実呼出しが0ならquality_evidence=falseです。
+
+## cacheなし3回の実行
+
+fixtureでのハーネス検証:
 
 ```sh
-uv run --no-sync python tools/evaluate-memory-search.py \
-  --fixture tests/fixtures/memory-retrieval-evaluation.json --k 2
+bash tools/evaluate-semantic-retrieval.sh --runs 3 --output /dev/shm/retrieval-fixture.json
+bash tools/evaluate-semantic-answer.sh --runs 3 --output /dev/shm/answer-fixture.json
 ```
 
-## 明示profileによるローカル実測
-
-[profile例](../examples/embedding.example.json)は`enabled=false`の合成値です。
-実測には、承認されたローカルembeddingモデルのalias・digest・実次元・endpointを確認した別profileを
-用意し、`enabled=true`を明示します。例ファイルの値が稼働中サービスに対応するとは扱いません。
+承認された既存ローカルモデルでの測定:
 
 ```sh
-uv run --no-sync python tools/evaluate-memory-search.py \
-  --profile /absolute/path/to/approved-embedding-profile.json --k 2
+bash tools/evaluate-semantic-retrieval.sh --runs 3 \
+  --profile /absolute/private/embedding.json --output /absolute/private/retrieval.json
+bash tools/evaluate-semantic-answer.sh --mode local_model --execute-local-model --runs 3 \
+  --profile /absolute/private/answer.json --output /absolute/private/answer-report.json
 ```
 
-`--profile`を渡した場合だけ`LocalEmbedding`を読み込み、queryと候補の合成本文をそのloopback endpointへ
-送ります。通信先、timeout、SDK、エラーの契約は[ADR 0011](adr/0011-local-memory-embedding.md)と同じです。
-profileが無効・不正、接続不能、不正応答の場合は失敗し、偽embeddingへfallbackしません。
+検索はvector cacheなしで毎回呼び直します。回答はpromptfoo `--no-cache` とcache無効環境を使い、
+結果側でもcached=falseを検証します。各runは再試行なしで別promptfooプロセスを直列実行します。
+全体が品質FAILでも3回の結果を残します。実行error・不完全reportは品質不合格と区別してFAILです。
 
-llama.cppの`/v1/embeddings`には`none`以外のpoolingが必要です。embedding用途に対応したモデルと
-server設定を確認してください。既存chat用gemmaモデル・portとの互換性は未確認です。
-[llama.cpp公式server仕様](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#post-v1embeddings-openai-compatible-embeddings-api)を参照してください。
+## 私有profileとサーバー
 
-実測reportは`mode=local_model`になり、embeddingを1回以上呼び出した場合だけ`quality_evidence=true`に
-なります。全queryの候補が0件なら呼出しはなく、この値はfalseです。`embedding_call_count`で呼出し件数を
-確認できます。これは指定したbackendから得たvectorで合成セットを測定した、という区別です。backendの真正性は確認せず、
-`backend_identity_verified=false`を併記します。model digestはprofileの宣言であり、接続先が実際にその
-モデルを使った証明ではありません。実世界の検索精度・privacy分類精度や品質合格を意味しません。
+profileはgit管理外の絶対パス（0700の私有ディレクトリ、0600のファイル）へ置きます。
+[embedding例](../examples/embedding.example.json) と
+[回答例](../evals/semantic/answer-profile.example.json) は無効な例であり、実サービスの設定ではありません。
 
-## fixtureと検索範囲
+`LocalEmbeddingProfile` はprofile_id・alias・GGUF SHA-256のmodel_digest・実dimensions・
+loopbackのapi_base・timeout（最大15秒）・enabled=trueを明示します。
+`AnswerProfile` はトップレベルenabled=true、上記embedding、chatを持ちます。
+chatは `transport=llamacpp_chat`、`model=openai/gemma4-12b`、loopback api_base、
+external_send_allowed=true、timeoutを設定します。chatのProfileにmodel_digestフィールドはないため、
+回答GGUFのSHA-256は証跡で別に記録します。資格情報を要する経路へfallbackしません。
 
-fixtureはJSONで、`dataset_type`は`synthetic`、versionとdimensionsを持ちます。
+起動前にGPUのVRAM・他の推論処理を確認し、余裕がなければ起動しません。
+既存コンテナの起動手順・主要設定は [llama.cpp運用](llamacpp-operations.md) を参照します。
+health・`/v1/models` alias・GGUF digest・image digest・build・portを確認します。
+embeddingにはmean等のpoolingが必要です。ubatchは最長入力のtoken数以上とし、
+long_textの失敗があれば設定値と失敗を記録します。運用設定を変えた場合は理由を記録し3回をやり直します。
+モデルの追加DL、他サービスの停止・変更、Ollamaの起動はこの評価手順に含めません。
+評価後は失敗時も起動した評価コンテナを停止し、inspectのexitedを記録します。
 
-| 要素 | フィールドと意味 |
+## 採点と合否
+
+| 対象 | 分類別の品質条件（各回90%以上） | 必須ゲート（各ケース全件合格） |
+| --- | --- | --- |
+| 検索 | relevant IDの全包含、該当なしの空結果、relevant Episodeへの必須Fact添付 | forbidden IDs/Fact不在、閾値未満混入0、正本検証、上位5件へのtop-1包含（fixtureは全順序一致も必須）、dispatch guard、context一致、no_match時の閾値以上適格候補0 |
+| 回答 | grounded回答の全必須事実グループを満たす | 禁止事実不在、dispatch有効性一致と送信上位5件へのtop-1包含（無効時はID空）、送信/公開拒否と破棄、no_memoryの空context |
+
+top-1はgoldの `expected_order` があればその先頭、なければ `relevant_ids` の先頭、空なら該当なしです。
+期待値は変更しません。検索の `top_one` は両modeで必須、`expected_order` はfixtureだけに残し、
+実モデルの品質ゲートには含めません。fixtureの62×3ではequivalent-band-orderの全順序を検証します。
+回答は両modeで順序・余分な非禁止IDを問わず包含で判定し、top-1なしならID照合を省きます。
+禁止ID・事実、valid=falseのID空、no_memoryの空context、lifecycleは維持します。
+
+品質率は `quality_passed` の割合です。必須ゲートと分けて集計するため、分類品質100%でも
+必須ゲート違反があればFAILです。全体件数の割合や3回平均で、90%未達の回・分類を相殺しません。
+各1件の分類では1/1を要求します。該当なしの正常0件と、実行結果0件を区別します。
+
+回答はNFKC→casefoldの部分文字列一致で、requiredは全グループAND・グループ内OR、
+forbiddenはいずれかの候補の出現を違反とします。LLM judge・単語境界・文意解析は使いません。
+複合語の誤一致や否定・時間関係を完全には判定できません。出典表記・回答言語は採点対象外です。
+本番contextの検索後mutationをdispatch直前で再検証し、回答後mutationでは公開前に回答を破棄します。
+
+欠落・重複・unknown ID・0件・実行error・非有限score・skip・cache利用・欠落assertion・
+改変集計を拒否します。回答はraw exportをPythonで再採点し、metadataと照合します。
+promptfooの平均scoreや終了コードだけでは合格にしません。
+正常な完走のCLI終了値は全体PASS=0、品質または必須ゲートFAIL=1です。
+
+## reportと公開証跡
+
+| 項目 | 内容 |
 | --- | --- |
-| `documents` | `id`、合成`text`、source参照、偽`vector` |
-| `source` | `conversation_id`、`turn_revision`、`message_index`、`epoch` |
-| `queries` | `id`、合成`text`、`candidate_ids`、`relevant_ids`、`excluded_ids`、偽`vector` |
-| `candidate_ids` | そのqueryで順位付けできる候補ID |
-| `relevant_ids` | 正解ID。候補の部分集合で、除外IDと重ならないこと |
-| `excluded_ids` | embeddingへ渡す前に候補から取り除くID |
+| 共通manifest | commit.sha / dirty、mode、quality_evidence、classifier、embedding space、本番retrieval設定、case_version（schema・入力/gold SHA-256）、runs、passed |
+| 各run | cases（ID・分類・quality_passed・gates・passed）、categories（total・passed・rate）、gates_passed・passed |
+| 検索固有 | backend_identity_verified=false、embedding_call_count、取得ID・添付Fact ID・score・検証済みID・閾値以上適格候補数・dispatch/contextの観測 |
+| 回答固有 | answer_model（profile_id・model・transport）、入力/カード/character/fixture SHA-256、promptfoo_version、toolchain（Node・内部DB依存版）、executions（attempts・exit_code・signal・raw_present・固定log分類）、送信ID・送信/破棄/空contextの観測 |
+| 異常終了 | 回答は部分runsとfailure.stage / reasonを残す。検索の実行errorはreportを生成できない場合があり、終了値とNOT RUNの残る回を証跡へ記録する |
 
-不明・重複IDや正解集合の不整合は拒否します。候補が0件ならembeddingを呼びません。
-同じquery内では製品と同じ`RetrievalPolicy`の順位付け（relevance 0.54以上、同等帯）を使い、返却件数だけkに合わせます。同等帯では文書順から作った固定のcreated_at（先頭ほど新しい）とIDで並べます。last_user_mentioned_atは未知（None）です。
-local modeではfixtureの偽vectorを品質値として使わず、実adapterから得たvectorを評価します。
+reportのmodel/revisionはprofileの宣言です。GGUFファイルを照合しても、接続先backendがそのモデルを
+使用した真正性の独立検証にはなりません。quality_evidence=trueは品質合格を意味しません。
 
-JSON fixtureの形式は維持し、合成本文を `Episode.normalized_text` として持つ `RetrievalCandidate` と
-citationを作り、製品の `rank_records` で順位付けします。保存・形成を行うハーネスではありません。
-この最小追従後の評価再設計は[PR #51](https://github.com/FYuki/digital-souls-core/pull/51)で別途行います。
+回答のraw export・生stdout/stderr・内部DBは専用0700一時領域へ保存し通常は終了時に削除します。
+runnerは資格情報・proxy・dotenv・libpq・caller Node設定を子へ継承せず、Node通信も拒否します。
+`--keep-private-artifacts` は明示診断用で、調査後にraw・生ログ・DBを削除します。
+公開するのは本文・query・vector・回答全文を含まないreportだけです。公開前に構造と文字列値を確認します。
 
-このハーネスは合成の候補・正解集合を直接扱います。`excluded_ids`の除去は評価入力の制御で、
-実際のprivate thread、発話除外、削除transaction、Binding、privacy分類の結合試験を置き換えません。
-これらはMemoryRetrieval・MemoryContextとPostgreSQL正本の`postgres` markerの合成試験で別に検証します。正本の履歴DBを読み込む機能はありません。
-`dataset_type=synthetic`というラベルだけで実データが安全になるわけではなく、私的実会話をfixtureへ転記しません。
-
-## 指標の定義
-
-正解が1件以上あるqueryを`answerable`、0件のqueryを`unanswerable`として区別します。
-上位k件に入った正解数をh、正解総数をrとします。
-
-| 指標 | 定義 |
-| --- | --- |
-| Recall@k | h / r。正解のうち取得できた割合 |
-| Precision@k | h / k。返却がk件未満でも分母はk |
-| Reciprocal rank | 最初の正解の順位の逆数。上位k件に正解がなければ0 |
-| MRR@k | answerable queryのreciprocal rankの平均 |
-| unanswerable empty rate | unanswerable queryのうち空結果を返した割合 |
-
-Recall・precision・MRRの平均はanswerableだけを対象とします。answerableで空結果なら各値は0です。
-unanswerableのquery別Recall・precision・reciprocal rankはnullとし、空結果の割合を別に集計します。
-集計対象queryが0件の場合、その平均や割合もnullです。正解なしのqueryを成功値1として混ぜません。
-
-## reportと証跡
-
-reportは`fixture_version`、mode、quality_evidence、`synthetic_only=true`、backend識別の状態、
-`space`、k、`embedding_call_count`、query件数、answerable/unanswerable件数、空結果件数、各平均指標を含みます。
-query別にはID、retrieved/relevant/excluded IDs、候補数、answerable、空結果かどうか、各指標を返します。
-本文・vector・由来本文をreportへ複製しません。`space`はmodel/revision/dimensions/configurationの宣言です。
-
-実測時の証跡には、Coreの正確なrevision、fixture version、コマンド、日付、実行環境、モデルの確認方法、
-server revisionとpooling、profileの機密情報を含まない識別、report、失敗・制約を記録します。
-指標が低くても実行成功と品質合格を同一視せず、profile失敗や未実行をPASSとしません。
-サーバー本文ログ、私的会話、資格情報を証跡へ含めません。
-
-この評価だけではprivate化・削除の安全性、全話題の意味理解、prompt injection耐性、速度・資源上限を
-証明しません。実運用の対象corpus・採用基準・追加評価は別途定めます。
+日付付き証跡には、cleanな実行commit・日時・コマンド・モデルalias/GGUF SHA-256・image digest/build・
+server主要設定・起動前と評価中のGPU資源・ケース版・各回全体/分類/ゲート・失敗ケースID・終了値・
+コンテナ停止確認・未検証範囲を記録し、安全なreportへリンクします。
+分類器品質、形成〜利用の実接続、実運用DB適用、実環境IT2/ST、私的corpusの検索精度、
+prompt injection耐性、速度・資源上限を、この合成セットの結果だけで合格としません。

@@ -1,0 +1,1841 @@
+{
+  "schema_version": 1,
+  "body_free": true,
+  "reproduction": {
+    "base_revision": "7225efd",
+    "modifications": "private-log diagnostics only",
+    "fixture_invocation": 2,
+    "exit_code": 1,
+    "stage": "promptfoo-export",
+    "run": 1,
+    "promptfoo_exit_code": null,
+    "signal": "SIGABRT",
+    "raw_present": false,
+    "stderr_classes": [
+      "native-cleanup-hook-abort"
+    ],
+    "completed_sqlite_rows": 62,
+    "stack": [
+      "node::RemoveEnvironmentCleanupHook",
+      "Statement::~Statement()",
+      "better_sqlite3.node"
+    ],
+    "private_artifacts_deleted": true
+  },
+  "started_at": "2026-10-09T01:59:17.283802+00:00",
+  "finished_at": "2026-10-09T02:16:13.638848+00:00",
+  "manifest": {
+    "schema_version": 1,
+    "commit": {
+      "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+      "dirty": false
+    },
+    "mode": "fixture",
+    "quality_evidence": false,
+    "classifier": "synthetic",
+    "answer_model": {
+      "profile_id": "fixture-answer",
+      "model": "openai/fixture-answer",
+      "transport": "fake-provider-port"
+    },
+    "space": {
+      "model": "synthetic",
+      "revision": "semantic-cases-v1",
+      "dimensions": 4,
+      "configuration": "fixture-no-cache"
+    },
+    "retrieval": {
+      "max_retrieved_memories": 5,
+      "candidate_pool_size": 20,
+      "relevance_threshold": 0.54,
+      "equivalence_margin": 0.002
+    },
+    "cases_sha256": "9f703b32ed79ac997320409dd38142324095084ec93164c60ea6b5aca9e50122",
+    "fixtures_sha256": "b3df1851c1dcb94b7b1bd0fed4e5905a9ae9e6072379a0dce5b40c6b650e6344",
+    "characters_sha256": "0cfdd7aec0e6a69ecf601ab0ab16ad3696e53b987cf022a43c73ca09d533726f",
+    "card_sha256": "17093470ae0139424d127bfc3308057b9bcface15dd70d0cf8bc45728c4bf3fa",
+    "case_version": {
+      "schema_version": 1,
+      "expectations_schema_version": 2,
+      "cases_sha256": "9f703b32ed79ac997320409dd38142324095084ec93164c60ea6b5aca9e50122",
+      "expectations_sha256": "0e979d561be09a45faf019baba285c14605f46ebacc6194f86b5298aa981caa4"
+    },
+    "promptfoo_version": "0.117.2",
+    "toolchain": {
+      "node": "24.19.0",
+      "promptfoo_sqlite": "13.0.3"
+    }
+  },
+  "uv": "uv 0.8.22",
+  "invocations": [
+    {
+      "invocation": 1,
+      "exit_code": 0,
+      "passed": true,
+      "elapsed_seconds": 104.346,
+      "report_sha256": "3d708b048f821a73e44dc0a29e93843a04fb4f780c8bb513169cffd5d22589fc",
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "toolchain": {
+        "node": "24.19.0",
+        "promptfoo_sqlite": "13.0.3"
+      },
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 2,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 3,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        }
+      ]
+    },
+    {
+      "invocation": 2,
+      "exit_code": 0,
+      "passed": true,
+      "elapsed_seconds": 101.374,
+      "report_sha256": "c867664daa56a63880d127b78cbef0d4c204f6d5077ffc2ba0b37490fdbf2712",
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "toolchain": {
+        "node": "24.19.0",
+        "promptfoo_sqlite": "13.0.3"
+      },
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 2,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 3,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        }
+      ]
+    },
+    {
+      "invocation": 3,
+      "exit_code": 0,
+      "passed": true,
+      "elapsed_seconds": 101.008,
+      "report_sha256": "627361ea197eeab3ba9f0c30713cc63efbcd85a43a6a76d2f5be23787cd12775",
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "toolchain": {
+        "node": "24.19.0",
+        "promptfoo_sqlite": "13.0.3"
+      },
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 2,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 3,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        }
+      ]
+    },
+    {
+      "invocation": 4,
+      "exit_code": 0,
+      "passed": true,
+      "elapsed_seconds": 101.651,
+      "report_sha256": "2c11334f8e5437a96f87df18f0fa0633545711b4fab2a7c51fb8fbd9678b2a98",
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "toolchain": {
+        "node": "24.19.0",
+        "promptfoo_sqlite": "13.0.3"
+      },
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 2,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 3,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        }
+      ]
+    },
+    {
+      "invocation": 5,
+      "exit_code": 0,
+      "passed": true,
+      "elapsed_seconds": 101.355,
+      "report_sha256": "7d155813ded18d63e16059bbcc08c79ff713794650534e3afc1a4da4b52d4806",
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "toolchain": {
+        "node": "24.19.0",
+        "promptfoo_sqlite": "13.0.3"
+      },
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 2,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 3,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        }
+      ]
+    },
+    {
+      "invocation": 6,
+      "exit_code": 0,
+      "passed": true,
+      "elapsed_seconds": 101.289,
+      "report_sha256": "31485e77844d8eb562836e5387ed4c0c202aef1c2776d4152ba46bd8026d4fbb",
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "toolchain": {
+        "node": "24.19.0",
+        "promptfoo_sqlite": "13.0.3"
+      },
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 2,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 3,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        }
+      ]
+    },
+    {
+      "invocation": 7,
+      "exit_code": 0,
+      "passed": true,
+      "elapsed_seconds": 101.257,
+      "report_sha256": "9966afa50d49a891e1b1f95839354efbed1d9a21e75c5d0e8e847c31afc1e1d7",
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "toolchain": {
+        "node": "24.19.0",
+        "promptfoo_sqlite": "13.0.3"
+      },
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 2,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 3,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        }
+      ]
+    },
+    {
+      "invocation": 8,
+      "exit_code": 0,
+      "passed": true,
+      "elapsed_seconds": 102.009,
+      "report_sha256": "10b6fa90a427d7294ff155400ec490dc3b5611144fc57d68709cbde6c0f53cbf",
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "toolchain": {
+        "node": "24.19.0",
+        "promptfoo_sqlite": "13.0.3"
+      },
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 2,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 3,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        }
+      ]
+    },
+    {
+      "invocation": 9,
+      "exit_code": 0,
+      "passed": true,
+      "elapsed_seconds": 101.394,
+      "report_sha256": "640279460d9c1a7089ace940efa22ca28f98374c9cfe69bcd2a0468414835c3f",
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "toolchain": {
+        "node": "24.19.0",
+        "promptfoo_sqlite": "13.0.3"
+      },
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 2,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 3,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        }
+      ]
+    },
+    {
+      "invocation": 10,
+      "exit_code": 0,
+      "passed": true,
+      "elapsed_seconds": 100.631,
+      "report_sha256": "2aebf9ef88750084c9735f0b42992e48bb1926390aad161e09a112d6a9451842",
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "toolchain": {
+        "node": "24.19.0",
+        "promptfoo_sqlite": "13.0.3"
+      },
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 2,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        },
+        {
+          "run": 3,
+          "attempts": 1,
+          "exit_code": 0,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "cases": 62,
+          "gates_passed": true,
+          "category_count": 26,
+          "category_rates": {
+            "synonym": 1,
+            "paraphrase": 1,
+            "cross_language": 1,
+            "unrelated": 1,
+            "negation": 1,
+            "update": 1,
+            "multisource": 1,
+            "multisource_revocation": 1,
+            "private": 1,
+            "excluded": 1,
+            "deleted_source": 1,
+            "deleted_memory": 1,
+            "binding_character": 1,
+            "binding_subject": 1,
+            "binding_client": 1,
+            "long_text": 1,
+            "after_search": 1,
+            "after_answer": 1,
+            "epoch_change": 1,
+            "fact_attachment": 1,
+            "fact_version": 1,
+            "fact_revocation": 1,
+            "semantic_direct": 1,
+            "semantic_derived": 1,
+            "equivalent_order": 1,
+            "threshold": 1
+          }
+        }
+      ]
+    }
+  ],
+  "normal_summary": {
+    "invocations": 10,
+    "runs": 30,
+    "cases": 1860,
+    "passed": true,
+    "retries": 0,
+    "elapsed_seconds": 1016.314
+  },
+  "invalid_fixtures": [
+    {
+      "variant": "forbidden",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "exit_code": 1,
+      "elapsed_seconds": 34.994,
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "report_sha256": "657e52e79d5054b8d349c2560099b109c7eb118f463c9567e6c658806496627c",
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 100,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "failure": null,
+      "cases": 62,
+      "gates_passed": false,
+      "synonym_rate": 1
+    },
+    {
+      "variant": "missing",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "exit_code": 1,
+      "elapsed_seconds": 35.441,
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "report_sha256": "a7b2a1a3ce6d571d8ce910e43d1a9c51063ab08baba1656111caa78244107159",
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 100,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "unclassified"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "failure": null,
+      "cases": 62,
+      "gates_passed": true,
+      "synonym_rate": 0.8
+    },
+    {
+      "variant": "error",
+      "expected_status": "FAIL",
+      "actual_status": "FAIL",
+      "exit_code": 1,
+      "elapsed_seconds": 34.44,
+      "commit": {
+        "sha": "94960e0d7a88acc0c62cd27224116c2dff01955e",
+        "dirty": false
+      },
+      "report_sha256": "147c2dac43d0ab118388b059bbabeabef9418f8c477870fea692108e7e3f3486",
+      "executions": [
+        {
+          "run": 1,
+          "attempts": 1,
+          "exit_code": 100,
+          "signal": null,
+          "spawn_error": null,
+          "raw_present": true,
+          "stdout_classes": [
+            "provider-error"
+          ],
+          "stderr_classes": [
+            "empty"
+          ]
+        }
+      ],
+      "failure": {
+        "stage": "report-gate",
+        "reason": "row-error"
+      },
+      "cases": 62,
+      "provider_error_count": 1,
+      "private_artifacts_deleted": true
+    }
+  ]
+}

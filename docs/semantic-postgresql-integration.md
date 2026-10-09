@@ -45,7 +45,8 @@ vector は呼出し内だけの一時値で、pgvector、永続 index、共有 c
 3. trusted 起動側で `StorageConfig` を明示注入し、PG* の暗黙設定やホームの `.pgpass` に依存しない接続を構成する。
 4. 履歴保存とmemory/local permission、分類器を同じ現行policyに結び付ける。正本登録はtrusted callerの保存判定が前提で、履歴保存だけで形成を始めない。
 5. embedding 対応モデル・digest・alias・次元・pooling・専用 endpoint と資源割当を決め、明示 profile を構成する。
-6. 実モデルによる[検索品質評価](memory-evaluation.md)と配備先の動作確認を別途実施する。
+6. 実モデルによる[検索・回答品質評価](memory-evaluation.md)は合成正本で各3回実施済み、いずれもFAIL。
+   [証跡](evidence/2026-10-09-semantic-real-model-evaluation-top5.md)を参照し、品質受入と配備先の動作確認を別途行う。
 
 この実装は DB server / role / credential の作成や、稼働 service / security 設定の変更を行いません。
 対象実環境の接続可否はコードの合成試験から推定しません。DB・role をすでに利用できるかの調査結果と、
