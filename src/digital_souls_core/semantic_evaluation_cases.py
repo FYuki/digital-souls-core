@@ -465,6 +465,12 @@ class CaseExpectation(_Model):
     answer: AnswerExpectation
 
 
+def expected_top_one(gold: CaseExpectation) -> str | None:
+    """Derive the intended first memory from fixed gold, without changing it."""
+    ids = gold.expected_order or gold.relevant_ids
+    return ids[0] if ids else None
+
+
 class EvaluationExpectations(_Model):
     schema_version: Annotated[int, Field(ge=2, le=2)]
     cases: tuple[CaseExpectation, ...] = Field(min_length=1, repr=False)

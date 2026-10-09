@@ -116,3 +116,59 @@ def test_dispatch_ids_are_checked_separately_from_answer_quality() -> None:
     g = gold("synonym-02")
     row = score_answer(g, {**output(g.id), "dispatch_memory_ids": ["other"]})
     assert row["quality_passed"] and not row["gates"]["dispatch"]
+
+
+@pytest.mark.parametrize("ids", [["extra", "target"], ["target", "extra"]])
+def test_dispatch_accepts_extra_nonforbidden_ids_and_any_order(ids: list[str]) -> None:
+    from digital_souls_core.semantic_answer_evaluation import score_answer
+
+    g = gold("synonym-02")
+    assert score_answer(g, {**output(g.id), "dispatch_memory_ids": ids})["passed"]
+
+
+def test_equivalent_order_answer_needs_only_top_one() -> None:
+    from digital_souls_core.semantic_answer_evaluation import score_answer
+
+    g = gold("equivalent-band-order")
+    assert g.expected_order
+    assert score_answer(g, {**output(g.id), "dispatch_memory_ids": [g.expected_order[0]]})["passed"]
+    assert not score_answer(g, {**output(g.id), "dispatch_memory_ids": list(g.expected_order[1:])})[
+        "gates"
+    ]["dispatch"]
+
+
+def test_invalid_dispatch_still_requires_empty_ids() -> None:
+    from digital_souls_core.semantic_answer_evaluation import score_answer
+
+    g = gold("post-search-revocation")
+    assert not g.dispatch.valid
+    assert not score_answer(g, {**output(g.id), "dispatch_memory_ids": ["target"]})["passed"]
+
+
+def test_no_top_one_skips_ids_but_keeps_empty_context_gate() -> None:
+    from digital_souls_core.semantic_answer_evaluation import score_answer
+
+    g = gold("unrelated-observatory")
+    row = score_answer(
+        g, {**output(g.id), "dispatch_memory_ids": ["extra"], "context_empty": False}
+    )
+    assert row["gates"]["dispatch"]
+    assert not row["gates"]["no_memory"] and not row["passed"]
+
+
+def test_forbidden_dispatch_id_cannot_become_an_extra_candidate() -> None:
+    from digital_souls_core.semantic_answer_evaluation import score_answer
+
+    g = gold("private-source")
+    assert not score_answer(
+        g, {**output(g.id), "dispatch_memory_ids": [*g.dispatch.memory_ids, *g.forbidden_ids]}
+    )["passed"]
+
+
+def test_top_one_outside_first_five_does_not_pass_answer_gate() -> None:
+    from digital_souls_core.semantic_answer_evaluation import score_answer
+
+    g = gold("synonym-02")
+    assert not score_answer(
+        g, {**output(g.id), "dispatch_memory_ids": ["a", "b", "c", "d", "e", "target"]}
+    )["passed"]
