@@ -159,3 +159,8 @@ error応答でgate拒否を確認。PostgreSQLでもerror入力fixtureがprovide
 - `tools/evaluate-semantic-answer.mjs`
 - `tools/evaluate-semantic-answer.sh`
 - `tools/semantic-answer.test.mjs`
+
+## 第2ラウンドの追跡
+
+上記の原因未特定だったexport失敗は、[第2ラウンドの調査・修正証跡](2026-10-09-semantic-answer-promptfoo-round2.md)で
+better-sqlite3のnative GCクラッシュとして再現・特定した。固定bindingの修正後に30 run連続と不正fixture3種を検証した。
