@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "responses": {
+    "synonym-warm-drink-ja": {
+      "answer": "架空のアオは、温かい紅茶を飲むのが好きです。"
+    },
+    "paraphrase-weekend-ja": {
+      "answer": "架空のアオは、週末になると自転車で川沿いを走ります。"
+    },
+    "cross-language-herb": {
+      "answer": "架空のアオは、窓辺の鉢でミントを育てています。"
+    },
+    "unrelated-observatory": {
+      "answer": "記憶に情報がありません。"
+    },
+    "negated-coffee-preference": {
+      "answer": "架空のアオは、コーヒーが苦手なので飲みません。"
+    },
+    "updated-morning-drink": {
+      "answer": "朝はほうじ茶を飲んでいます。"
+    },
+    "multisource-picnic": {
+      "answer": "架空のアオは、公園へサンドイッチを持っていきます。飲み物は麦茶です。"
+    },
+    "multisource-partial-revocation": {
+      "answer": "架空のアオは、公園へサンドイッチを持っていきます。"
+    },
+    "private-source": {
+      "answer": "架空のアオの参照可能なメモ帳は青色です。"
+    },
+    "excluded-source": {
+      "answer": "架空のアオの参照可能なメモ帳は青色です。"
+    },
+    "deleted-source": {
+      "answer": "架空のアオの参照可能なメモ帳は青色です。"
+    },
+    "deleted-memory": {
+      "answer": "架空のアオは、今は青色のメモ帳を使っています。"
+    },
+    "binding-character": {
+      "answer": "この範囲の架空のアオは、りんごが好きです。"
+    },
+    "binding-subject": {
+      "answer": "この範囲の架空のアオは、りんごが好きです。"
+    },
+    "binding-client": {
+      "answer": "この範囲の架空のアオは、りんごが好きです。"
+    },
+    "long-text-explicit-detail": {
+      "answer": "手帳の表紙は橙色です。"
+    },
+    "post-search-revocation": {
+      "answer": "架空のアオは、紅茶が好きです。"
+    },
+    "post-answer-revocation": {
+      "answer": "架空のアオは、紅茶が好きです。"
+    },
+    "source-epoch-changed": {
+      "answer": "記憶に情報がありません。"
+    },
+    "synonym-02": {
+      "answer": "架空のアオは鉛筆でメモを書きます。"
+    },
+    "synonym-03": {
+      "answer": "架空のアオは散歩にスニーカーを履きます。"
+    },
+    "synonym-04": {
+      "answer": "架空のアオは自転車で通学します。"
+    },
+    "synonym-05": {
+      "answer": "架空のアオは歴史小説を読みます。"
+    },
+    "synonym-06": {
+      "answer": "架空のアオは雨の日に黄色い傘を使います。"
+    },
+    "synonym-07": {
+      "answer": "架空のアオは朝にりんごを食べます。"
+    },
+    "synonym-08": {
+      "answer": "架空のアオは金魚を育てています。"
+    },
+    "synonym-09": {
+      "answer": "架空のアオはジャズの音楽が好きです。"
+    },
+    "synonym-10": {
+      "answer": "架空のアオは休憩を図書館で過ごします。"
+    },
+    "paraphrase-02": {
+      "answer": "架空のアオは疲れたら庭を散歩して気分転換します。"
+    },
+    "paraphrase-03": {
+      "answer": "架空のアオは寝坊しないよう目覚まし時計を二つ置きます。"
+    },
+    "paraphrase-04": {
+      "answer": "架空のアオは本の読みかけのページに青いしおりを挟みます。"
+    },
+    "paraphrase-05": {
+      "answer": "架空のアオは友人の誕生日に手作りのクッキーを渡します。"
+    },
+    "paraphrase-06": {
+      "answer": "架空のアオは忘れないよう予定を壁のカレンダーに書きます。"
+    },
+    "paraphrase-07": {
+      "answer": "架空のアオは暑い日に扇風機で涼みます。"
+    },
+    "paraphrase-08": {
+      "answer": "架空のアオは料理を終えた直後に鍋を洗います。"
+    },
+    "paraphrase-09": {
+      "answer": "架空のアオは雨の日には家で折り紙を折ります。"
+    },
+    "paraphrase-10": {
+      "answer": "架空のアオは写真の題材として夕焼けの空を選びます。"
+    },
+    "cross-language-02": {
+      "answer": "架空のアオはフルートを練習しています。"
+    },
+    "cross-language-03": {
+      "answer": "架空のアオは海岸でジョギングします。"
+    },
+    "cross-language-04": {
+      "answer": "架空のアオはかぼちゃのスープを作ります。"
+    },
+    "cross-language-05": {
+      "answer": "架空のアオは白いユリが好きです。"
+    },
+    "cross-language-06": {
+      "answer": "架空のアオのリュックは赤色です。"
+    },
+    "cross-language-07": {
+      "answer": "Fictional Aoi knits scarves in winter."
+    },
+    "cross-language-08": {
+      "answer": "Fictional Aoi goes swimming on Tuesday."
+    },
+    "cross-language-09": {
+      "answer": "Fictional Aoi prefers autumn."
+    },
+    "cross-language-10": {
+      "answer": "Fictional Aoi draws mountains."
+    },
+    "unrelated-02": {
+      "answer": "記憶に情報がありません。"
+    },
+    "unrelated-03": {
+      "answer": "記憶に情報がありません。"
+    },
+    "unrelated-04": {
+      "answer": "記憶に情報がありません。"
+    },
+    "unrelated-05": {
+      "answer": "記憶に情報がありません。"
+    },
+    "unrelated-06": {
+      "answer": "記憶に情報がありません。"
+    },
+    "unrelated-07": {
+      "answer": "記憶に情報がありません。"
+    },
+    "unrelated-08": {
+      "answer": "記憶に情報がありません。"
+    },
+    "unrelated-09": {
+      "answer": "記憶に情報がありません。"
+    },
+    "unrelated-10": {
+      "answer": "記憶に情報がありません。"
+    },
+    "valid-fact-attachment": {
+      "answer": "旅の目的地は架空の星町です。"
+    },
+    "stale-fact-link": {
+      "answer": "架空のアオから旅の計画を聞きました。"
+    },
+    "revoked-fact-source": {
+      "answer": "架空のアオから旅の計画を聞きました。"
+    },
+    "direct-semantic": {
+      "answer": "静かな場所で読書するのが好きです。"
+    },
+    "derived-semantic": {
+      "answer": "静かな場所で読書するのが好きです。"
+    },
+    "equivalent-band-order": {
+      "answer": "春茶、夏茶、秋茶、冬茶、花茶を選びました。"
+    },
+    "below-threshold": {
+      "answer": "記憶に情報がありません。"
+    }
+  }
+}

@@ -52,7 +52,7 @@ schema・contracts・domainの振る舞いは、プロバイダーSDK、通信�
 `.node-version`と一致するNode **24.19.0**を用意してください。
 検証にパッケージのインストール、LLM認証情報、外部通信、GPUは不要です。
 Nodeは文書検証ツールの実行環境であり、製品の実装言語を選定したものではありません。
-検証ツールは組み込みモジュールのみを使うため、現在はlock対象の開発パッケージはありません。
+検証ツールは組み込みモジュールのみを使うため、文書検証は追加パッケージを使いません。回答評価のみ、`evals/semantic/package-lock.json` の固定依存を使います。
 
 ```sh
 node --test --test-reporter=./tools/required-tests-reporter.mjs tools/check-docs.test.mjs tools/required-tests-reporter.test.mjs
@@ -85,8 +85,8 @@ lint、format-check、静的型検査、UT、IT1、パッケージのbuild・ins
 
 ```sh
 uv sync --frozen
-uv run --no-sync ruff check src tests tools/evaluate-semantic-retrieval.py
-uv run --no-sync ruff format --check src tests tools/evaluate-semantic-retrieval.py
+uv run --no-sync ruff check src tests tools/evaluate-semantic-retrieval.py evals/semantic/provider.py
+uv run --no-sync ruff format --check src tests tools/evaluate-semantic-retrieval.py evals/semantic/provider.py
 uv run --no-sync mypy
 uv run --no-sync pytest -m ut -q
 uv run --no-sync pytest -m it1 -q
@@ -133,3 +133,22 @@ CI の `postgres-storage` は全 PR と main / epic push で必須試験を実�
 ネットワーク無効化と明示的な Unix socket 接続で保証します。
 このテストの成功を実運用・実モデルの IT2 / ST の合格とは扱いません。
 設定・制約は [PostgreSQL の利用境界](docs/postgresql.md) を参照してください。
+
+## 回答評価の固定開発依存
+
+[回答評価](evals/semantic/README.md)は `evals/semantic` 内の promptfoo **0.117.2** だけを
+直接追加依存とし、製品のPython依存へ含めません。`npm ci --no-audit --no-fund`
+でlock通りに取得します（取得にはネットワークが必要）。取得後のfixture評価は外部通信・実モデルを使いません。
+promptfooの内部DB依存はNode 24のGCクラッシュを避けるため `better-sqlite3 13.0.3` に固定overrideします。
+同梱N-API bindingを使い、`evals/semantic/.npmrc` の `ignore-scripts=true` で依存のinstall scriptを無効にします。
+
+```sh
+(cd evals/semantic && npm ci --no-audit --no-fund)
+node --test --test-reporter=./tools/required-tests-reporter.mjs tools/*.test.mjs
+bash tools/evaluate-semantic-answer.sh --runs 3 --output /dev/shm/semantic-answer-report.json
+```
+
+`postgres-storage` 内で回答用JS試験と62ケース×3回のfixture gateを必須にします。
+raw export・promptfooの内部DBは0700の一時領域で生成し、終了時に削除します。
+公開する証跡は本文を含まないreportだけです。実モデル実行は手動で明示profileと実行flagを必要とし、
+fixture評価の成功をモデル品質の証拠にしません。

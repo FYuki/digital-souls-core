@@ -674,10 +674,8 @@ def registration_batches(case: EvaluationCase) -> tuple[tuple[Binding, RecordBat
     )
 
 
-def _validate(cases: EvaluationCases, expectations: EvaluationExpectations) -> None:
-    case_ids = _unique(tuple(c.id for c in cases.cases))
-    if case_ids != _unique(tuple(g.id for g in expectations.cases)):
-        raise ValueError
+def _validate_inputs(cases: EvaluationCases) -> None:
+    _unique(tuple(c.id for c in cases.cases))
     _unique(tuple(c.legacy_id for c in cases.cases if c.legacy_id is not None))
     vectors: dict[str, Vector] = {}
     for case in cases.cases:
@@ -697,6 +695,22 @@ def _validate(cases: EvaluationCases, expectations: EvaluationExpectations) -> N
             if text in vectors and vectors[text] != vector:
                 raise ValueError
             vectors[text] = vector
+
+
+def parse_evaluation_inputs(cases_json: str) -> EvaluationCases:
+    """Input-only validation for providers; never opens or constructs gold."""
+    try:
+        cases = EvaluationCases.model_validate_json(cases_json)
+        _validate_inputs(cases)
+        return cases
+    except (ValueError, KeyError, TypeError, OverflowError):
+        raise EvaluationDataError("Invalid semantic evaluation inputs") from None
+
+
+def _validate(cases: EvaluationCases, expectations: EvaluationExpectations) -> None:
+    _validate_inputs(cases)
+    if {c.id for c in cases.cases} != _unique(tuple(g.id for g in expectations.cases)):
+        raise ValueError
     by_id = {c.id: c for c in cases.cases}
     for gold in expectations.cases:
         case = by_id[gold.id]
