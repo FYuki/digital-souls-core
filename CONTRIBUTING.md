@@ -139,6 +139,8 @@ CI の `postgres-storage` は全 PR と main / epic push で必須試験を実�
 [回答評価](evals/semantic/README.md)は `evals/semantic` 内の promptfoo **0.117.2** だけを
 直接追加依存とし、製品のPython依存へ含めません。`npm ci --no-audit --no-fund`
 でlock通りに取得します（取得にはネットワークが必要）。取得後のfixture評価は外部通信・実モデルを使いません。
+promptfooの内部DB依存はNode 24のGCクラッシュを避けるため `better-sqlite3 13.0.3` に固定overrideします。
+同梱N-API bindingを使い、`evals/semantic/.npmrc` の `ignore-scripts=true` で依存のinstall scriptを無効にします。
 
 ```sh
 (cd evals/semantic && npm ci --no-audit --no-fund)

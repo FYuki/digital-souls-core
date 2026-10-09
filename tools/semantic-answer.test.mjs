@@ -29,6 +29,7 @@ test('configuration contains all input IDs and no gold', () => {
 });
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -152,6 +153,57 @@ test('package and lock pin the installed promptfoo 0.117.2', () => {
   const lock = JSON.parse(fs.readFileSync(path.join(directory,'package-lock.json')));
   assert.equal(pkg.devDependencies.promptfoo,'0.117.2');
   assert.equal(lock.packages['node_modules/promptfoo'].version,'0.117.2');
+  assert.equal(pkg.overrides.promptfoo['better-sqlite3'],'13.0.3');
+  assert.equal(lock.packages['node_modules/better-sqlite3'].version,'13.0.3');
+});
+
+test('native SQLite statement collection survives GC with the Node 24 evaluation binding', () => {
+  const script = `const assert=require('node:assert/strict');
+    const Database=require(${JSON.stringify(path.join(directory,'node_modules/better-sqlite3'))});
+    const db=new Database(':memory:');
+    db.exec('CREATE TABLE synthetic (value INTEGER)');
+    for(let batch=0;batch<20;batch++) {
+      for(let i=0;i<100;i++) {
+        db.prepare('INSERT INTO synthetic VALUES (?)').run(i);
+        assert.equal(db.prepare('SELECT count(*) AS n FROM synthetic').get().n,batch*100+i+1);
+      }
+      global.gc();
+    }
+    db.close(); global.gc();`;
+  const child=spawnSync(process.execPath,['--expose-gc','-e',script],{encoding:'utf8'});
+  assert.equal(child.signal,null);
+  assert.equal(child.status,0);
+});
+
+test('install scripts are disabled and the shipped SQLite binding needs no lifecycle script', () => {
+  assert.equal(fs.readFileSync(path.join(directory,'.npmrc'),'utf8').trim(),'ignore-scripts=true');
+  const pkg=require('../evals/semantic/node_modules/better-sqlite3/package.json');
+  for(const event of ['preinstall','install','postinstall','prepare']) assert.equal(pkg.scripts[event],undefined);
+  assert.equal(pkg.gypfile,false);
+});
+
+test('diagnostic classifications disclose only fixed structural labels', async () => {
+  const {classifyLog}=await import('./evaluate-semantic-answer.mjs');
+  assert.deepEqual(classifyLog(''),['empty']);
+  assert.deepEqual(classifyLog('private query / answer / stderr'),['unclassified']);
+  assert.deepEqual(classifyLog('RemoveEnvironmentCleanupHook\nAssertion failed: (env) != nullptr\nprivate answer'),['native-cleanup-hook-abort']);
+  assert.deepEqual(classifyLog('SQLITE_BUSY: private answer'),['sqlite-busy','sqlite-error']);
+  assert.deepEqual(classifyLog('ETIMEDOUT private answer'),['assertion-timeout']);
+});
+
+test('command awaits stdio closure and keeps failure bodies in private files', async () => {
+  const {command,classifyLog}=await import('./evaluate-semantic-answer.mjs');
+  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'answer-command-test-'));
+  fs.chmodSync(temp,0o700);
+  try {
+    const logs={stdout:path.join(temp,'stdout'),stderr:path.join(temp,'stderr')};
+    const result=await command(['-e',"process.stdout.write('private output'); process.stderr.write('private error'); process.exitCode=7"],{},logs);
+    assert.deepEqual(result,{code:7,signal:null,spawn_error:null});
+    assert.equal(fs.readFileSync(logs.stdout,'utf8'),'private output');
+    assert.equal(fs.readFileSync(logs.stderr,'utf8'),'private error');
+    assert.equal(fs.statSync(logs.stderr).mode & 0o777,0o600);
+    assert.deepEqual(classifyLog(fs.readFileSync(logs.stderr,'utf8')),['unclassified']);
+  } finally { fs.rmSync(temp,{recursive:true,force:true}); }
 });
 
 test('error answer input fixture cannot become a no_memory success', async () => {

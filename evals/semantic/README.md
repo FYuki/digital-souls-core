@@ -136,6 +136,11 @@ queryと全normalized_text（Fact各版を含む）には共通4次元の有限�
 
 Python依存は増やさず、このディレクトリの `package.json` / `package-lock.json` だけで
 promptfoo **0.117.2** を固定します。Nodeは `.node-version`、uvは0.8.22です。
+内部DB依存は `better-sqlite3` **13.0.3** にoverrideで固定します。11.10.0では固定Node 24.19.0の
+Statement GC時に `RemoveEnvironmentCleanupHook` assertionでSIGABRTが再現しました。
+13系のN-API bindingはLinux x64用のバイナリを同梱し、この破綻するObjectWrap経路を使いません。
+`.npmrc` の `ignore-scripts=true` によりinstall scriptは全て無効です。評価経路に必要なscriptはありません。
+対応する同梱bindingがない環境はFAILとし、勝手にbuild/download scriptを許可しません。
 
 ```sh
 uv sync --locked
@@ -153,6 +158,7 @@ fixture が既定です。`with-test-postgres.sh` のnetworkなし使い捨てPo
 
 [characters.json](characters.json) と [evaluation.card.json](evaluation.card.json) は最小system promptの
 固定した合成キャラクターです。ケースの検索Bindingへcharacter IDだけを合わせます。
+日本語goldとの不要な言語不一致を避けるため、実モデル評価前に「ユーザーの質問と同じ言語で答える」を固定します。
 既存Mioriカードは読み込みません。モデルにはqueryと本番が生成したcontextだけを渡し、
 providerは `cases.json` だけを入力として検証します。goldはassertion / report bridgeのみが読みます。
 
@@ -182,6 +188,12 @@ promptfooの平均score・終了コードだけでは合格にしません。
 証跡へ出しません。reportにはcommit/dirty、mode、classifier、profileの機密情報を除いたモデル識別、
 embedding space、本番検索設定、入力/gold/カード/fixtureのSHA-256、promptfoo版、各回の結果と分類集計を残します。
 モデル識別は設定値で、実backendの同一性を独立検証した証拠ではありません。
+reportの `executions` は各runの試行数（常に1、再試行なし）、終了コード・signal・raw有無・
+stdout/stderrの既知パターン分類だけを記録し、`toolchain` にNodeと内部DB依存の版を記録します。
+異常終了やgate拒否でも部分runとFAIL理由をreportへ書き、公開stderrには構造診断だけを出します。
+生stdout/stderrは同じ0700一時領域の0600ファイルへ保存し、通常は終了時に削除します。
+明示的な診断用 `--keep-private-artifacts` の場合だけraw・生ログを保持します。表示されるローカルパスを
+調査後に削除し、その内容を公開証跡へ転記しないでください。
 
 ### 明示的な実モデル実行（#115で実施、今回 NOT RUN）
 
