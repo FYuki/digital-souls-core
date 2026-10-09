@@ -195,7 +195,7 @@ def valid_report() -> EvaluationReport:
             DATA, ROOT / "evals/semantic/cases.json", ROOT / "evals/semantic/expectations.json"
         ),
         runs=(run, run, run),
-        embedding_call_count=366,
+        embedding_call_count=183,
         passed=True,
     )
 

@@ -69,7 +69,7 @@ def test_required_cli_all_sixty_two_cases_three_uncached_runs(tmp_path: Path) ->
         )
     assert "vectors" not in serialized
     # Every run must embed fresh inputs: these counts are identical, not cached.
-    assert report.embedding_call_count == 3 * 2 * sum(
+    assert report.embedding_call_count == 3 * sum(
         c.id != "source-epoch-changed" for c in DATA.cases.cases
     )
 
@@ -124,19 +124,12 @@ async def test_append_exclusion_probe_and_source_deletion_use_public_ports() -> 
         assert all(excluded not in call.texts for call in runtime.embedding.calls)
 
 
-async def test_context_fallback_does_not_hide_second_search_error() -> None:
-    class BrokenSecondCall(FixtureEmbedding):
-        def __init__(self) -> None:
-            super().__init__(DATA)
-            self.count = 0
-
+async def test_context_fallback_does_not_hide_search_error() -> None:
+    class BrokenCall(FixtureEmbedding):
         async def embed(self, texts: tuple[str, ...]) -> tuple[tuple[float, ...], ...]:
-            self.count += 1
-            if self.count == 2:
-                raise CoreError(502, "synthetic_failed", "synthetic")
-            return await super().embed(texts)
+            raise CoreError(502, "synthetic_failed", "synthetic")
 
-    with isolated_case(config(), case("synonym-02"), BrokenSecondCall()) as runtime:
+    with isolated_case(config(), case("synonym-02"), BrokenCall(DATA)) as runtime:
         with pytest.raises(ValueError, match="context retrieval failed"):
             await observe(runtime)
 
@@ -149,5 +142,5 @@ async def test_changing_embedding_space_fails_closed() -> None:
             return vectors
 
     with isolated_case(config(), case("synonym-02"), ChangedSpace(DATA)) as runtime:
-        with pytest.raises(CoreError):
+        with pytest.raises(ValueError, match="context retrieval failed"):
             await observe(runtime)

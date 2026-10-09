@@ -259,13 +259,12 @@ class PreparedCase:
         self.retrieval.failed = False
         self.embedding.calls.clear()
         binding = self.case.binding.to_domain()
-        result = await self.retrieval.search(binding, self.case.query)
         context = await MemoryContext(self.retrieval).context(
             self.character, binding.scope, self.case.query, authorized=lambda: True
         )
-        if self.retrieval.failed or self.retrieval.results != [result, result]:
+        if self.retrieval.failed or len(self.retrieval.results) != 1:
             raise ValueError("Evaluation context retrieval failed")
-        return result, context
+        return self.retrieval.results[0], context
 
 
 def prepare_case(

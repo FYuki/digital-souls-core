@@ -188,28 +188,24 @@ async def observe(runtime: PreparedCase) -> Observation:
         for c in result
         if c in eligible and runtime.records.current(runtime.case.binding.to_domain(), (c,))
     )
+    scores: dict[str, float] = {}
     if result:
-        if len(runtime.embedding.calls) != 2:
+        if len(runtime.embedding.calls) != 1:
             raise ReportError("Missing embedding trace")
-        # Verify both searches independently; changing vectors must not evade the gate.
-        scores_by_call = []
-        for call in runtime.embedding.calls:
-            if len(call.texts) != len(call.vectors) or call.texts[0] != runtime.case.query:
-                raise ReportError("Invalid embedding trace")
-            scores = {}
-            for c in result:
-                indices = [
-                    i for i, t in enumerate(call.texts[1:], 1) if t == c.record.normalized_text
-                ]
-                if not indices:
-                    raise ReportError("Missing returned vector")
-                scores[c.identifier] = min(
-                    independent_relevance(call.vectors[0], call.vectors[i]) for i in indices
-                )
-            scores_by_call.append(scores)
-        scores = {identifier: min(s[identifier] for s in scores_by_call) for identifier in ids}
-    else:
-        scores = {}
+        call = runtime.embedding.calls[0]
+        if len(call.texts) != len(call.vectors) or call.texts[0] != runtime.case.query:
+            raise ReportError("Invalid embedding trace")
+        for candidate in result:
+            indices = [
+                i
+                for i, text in enumerate(call.texts[1:], 1)
+                if text == candidate.record.normalized_text
+            ]
+            if not indices:
+                raise ReportError("Missing returned vector")
+            scores[candidate.identifier] = min(
+                independent_relevance(call.vectors[0], call.vectors[i]) for i in indices
+            )
     # Production JSON retains normalized texts and exact Fact snapshots, not opaque IDs.
     context_rows = json.loads(context.text) if context.text else []
     matching = len(context_rows) == len(result) and all(
