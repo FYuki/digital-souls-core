@@ -230,7 +230,11 @@ bash tools/evaluate-semantic-answer.sh --mode local_model --execute-local-model 
 
 実行flagまたはprofileが欠ければNOT RUN（exit 3）、無効profileや通信失敗はFAILです。
 このツールはサーバー・GPU・モデルを起動しません。
-ローカルnomic / gemma4-12bで上位5件包含の基準による検索・回答各3回の実モデル再評価を実施済みです。
-いずれもFAILで品質は未受入です。分類品質と必須ゲートを分けた
-[実モデル証跡](../../docs/evidence/2026-10-09-semantic-real-model-evaluation-top5.md)と
+採用したbge-m3 Q8_0（CLS、1024次元、接頭辞なし）・閾値0.52 / gemma4-12bで、
+上位5件包含の基準による検索・回答各3回の実モデル再評価を実施済みです。
+各回とも検索品質/全条件53/62、回答品質61/62・全条件53/62でFAIL、品質は未受入です。
+日英は検索・回答とも10/10ですが、検索は無関係3/10・長文0/1・閾値0/1、回答は長文0/1が品質未達です。
+必須ゲートは検索top_one 1件/no_match 8件、回答dispatch 1件/no_memory 8件の違反が残ります。
+分類品質と必須ゲートを分け、前回nomic/0.54との比較も記録した
+[実モデル証跡](../../docs/evidence/2026-10-10-semantic-real-model-evaluation-bge-m3.md)と
 [利用手順](../../docs/memory-evaluation.md)を参照してください。
