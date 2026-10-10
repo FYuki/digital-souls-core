@@ -77,7 +77,7 @@ async def test_final_stored_history_exact_byte_limit(
         ).message.content == content
 
 
-def test_combined_input_message_limit_is_http_413(stores: Stores) -> None:
+def test_combined_input_above_previous_message_limit_is_saved(stores: Stores) -> None:
     service, provider, policy = setup(stores)
     cid = service.create("synthetic").conversation_id
     service.store.append(
@@ -97,16 +97,52 @@ def test_combined_input_message_limit_is_http_413(stores: Stores) -> None:
         f"/v1/characters/synthetic/conversations/{cid}/completions",
         json=turn(expected_revision=1).model_dump(),
     )
-    assert response.status_code == 413
-    assert response.json()["error"]["code"] == "history_limit"
-    assert provider.calls == []
-    assert service.read("synthetic", cid).revision == 1
+    assert response.status_code == 200
+    assert len(provider.calls[0][1]["messages"]) == 258  # Includes injected system.
+    restored = http.get(f"/v1/characters/synthetic/conversations/{cid}")
+    assert restored.status_code == 200
+    assert restored.json()["revision"] == 2
+    assert len(restored.json()["messages"]) == 258
+    assert service.store.receipt(service.binding("synthetic"), cid, "r1") is not None
 
 
-@pytest.mark.parametrize("count", [255, 256])
+@pytest.mark.parametrize("stream", [False, True])
+def test_large_turn_tools_and_exclusions_are_saved(stores: Stores, stream: bool) -> None:
+    service, provider, policy = setup(stores)
+    http = TestClient(
+        create_app(service.inference, history_store=service.store, history_policy=policy),
+        base_url="http://127.0.0.1",
+    )
+    base = "/v1/characters/synthetic/conversations"
+    cid = http.post(base).json()["conversation_id"]
+    tools = [
+        {"type": "function", "function": {"name": f"synthetic_{i}", "parameters": {}}}
+        for i in range(129)
+    ]
+    response = http.post(
+        f"{base}/{cid}/completions",
+        json={
+            "request_id": "synthetic-large-turn",
+            "expected_revision": 0,
+            "messages": [{"role": "user", "content": "Synthetic"}] * 129,
+            "tools": tools,
+            "memory_excluded_indices": list(range(129)),
+            "stream": stream,
+        },
+    )
+    assert response.status_code == 200
+    assert provider.calls[0][1]["tools"] == tools
+    assert len(provider.calls[0][1]["messages"]) == 130
+    restored = http.get(f"{base}/{cid}").json()
+    assert restored["revision"] == 1 and len(restored["messages"]) == 130
+    assert not any(source["eligible"] for source in restored["memory_sources"])
+    assert len(restored["memory_sources"]) == 130
+
+
+@pytest.mark.parametrize("count", [255, 256, 257, 385])
 @pytest.mark.parametrize("tools", [False, True])
 @pytest.mark.parametrize("stream", [False, True])
-async def test_input_at_limit_accepts_response(
+async def test_input_around_previous_limit_accepts_response(
     stores: Stores, count: int, tools: bool, stream: bool
 ) -> None:
     service, provider, _ = setup(stores)

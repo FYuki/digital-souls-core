@@ -173,8 +173,6 @@ class Conversations:
                 if finding.no_history or finding.no_memory:
                     confirmation_indices.append(index)
         all_input = (*snapshot.messages, *incoming)
-        if len(all_input) > 256:
-            raise CoreError(413, "history_limit", "Conversation message limit exceeded")
         payload = body.model_dump(
             exclude={"request_id", "expected_revision", "memory_excluded_indices"},
             exclude_none=True,
@@ -273,7 +271,7 @@ class Conversations:
         if any(call.function.name not in names for call in message.tool_calls or []):
             raise ValueError("unknown tool")
         # Input already has a validated, fully resolved tool sequence. Validate only
-        # new IDs here; the response is not part of the 256-message input budget.
+        # new IDs here; the response's tool results belong to a subsequent turn.
         used = {call.id for item in request.messages for call in item.tool_calls or []}
         for call in message.tool_calls or []:
             if call.id in used:
@@ -300,7 +298,7 @@ class Conversations:
                 budget.write(text, delta.get("content") or "")
                 for part in delta.get("tool_calls") or []:
                     index = part["index"]
-                    if type(index) is not int or not 0 <= index < 128:
+                    if type(index) is not int or not 0 <= index <= len(calls):
                         raise ValueError("invalid tool index")
                     if index not in calls:
                         empty = {

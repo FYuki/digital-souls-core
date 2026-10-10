@@ -3,6 +3,8 @@
 - Status: Proposed
 - Date: 2026-10-03
 
+一部を[Issue #147](https://github.com/FYuki/digital-souls-core/issues/147)のcontext拡張で置き換えます（2026-10-10 ユーザー決定。context 4096を32768へ変更し、KV型はK/Vともf16を維持。[実測証跡](../evidence/2026-10-10-llamacpp-context.md)）。
+
 ## 背景
 
 ユーザーは限定比較を受け、Core用の推論先をllama.cppへ切り替える方針を選択した。

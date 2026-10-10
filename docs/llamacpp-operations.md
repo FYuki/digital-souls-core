@@ -8,8 +8,10 @@ WSL内のloopback到達性は環境ごとに確認する。LAN公開や共有ユ
 
 - [固定Compose](../compose.llamacpp.yml): b11347の公式CUDA imageをdigest固定。
 - model GGUFだけをread-onlyマウント。SHAは[ADR 0003](adr/0003-local-llamacpp-provider.md)の値と照合する。
-- aliasはgemma4-12b。GGUF chat template、thinking無効、context 4096、GPU layers 99要求、
+- aliasはgemma4-12b。GGUF chat template、thinking無効、context 32768、GPU layers 99要求、
   f16 KV、Flash Attention on、8 threads、slot 1。自動fitや他モデルfallbackは使わない。
+- contextとKV型は[Issue #147の実測証跡](evidence/2026-10-10-llamacpp-context.md)に基づく。
+  RTX 4070 Ti SUPERでbge-m3同時起動・合成要求各3回を確認した。OpenClaw実接続の再受入は未実施。
 - hostは127.0.0.1:18081だけを公開。container内部8080、非root、read-only、cap_drop ALL、
   no-new-privileges、memory 12g、pids 256。Web UIとAgent機能は無効。
 - Docker/Toolkitは既存設定を使う。追加security設定が必要なら停止して確認する。
@@ -60,7 +62,7 @@ profile/api_baseの変更はCoreを再起動して反映する。
 ## 常駐の判断
 
 既定restart=noではDocker/OS再起動後に自動でモデルをロードしない。
-自動復帰が必要な場合は、GPU占有（検証時はシステム合計約11 GiB）、18081待受、
+自動復帰が必要な場合は、GPU占有（今回のGemma+bge-m3実測はシステム合計最大12913 MiB）、18081待受、
 Ollamaの起動順との競合を確認してからrestart policyを変更する。今回は変更しない。
 `unless-stopped`だけを設定しても、既存Ollama unitとの排他や起動順は保証されない。
 自動起動の調整は別途レビューする。Core自身のsystemd常駐も今回は追加しない。
