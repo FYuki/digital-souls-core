@@ -14,6 +14,11 @@
 継続的な会話・記憶・人格を一つの境界で扱い、複数の入口（チャットUI、外部Agent等）から同じ人格を
 利用できるようにします。
 
+製品利用は、一つの常駐Coreの共通runtimeへ各入口から接続する方針です。
+CLIを追加する場合は薄いクライアントとします（[ADR 0025](docs/adr/0025-shared-runtime-interfaces.md)）。
+現在の外部入口はHTTP APIで、CLI・MCPの追加は未実装です。
+OpenClaw固有の入力由来・履歴連携は[連携検討](docs/openclaw-integration-design.md)で扱います。
+
 Coreの範囲は次のとおりです。
 
 - キャラクター定義と、対話に必要なコンテキスト。
