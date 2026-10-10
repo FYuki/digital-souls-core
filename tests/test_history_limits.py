@@ -1,16 +1,112 @@
 import json
 from typing import Any, cast
+from unittest.mock import Mock
 
 import pytest
+from fastapi.testclient import TestClient
 
 from digital_souls_core import conversations
+from digital_souls_core.api import create_app
 from digital_souls_core.application import CoreError, Inference
+from digital_souls_core.contracts import Message
 from digital_souls_core.conversations import Conversations
-from digital_souls_core.history import HistoryStore
+from digital_souls_core.history import Binding, HistoryStore, Receipt, Snapshot
 
+from .conversation_support import SyntheticPolicy, turn
 from .support import FakeProvider, character, chunk
 
 pytestmark = pytest.mark.it1
+
+
+def test_history_api_accepts_combined_input_above_previous_limit() -> None:
+    provider = FakeProvider()
+    store = Mock(spec=HistoryStore)
+    seeded = tuple(Message(role="user", content="Synthetic") for _ in range(256))
+    snapshot = Snapshot("synthetic-conversation", 1, seeded)
+    store.read.side_effect = lambda binding, cid: snapshot
+    store.receipt.return_value = None
+
+    def append(
+        binding: Binding,
+        cid: str,
+        request_id: str,
+        fingerprint: str,
+        expected_revision: int,
+        messages: tuple[Message, ...],
+        finish_reason: str,
+    ) -> Receipt:
+        nonlocal snapshot
+        assert cid == snapshot.conversation_id and expected_revision == snapshot.revision
+        snapshot = Snapshot(cid, expected_revision + 1, (*snapshot.messages, *messages))
+        return Receipt(fingerprint, snapshot.revision, messages[-1], finish_reason)
+
+    store.append.side_effect = append
+    http = TestClient(
+        create_app(
+            Inference((character("synthetic"),), provider),
+            history_store=store,
+            history_policy=SyntheticPolicy(),
+        ),
+        base_url="http://127.0.0.1",
+    )
+    url = f"/v1/characters/synthetic/conversations/{snapshot.conversation_id}"
+    response = http.post(url + "/completions", json=turn(expected_revision=1).model_dump())
+    assert response.status_code == 200
+    restored = http.get(url).json()
+    assert restored["revision"] == 2 and len(restored["messages"]) == 258
+    assert provider.calls[0][1]["messages"][1:-1] == [
+        message.model_dump(exclude_none=True) for message in seeded
+    ]
+    store.append.assert_called_once()
+
+
+@pytest.mark.parametrize("count", [129, 257])
+async def test_stream_accepts_contiguous_tool_indices_above_previous_limit(count: int) -> None:
+    provider = FakeProvider()
+    service = Conversations(
+        Inference((character("synthetic"),), provider), cast(HistoryStore, None)
+    )
+    provider.chunks = [
+        chunk(
+            {
+                "tool_calls": [
+                    {
+                        "index": i,
+                        "id": f"call_{i}",
+                        "type": "function",
+                        "function": {"name": "synthetic", "arguments": "{"},
+                    }
+                ]
+            }
+        )
+        for i in range(count)
+    ]
+    # Later fragments can revisit existing indices, including those above 127.
+    provider.chunks += [
+        chunk({"tool_calls": [{"index": i, "function": {"arguments": "}"}}]})
+        for i in reversed(range(count))
+    ]
+    provider.chunks.append(chunk({}, "tool_calls"))
+    message, finish = await service._stream(
+        service.inference.characters["synthetic"].config.profile, {}
+    )
+    assert finish == "tool_calls" and message.tool_calls is not None
+    assert [call.id for call in message.tool_calls] == [f"call_{i}" for i in range(count)]
+    assert all(call.function.arguments == "{}" for call in message.tool_calls)
+    assert provider.closed
+
+
+@pytest.mark.parametrize("indices", [[1], [0, 2], [-1], [True], [0.0], ["0"]])
+async def test_stream_rejects_noncontiguous_or_invalid_tool_indices(indices: list[Any]) -> None:
+    provider = FakeProvider()
+    service = Conversations(
+        Inference((character("synthetic"),), provider), cast(HistoryStore, None)
+    )
+    provider.chunks = [chunk({"tool_calls": [{"index": index}]}) for index in indices]
+    # No finish chunk: rejection must happen at the invalid index, before EOF.
+    with pytest.raises(ValueError, match="^invalid tool index$"):
+        await service._stream(service.inference.characters["synthetic"].config.profile, {})
+    assert provider.closed
 
 
 @pytest.mark.parametrize("extra", [-1, 0, 1])
@@ -90,8 +186,9 @@ async def test_tiny_chunks_have_linear_serialization_work(monkeypatch: pytest.Mo
 
 
 @pytest.mark.parametrize("extra", [-1, 0, 1])
+@pytest.mark.parametrize("count", [12, 129])
 async def test_multiple_tool_structural_byte_boundary(
-    monkeypatch: pytest.MonkeyPatch, extra: int
+    monkeypatch: pytest.MonkeyPatch, extra: int, count: int
 ) -> None:
     provider = FakeProvider()
     service = Conversations(
@@ -103,7 +200,7 @@ async def test_multiple_tool_structural_byte_boundary(
             "type": "function",
             "function": {"name": "weather", "arguments": "{}"},
         }
-        for i in range(12)
+        for i in range(count)
     }
     exact = len(json.dumps(["", calls], ensure_ascii=False).encode())
     monkeypatch.setattr(conversations, "MAX_BYTES", exact + extra)
@@ -116,5 +213,5 @@ async def test_multiple_tool_structural_byte_boundary(
         assert error.value.code == "history_limit"
     else:
         message, _ = await service._stream(profile, {})
-        assert message.tool_calls and len(message.tool_calls) == 12
+        assert message.tool_calls and len(message.tool_calls) == count
     assert provider.closed

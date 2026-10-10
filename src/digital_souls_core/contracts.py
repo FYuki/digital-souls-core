@@ -61,9 +61,9 @@ class NamedToolChoice(StrictModel):
 
 
 class CompletionInput(StrictModel):
-    messages: Annotated[list[Message], Field(min_length=1, max_length=256)]
+    messages: Annotated[list[Message], Field(min_length=1)]
     stream: bool = False
-    tools: Annotated[list[Tool], Field(min_length=1, max_length=128)] | None = None
+    tools: Annotated[list[Tool], Field(min_length=1)] | None = None
     tool_choice: Literal["auto", "none", "required"] | NamedToolChoice | None = None
     temperature: Annotated[float, Field(ge=0, le=2, allow_inf_nan=False)] | None = None
     max_tokens: Annotated[int, Field(gt=0, le=32768)] | None = None

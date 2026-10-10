@@ -26,12 +26,10 @@ def as_utc(value: datetime) -> datetime:
 class TurnInput(StrictModel):
     request_id: Name
     expected_revision: Annotated[int, Field(ge=0)]
-    messages: Annotated[list[Message], Field(min_length=1, max_length=128)]
-    memory_excluded_indices: list[Annotated[int, Field(ge=0)]] = Field(
-        default_factory=list, max_length=128
-    )
+    messages: Annotated[list[Message], Field(min_length=1)]
+    memory_excluded_indices: list[Annotated[int, Field(ge=0)]] = Field(default_factory=list)
     stream: bool = False
-    tools: Annotated[list[Tool], Field(min_length=1, max_length=128)] | None = None
+    tools: Annotated[list[Tool], Field(min_length=1)] | None = None
     tool_choice: Literal["auto", "none", "required"] | NamedToolChoice | None = None
     temperature: Annotated[float, Field(ge=0, le=2, allow_inf_nan=False)] | None = None
     max_tokens: Annotated[int, Field(gt=0, le=32768)] | None = None
