@@ -30,7 +30,7 @@ services:
       - --port
       - "8080"
       - --ctx-size
-      - "4096"
+      - "32768"
       - --parallel
       - "1"
       - --gpu-layers
