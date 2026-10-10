@@ -68,10 +68,12 @@ profileも旧model/digest/dimensionsへ戻し、旧閾値0.54との組合せは�
 
 ## 手動で切り替える
 
-Ollamaを停止すると既存のOllama接続クライアントは利用できなくなる。影響を確認した利用者が
-Ubuntu-dogfoodで次を実行する。unitは削除・無効化せず、sudoを迂回しない。
+Ollamaのunitが存在する場合、停止すると既存のOllama接続クライアントは利用できなくなる。
+影響を確認した利用者がUbuntu-dogfoodで次を実行する。unitは削除・無効化せず、sudoを迂回しない。
+unitが存在しない（`LoadState=not-found`）場合は停止操作が不要で、起動scriptから実行する。
 
 ```bash
+# Ollamaのunitが存在する場合だけ、影響を確認して停止する。
 sudo systemctl stop digital-souls-ollama.service
 bash tools/start-llamacpp.sh
 curl --noproxy '*' --fail --silent --show-error \
@@ -79,7 +81,20 @@ curl --noproxy '*' --fail --silent --show-error \
   --retry-max-time 120 --retry-all-errors http://127.0.0.1:18081/health
 ```
 
-起動scriptはOllama active時やchat / embedding model SHA不一致時に拒否する。両Composeサービスを起動します。停止済みという確認は起動時の条件であり、
+起動scriptは `digital-souls-ollama.service` を次の条件で確認する。
+`systemctl show` の成功を必須とし、空出力・不明な状態では停止を証明できないためfail-closedで拒否する。
+
+| LoadState | ActiveState | 判定 |
+| --- | --- | --- |
+| `not-found` | 照会不要 | unitが存在しないため許可 |
+| `loaded` | `inactive` | 停止済みのため許可 |
+| `loaded` | `active` / `activating` / `reloading` / `deactivating` / `failed` など、`inactive`以外（空出力を含む） | 拒否 |
+| `masked` / `error` など、`loaded`・`not-found`以外（空出力を含む） | 照会不要 | 拒否 |
+| 必要な`systemctl show`の失敗 | 出力にかかわらず | 拒否 |
+
+root実行やchat / embedding model SHA不一致・未設定時にも拒否する。条件を満たせば両Composeサービスを起動する。
+unit不存在の確認は、手動起動されたOllamaや他のGPU処理の不在を保証しない。起動前にはGPU余裕と他の推論を確認する。
+停止済みという確認は起動時の条件であり、
 別の管理者が後からOllamaを再開することまで防ぐ排他機構ではない。両方を同時に起動しない。
 health確認はcold load中の503や接続待ちを再試行する。再試行の開始期限は120秒、
 最後の試行を含め最大約122秒で失敗する。失敗時はCoreを起動せず、containerの状態を確認する。
@@ -110,6 +125,7 @@ Ollamaの起動順との競合を確認してからrestart policyを変更する
 今回起動したCoreプロセスを停止し、先にllamaとembeddingコンテナを停止する。
 repoルートで実行し、Composeには起動時と同じ検証済み絶対モデルpath・uid/gidを指定する。
 新しいシェルでも`MODEL_PATH`を起動時と同じ絶対pathに設定する。個人固有の値は公開しない。
+以下のOllama再開手順は、旧unitを保持している環境が対象です。unitが存在しない環境では再開操作は行いません。
 停止コマンドの成功とcontainer状態がexitedであることを確認できた場合だけOllamaを再開する。
 停止失敗・inspect失敗・稼働中・状態不明では再開せず、原因を確認する。
 
