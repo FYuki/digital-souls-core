@@ -196,3 +196,68 @@ def test_required_tuning_cli_eighty_nine_cases_three_uncached_runs(tmp_path: Pat
     for c in data.cases.cases:
         assert c.query not in serialized
         assert all(r.normalized_text not in serialized for r in c.episodes)
+
+
+def test_candidate_tuning_fixture_repeats_without_quality_claims(tmp_path: Path) -> None:
+    # Separate PG process keeps the 267 schemas out of the storage suite's DB.
+    script = """
+import asyncio, json, os
+from pathlib import Path
+from digital_souls_core.postgres_db import PostgresConfig
+from digital_souls_core.semantic_embedding_candidates import (
+    PrefixEmbedding, evaluate_candidate, tuning_paths,
+)
+from digital_souls_core.semantic_evaluation_cases import load_evaluation_cases
+from digital_souls_core.semantic_evaluation_runtime import FixtureEmbedding
+from digital_souls_core.semantic_retrieval_evaluation import case_version, execution_commit
+root = Path.cwd()
+paths = tuning_paths(root)
+data = load_evaluation_cases(*paths)
+config = PostgresConfig(
+    host=os.environ['DSC_TEST_POSTGRES_SOCKET'],
+    port=int(os.environ['DSC_TEST_POSTGRES_PORT']),
+    database=os.environ['DSC_TEST_POSTGRES_DATABASE'],
+    user=os.environ['DSC_TEST_POSTGRES_USER'],
+)
+report = asyncio.run(evaluate_candidate(
+    data, config, PrefixEmbedding(FixtureEmbedding(data)), runs=3,
+    mode='fixture', commit=execution_commit(root), version=case_version(data, *paths),
+))
+Path(os.environ['CANDIDATE_TEST_OUTPUT']).write_text(json.dumps(report))
+"""
+    output = tmp_path / "candidate-report.json"
+    process = subprocess.run(
+        ["bash", str(ROOT / "tools/with-test-postgres.sh"), sys.executable, "-c", script],
+        cwd=ROOT,
+        env={**os.environ, "CANDIDATE_TEST_OUTPUT": str(output)},
+        capture_output=True,
+        text=True,
+        timeout=360,
+        check=False,
+    )
+    assert process.returncode == 0, process.stderr
+    import json
+
+    report = json.loads(output.read_text())
+    assert report["baseline"]["passed"]
+    assert not report["baseline"]["quality_evidence"]
+    assert report["baseline"]["embedding_call_count"] == 264
+    assert all(len(a["cases"]) == 89 and len(a["sweep"]) == 41 for a in report["analysis"])
+    assert all(
+        next(s for s in a["sweep"] if s["threshold"] == 0.54)["categories"]["cross_language"][
+            "quality_passed"
+        ]
+        == 24
+        for a in report["analysis"]
+    )
+    from digital_souls_core.semantic_embedding_candidates import tuning_paths
+    from digital_souls_core.semantic_evaluation_cases import load_evaluation_cases
+
+    data = load_evaluation_cases(*tuning_paths(ROOT))
+    for case in data.cases.cases:
+        assert case.query not in output.read_text()
+        assert all(
+            r.normalized_text not in output.read_text()
+            for r in (*case.episodes, *case.facts, *case.semantics)
+        )
+    assert "vectors" not in output.read_text()
