@@ -1,8 +1,10 @@
 # ADR 0025: 常駐Coreの共通runtimeと外部インターフェース
 
-## Status
+Status: Accepted
 
-Accepted（合意日・Accepted記録日: 2026-10-10）。
+日付: 2026-10-10
+
+Accepted日: 2026-10-10（ユーザーとの合意日も同日）
 
 ユーザーが、単一の常駐Coreへ入口を追加し、CLIは薄いクライアントとするA案を採用した。
 採用範囲は本書の「決定」。OpenClaw固有の連携方式は検討依頼であり、
@@ -51,3 +53,4 @@ Coreの常駐が必要になる。推論先のLLM・GPUサービス自体のプ�
 - [製品の範囲](../../README.md)
 - [推論API](../api.md)、[履歴API](../history-api.md)
 - [OpenClawとの連携検討](../openclaw-integration-design.md)
+- [文書検証の証跡](../evidence/2026-10-10-shared-runtime-design.md)
