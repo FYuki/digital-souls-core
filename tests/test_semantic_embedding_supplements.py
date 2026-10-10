@@ -14,7 +14,7 @@ pytestmark = pytest.mark.ut
 
 
 async def test_descriptive_analysis_clips_inputs_and_never_exports_bodies(tmp_path: Path) -> None:
-    manifest = {
+    manifest: dict[str, dict[str, object]] = {
         "nomiracl": {
             "revision": "ecd08778d0426a5ca28ac99763b0c9ddc2c78e68",
             "counts": {"queries": 1},
@@ -66,7 +66,7 @@ async def test_descriptive_analysis_clips_inputs_and_never_exports_bodies(tmp_pa
             en="Synthetic blocked pair",
         )
     )
-    manifest["mkqa"]["counts"]["pairs"] = 3
+    manifest["mkqa"]["counts"] = {"pairs": 3}
     (tmp_path / "manifest.json").write_text(json.dumps(manifest))
     (tmp_path / "mkqa-ja-en.jsonl").write_text("\n".join(json.dumps(r) for r in mkqa) + "\n")
     for query_prefix, document_prefix in (("", ""), ("query: ", "passage: ")):

@@ -11,6 +11,7 @@ import asyncio
 import json
 import os
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 from digital_souls_core.postgres_db import PostgresConfig
@@ -48,6 +49,8 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
         return {
             "schema_version": 1,
             "purpose": "local supplements only; descriptive",
+            "commit": execution_commit(ROOT).model_dump(),
+            "space": asdict(embedding.space),
             "supplements": await evaluate_supplements(args.supplements, embedding),
         }
     config = PostgresConfig(

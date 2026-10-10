@@ -148,7 +148,7 @@ async def evaluate_supplements(directory: Path, embedding: PrefixEmbedding) -> d
             "mkqa_original_pairs": original_pairs,
             "mkqa_measured_pairs": len(mkqa),
             "mkqa_not_run_pairs": len(blocked),
-            "mkqa_not_run_reason": "raw-input scanner secret/failed; same preflight for all candidates",
+            "mkqa_not_run_reason": "raw-input scanner secret/failed; universal preflight",
         },
         "nomiracl": {
             "query_max_characters": 128,
