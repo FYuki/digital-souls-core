@@ -3,6 +3,9 @@
 - 日付: 2026-10-10
 - 起点: `35c20182f0aa3acfe2bcf49c73ddd7eb3d9eb022`（Epic #134）
 - 作業branch: `docs/shared-runtime-interfaces`
+- 検証対象: 作成時は commit `22419d064dd5e470e21001c01495aeceb7979fa1` としてstageした内容で下表を実行（作成元の記録）。
+  Epic監督がADR 0025の書式修正後の commit `bf4f905b30f88ab02e5413523d61ac001d62df6a`
+  （tree `9d21319c5e87672f4173d5dac94257ecdf056e82`）で下表の文書ツール・check-docs・diff --checkを再実行し、PASSを確認した（PR #141でmerge）。
 - 対象: [ADR 0025](../adr/0025-shared-runtime-interfaces.md)、
   [連携検討](../openclaw-integration-design.md)、README、ADR索引
 - 変更範囲: 文書のみ。実行コード・設定の変更なし。
