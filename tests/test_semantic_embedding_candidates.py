@@ -137,3 +137,32 @@ def test_sweep_boundary_quality_and_no_match_are_scored_without_relaxation() -> 
 def test_prefix_rejects_unsupported_roles() -> None:
     with pytest.raises(ValueError):
         PrefixEmbedding(FakeEmbedding(), "passage: ", "query: ")
+
+
+def test_complete_sweep_aggregates_subgroups_and_violations() -> None:
+    from pathlib import Path
+
+    from digital_souls_core.semantic_embedding_candidates import THRESHOLDS, summarize_sweep
+    from digital_souls_core.semantic_evaluation_cases import load_evaluation_cases
+
+    data = load_evaluation_cases(*tuning_paths(Path(__file__).resolve().parents[1]))
+    rows = [
+        dict(
+            threshold=t,
+            id=g.id,
+            quality_passed=not g.no_match,
+            top_one_passed=True,
+            no_match_passed=not g.no_match,
+            forbidden_ids_passed=not g.no_match,
+        )
+        for t in THRESHOLDS
+        for g in data.expectations.cases
+    ]
+    summaries = summarize_sweep(data, rows)
+    assert len(summaries) == 41
+    for s in summaries:
+        categories = s["categories"]
+        assert categories["unrelated_far"]["total"] == 12
+        assert categories["unrelated_near"]["forbidden_ids_failed"] == 10
+        assert categories["threshold_no_match"]["no_match_failed"] == 6
+        assert categories["cross_en_query"]["quality_passed"] == 12

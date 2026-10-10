@@ -220,7 +220,13 @@ def summarize_sweep(
             for group in case_groups(expectations[row["id"]]):
                 c = categories.setdefault(
                     group,
-                    {"total": 0, "quality_passed": 0, "top_one_failed": 0, "no_match_failed": 0},
+                    {
+                        "total": 0,
+                        "quality_passed": 0,
+                        "top_one_failed": 0,
+                        "no_match_failed": 0,
+                        "forbidden_ids_failed": 0,
+                    },
                 )
                 c["total"] += 1
                 c["quality_passed"] += int(row["quality_passed"])

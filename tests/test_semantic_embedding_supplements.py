@@ -58,7 +58,7 @@ async def test_descriptive_analysis_clips_inputs_and_never_exports_bodies(tmp_pa
     assert all(t.startswith("query: ") for call in fake.calls[1:] for t in call)
     output = json.dumps(result)
     assert query not in output and body not in output
-    assert all(r["ja"] not in output and r["en"] not in output for r in mkqa)
+    assert all(str(r["ja"]) not in output and str(r["en"]) not in output for r in mkqa)
 
 
 @pytest.mark.parametrize("kind", ["empty", "duplicate", "schema", "extra"])
