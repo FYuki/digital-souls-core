@@ -43,10 +43,20 @@ inference profile、provider/modelは別の識別子です。返却JSONの`model
 
 ## 対応する小範囲
 
-- textのみの`messages`（system/user/assistant/tool、1〜256件）。callerのsystemは
+- textのみの`messages`（system/user/assistant/tool、1件以上・件数上限なし）。callerのsystemは
   人格systemの後に置きます。人格はLLMへの指示であり、セキュリティ境界ではありません。
+- 各役割の入力`content`は文字列、または`[{"type":"text","text":"..."}]`の配列を
+  受け付けます。入口で各textを`\n`で連結し、1要素ならそのtextそのものになります。
+  各要素は`type`・`text`だけを持ち、typeは`text`、textは厳密な文字列です。
+  text以外のtype（image_url/input_audio/file等）、未知キー（cache_control等）、空配列、
+  非object要素、非文字列text、配列以外の非文字列contentは400です。黙って捨てません。
+  assistantの`content: null`と`tool_calls`の組合せは従来どおり受理します。
+  privacy検査・履歴保存・推論送信・既存バイト検査には正規化した文字列を渡します。
+  応答のtext contentは従来どおり文字列で、tool call時のnullも維持します。
+  provider応答の解析と保存済み履歴の読み込みには配列受理を広げません。
 - function型`tools`（name/description/parameters）、`tool_choice`のauto/none/required/名前指定。
-  tool名は重複不可。tool callのID、名前、arguments文字列とtool結果は改変しません。
+  toolsは指定時1個以上・個数上限なしで、tool名は重複不可。
+  tool callのID、名前、arguments文字列とtool結果は改変しません。
   argumentsをJSONとして解釈・実行しません。履歴中のcall IDは一意で、全結果が必要です。
 - `stream`、`temperature`（0〜2）、`max_completion_tokens`（1〜32768）。
   旧`max_tokens`も同じ内部`max_completion_tokens`へ正規化します。両方指定は400です。

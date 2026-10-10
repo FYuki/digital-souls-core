@@ -152,6 +152,11 @@ export CORE_LLAMACPP_EMBEDDING_MODEL="${EMBEDDING_MODEL_PATH:?set verified bge-m
 ```
 
 aliasは18081がgemma4-12b、18082がbge-m3であることを確認します。chatをComposeで再作成せず、旧nomicを起動しません。
+
+注記（main統合時）：上の手順は#132の再評価で使ったもので、chatは2026-10-06作成の既存コンテナ（`--ctx-size 4096`）でした。
+その後[#147](evidence/2026-10-10-llamacpp-context.md)でComposeのchatはcontext 32768へ変わり、既存コンテナは自動では追従しません。
+今後の実モデル評価では、`docker inspect` でchatの `--ctx-size` を記録し、Compose定義と違う場合は運用者がchatを再作成するか、
+差異を証跡に明記してから実行します。#132の結果はctx 4096のchatによるものです。
 評価終了時・失敗時とも、同じ環境変数で次を実行し、exitedの時刻とnvidia-smiのVRAMを記録します。
 起動途中で失敗した場合も、今回起動したコンテナを停止して確認します。
 

@@ -25,7 +25,6 @@ pytestmark = pytest.mark.ut
         {"max_tokens": 0},
         {"temperature": float("nan")},
         {"stream": "true"},
-        {"messages": [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]},
         {"messages": [{"role": "tool", "content": "result", "tool_call_id": "missing"}]},
         {"messages": [{"role": "assistant", "tool_calls": [CALL]}]},
         {"tool_choice": "auto"},
