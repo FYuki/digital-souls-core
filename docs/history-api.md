@@ -38,7 +38,16 @@ completion本文の例（合成データ）:
 }
 ```
 
-`messages`には新しいuserまたはtoolのみを渡します。過去ログを再送しません。
+`messages`には新しいuserまたはtoolのみを1件以上渡します。件数上限はありません。
+過去ログを再送しません。保存済み履歴と新規入力の合計にも件数上限はありません。
+入力`content`は文字列、または`[{"type":"text","text":"..."}]`の配列です。
+入口で各textを`\n`で連結し、1要素ならそのtextそのものになります。
+要素は`type`・`text`だけを許可し、typeは`text`のみ、textは厳密な文字列です。
+text以外のtype、未知キー（cache_control等）、空配列、非object要素、非文字列text、
+配列以外の非文字列contentは400です。未知部分を黙って捨てません。
+privacyスキャン・保存・推論送信・既存1 MiBバイト検査は正規化した文字列へ適用します。
+復元と応答のtext contentも文字列で、assistant tool callのnullは従来どおりです。
+保存済み履歴やprovider応答の解析で配列を受理する変更ではありません。
 tools/tool_choice/temperature/max_tokens/max_completion_tokensの条件は既存APIと同じです。
 request_idは1〜64文字の英数字・`_`・`-`、期待revisionは0以上の整数です。
 成功は`conversation_id`、`request_id`、確定`revision`、公開assistant `message`、
@@ -46,7 +55,9 @@ request_idは1〜64文字の英数字・`_`・`-`、期待revisionは0以上の�
 
 tool_callsを受け取ったら外部Agentが実行し、次のrequest IDで対応する全tool resultを渡します。
 Coreは実行しません。不正な往復は400です。入力・設定が同じrequest IDの再送は同じreceiptを返し、
-再推論しません。異なる入力のID再利用、期待revisionのずれは409です。
+再推論しません。fingerprintはcontent正規化後に計算するため、同じtextを文字列と
+配列で再送しても同一入力です（例：`"one\ntwo"`と2要素のtext配列）。stream等の他項目は
+従来どおりfingerprintに含みます。異なる入力のID再利用、期待revisionのずれは409です。
 同時要求は推論コストが重複し得ます。409後は復元して次の入力を判断してください。
 
 ## streamと失敗
@@ -60,7 +71,12 @@ commit後に到着した通知や配送失敗では保存済みreceiptが残り�
 保存完了後に配送が途切れた場合は同じ本文とrequest IDで再試行してください。
 stream値も再試行fingerprintに含みます。復旧時に切り替えないでください。
 
-policy欠落・判定不能・拒否は403、不明会話は404、上限超過は413、不正上流応答は502です。
+履歴のバイト上限は1 MiBです。入力・推論payload・streamバッファ・保存後の履歴を
+JSONのUTF-8バイト数で検査し、超過は切り捨てず413（`history_limit`）で拒否します。
+注入contextの`context_budget_bytes`と推論先のモデルcontext制限も引き続き適用します。
+会話streamのtool call indexは非負の整数（boolean不可）で、新しいindexは0から連続する必要があります。
+既存indexへの後続deltaは受け付け、tool call数の固定上限は設けません。
+policy欠落・判定不能・拒否は403、不明会話は404、不正上流応答は502です。
 保存失敗は成功やDONEとして返しません。エラー本文へ入力・秘密値を反映しません。
 削除は進行中推論を自動キャンセルしませんが、その後の保存を拒否します。
 
@@ -87,7 +103,7 @@ PostgreSQLのrollback後に再初期化できます。未知のversionや部分s
 
 [ADR 0006](adr/0006-conversation-memory-controls.md)の操作表を適用します。
 completionに`memory_excluded_indices: [0]`を渡すと、今回の`messages`内のindex 0を
-履歴に保存したまま記憶対象外にします。indexは0始まりで重複・範囲外を拒否します。
+履歴に保存したまま記憶対象外にします。indexは0始まりで重複・範囲外を拒否し、件数上限はありません。
 省略時は空配列で、旧receipt fingerprint互換を維持します。再送で指定を変えると409です。
 このmetadataはモデルへ送信しません。自然文だけから指定期間や操作を推測しません。
 

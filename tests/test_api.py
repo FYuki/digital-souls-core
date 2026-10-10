@@ -27,6 +27,31 @@ def request_body(**extra: Any) -> dict[str, Any]:
     }
 
 
+@pytest.mark.parametrize("endpoint", ["chat", "character"])
+@pytest.mark.parametrize("stream", [False, True])
+def test_stateless_accepts_messages_and_tools_above_previous_limits(
+    endpoint: str, stream: bool
+) -> None:
+    fake = FakeProvider()
+    messages = [{"role": "user", "content": "Synthetic"}] * 257
+    tools = [
+        {"type": "function", "function": {"name": f"synthetic_{i}", "parameters": {}}}
+        for i in range(129)
+    ]
+    selector = {"model": "miori-alias"} if endpoint == "chat" else {"character_id": "miori"}
+    response = client(fake).post(
+        f"/v1/{endpoint}/completions",
+        json={**selector, "messages": messages, "tools": tools, "stream": stream},
+    )
+    assert response.status_code == 200
+    assert fake.calls[0][1]["messages"][1:] == messages
+    assert fake.calls[0][1]["tools"] == tools
+    if stream:
+        assert response.text.endswith("data: [DONE]\n\n") and fake.closed
+    else:
+        assert response.json() == fake.response
+
+
 def test_normal_chat_both_entries_same_context_and_pinned_metadata() -> None:
     fake = FakeProvider()
     http = client(fake)
