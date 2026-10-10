@@ -144,3 +144,55 @@ async def test_changing_embedding_space_fails_closed() -> None:
     with isolated_case(config(), case("synonym-02"), ChangedSpace(DATA)) as runtime:
         with pytest.raises(ValueError, match="context retrieval failed"):
             await observe(runtime)
+
+
+def test_required_tuning_cli_eighty_nine_cases_three_uncached_runs(tmp_path: Path) -> None:
+    from digital_souls_core.semantic_evaluation_cases import load_evaluation_cases
+    from digital_souls_core.semantic_retrieval_evaluation import case_version
+
+    directory = ROOT / "evals/semantic/tuning"
+    cases_path, gold_path = directory / "cases.json", directory / "expectations.json"
+    data = load_evaluation_cases(cases_path, gold_path)
+    output = tmp_path / "tuning-report.json"
+    # The 267 extra schemas use their own disposable server: catalog/WAL growth
+    # must not consume the storage suite's bounded 512 MiB PostgreSQL container.
+    process = subprocess.run(
+        [
+            "bash",
+            str(ROOT / "tools/with-test-postgres.sh"),
+            sys.executable,
+            "-I",
+            str(ROOT / "tools/evaluate-semantic-retrieval.py"),
+            "--cases",
+            str(cases_path),
+            "--expectations",
+            str(gold_path),
+            "--runs",
+            "3",
+            "--output",
+            str(output),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=360,
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == process.stderr == ""
+    serialized = output.read_text()
+    report = EvaluationReport.model_validate_json(serialized)
+    validate_report(report, data, 3)
+    assert report.passed and report.mode == "fixture" and not report.quality_evidence
+    assert report.case_version == case_version(data, cases_path, gold_path)
+    assert report.case_version != case_version(
+        DATA, ROOT / "evals/semantic/cases.json", ROOT / "evals/semantic/expectations.json"
+    )
+    assert all(len(run.cases) == 89 and run.gates_passed for run in report.runs)
+    assert all(summary.rate == 1.0 for run in report.runs for summary in run.categories.values())
+    assert all(row.passed for run in report.runs for row in run.cases)
+    # epoch-change has no eligible records after revocation; every other case
+    # embeds fresh inputs once per run, including the same logical record IDs.
+    assert report.embedding_call_count == 3 * 88
+    for c in data.cases.cases:
+        assert c.query not in serialized
+        assert all(r.normalized_text not in serialized for r in c.episodes)
