@@ -19,6 +19,13 @@ if [[ ${actual%% *} != "$expected" ]]; then
   echo 'Model SHA-256 does not match the verified Gemma 4 weights.' >&2
   exit 1
 fi
+: "${CORE_LLAMACPP_EMBEDDING_MODEL:?Set the verified user-owned bge-m3 GGUF path}"
+embedding_expected=aa473d51f451a22f0fcf39ba3330c14bed38a385712b1113440f69df4047a173
+embedding_actual=$(sha256sum -- "$CORE_LLAMACPP_EMBEDDING_MODEL")
+if [[ ${embedding_actual%% *} != "$embedding_expected" ]]; then
+  echo 'Model SHA-256 does not match the verified bge-m3 Q8_0 weights.' >&2
+  exit 1
+fi
 export CORE_LLAMACPP_UID="$(id -u)" CORE_LLAMACPP_GID="$(id -g)"
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 docker compose -f "$repo_dir/compose.llamacpp.yml" config --quiet

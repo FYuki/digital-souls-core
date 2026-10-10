@@ -288,7 +288,15 @@ async def evaluate_candidate(
                     *(r.record.normalized_text for r in records),
                 ):
                     raise ValueError("Candidate trace mismatch")
-                ranked = rank_at_threshold(records, vectors, space, 0.54) if calls else ()
+                # Baseline must match the runtime policy (ADR 0024). The #130
+                # reports retain their historical 0.54 baseline and source SHA.
+                ranked = (
+                    rank_at_threshold(
+                        records, vectors, space, RetrievalPolicy().relevance_threshold
+                    )
+                    if calls
+                    else ()
+                )
                 if tuple(r.identifier for r in ranked) != observation.retrieved_ids:
                     raise ValueError("Sweep differs from production retrieval")
                 measurements.append(

@@ -7,10 +7,10 @@ WSL内のloopback到達性は環境ごとに確認する。LAN公開や共有ユ
 ## 構成と事前確認
 
 - [固定Compose](../compose.llamacpp.yml): b11347の公式CUDA imageをdigest固定。
-- model GGUFだけをread-onlyマウント。SHAは[ADR 0003](adr/0003-local-llamacpp-provider.md)の値と照合する。
+- model GGUFだけをread-onlyマウント。chatのSHAは[ADR 0003](adr/0003-local-llamacpp-provider.md)、embeddingのSHAは[ADR 0024](adr/0024-multilingual-memory-embedding.md)の値と照合する。
 - aliasはgemma4-12b。GGUF chat template、thinking無効、context 4096、GPU layers 99要求、
   f16 KV、Flash Attention on、8 threads、slot 1。自動fitや他モデルfallbackは使わない。
-- hostは127.0.0.1:18081だけを公開。container内部8080、非root、read-only、cap_drop ALL、
+- chatのhostは127.0.0.1:18081だけを公開。container内部8080、非root、read-only、cap_drop ALL、
   no-new-privileges、memory 12g、pids 256。Web UIとAgent機能は無効。
 - Docker/Toolkitは既存設定を使う。追加security設定が必要なら停止して確認する。
 - 起動前にGPU余裕と他の推論を確認する。既存Whisper/Irodoriは停止・変更しない。
@@ -22,9 +22,49 @@ WSL内のloopback到達性は環境ごとに確認する。LAN公開や共有ユ
 
 ```bash
 export CORE_LLAMACPP_MODEL="${MODEL_PATH:?Set MODEL_PATH to the verified absolute GGUF path}"
+export CORE_LLAMACPP_EMBEDDING_MODEL="${EMBEDDING_MODEL_PATH:?Set EMBEDDING_MODEL_PATH to the verified bge-m3 GGUF path}"
 docker pull ghcr.io/ggml-org/llama.cpp@sha256:69019445c94c970496c8f6d6447214b837508162dfe1152768942c51237e3ab7
 nvidia-smi --query-gpu=memory.used,memory.free,utilization.gpu --format=csv
 ```
+
+## bge-m3 embedding サーバーへの切替
+
+[ADR 0024](adr/0024-multilingual-memory-embedding.md) の bge-m3 Q8_0 は alias `bge-m3`、
+CLS pooling、1024次元、接頭辞なしです。モデルの固定revision・SHA-256・サイズはADRを参照します。
+Composeの `embedding` サービスはchatと同じ固定image・非root・read-only・cap_drop ALL・
+no-new-privileges・pids 256・memory 12g・64MiB tmpfs・read-only bind（create_host_path=false）です。
+#130の測定と同じctx/batch/ubatch=2048、parallel=1、gpu-layers=99、8 threads、cache-ram=0で、
+Web UIとログを無効にします。公開portは `127.0.0.1:18082` のみです。
+
+`EMBEDDING_MODEL_PATH` に運用者所有の検証済み `bge-m3-q8_0.gguf` の絶対pathを設定します。
+起動scriptはchatとembeddingの両ファイルのSHA-256を確認し、不一致・未設定ならComposeを呼びません。
+profile例は既定無効です。モデル・endpointを確認後、git管理外の私有profileで有効化し、
+trusted起動コードへ明示注入します。保存済みvectorはなく、データ移行は不要です。
+
+手動作成の旧nomicコンテナ `digital-souls-core-llamacpp-embed` が18082を使うため、
+影響を確認した運用者は**旧コンテナを停止しexitedを確認してから**起動します。
+停止・確認に失敗した場合は起動せず、旧コンテナとモデルはrollback用に保持します。
+GPUの余裕を事前に確認し、同じportで二つのembeddingサーバーを起動しません。
+
+```bash
+(
+  set -euo pipefail
+  docker stop digital-souls-core-llamacpp-embed
+  [[ $(docker inspect --format '{{.State.Status}}' digital-souls-core-llamacpp-embed) == exited ]]
+  bash tools/start-llamacpp.sh
+  curl --noproxy '*' --fail --silent --show-error \
+    --connect-timeout 1 --max-time 2 --retry 60 --retry-delay 2 \
+    --retry-max-time 120 --retry-all-errors http://127.0.0.1:18082/health
+  curl --noproxy '*' --fail --silent --show-error http://127.0.0.1:18082/v1/models
+)
+```
+
+新コンテナ名は `digital-souls-core-llamacpp-bge-m3` です。alias・image digest・GGUF SHA・
+1024次元を照合し、profileのembedding endpointを18082へ合わせます（chatは18081）。
+実モデルの検索・回答再評価は #132 で行います。fixtureのPASSはこの動作確認の代用ではありません。
+embeddingだけを旧nomicへ戻す場合は、同じ環境変数で `docker compose -f compose.llamacpp.yml stop embedding`、
+新コンテナのexited確認、旧コンテナの `docker start digital-souls-core-llamacpp-embed` の順です。
+profileも旧model/digest/dimensionsへ戻し、旧閾値0.54との組合せは別途配備判断します。
 
 ## 手動で切り替える
 
@@ -39,7 +79,7 @@ curl --noproxy '*' --fail --silent --show-error \
   --retry-max-time 120 --retry-all-errors http://127.0.0.1:18081/health
 ```
 
-起動scriptはOllama active時やmodel SHA不一致時に拒否する。停止済みという確認は起動時の条件であり、
+起動scriptはOllama active時やchat / embedding model SHA不一致時に拒否する。両Composeサービスを起動します。停止済みという確認は起動時の条件であり、
 別の管理者が後からOllamaを再開することまで防ぐ排他機構ではない。両方を同時に起動しない。
 health確認はcold load中の503や接続待ちを再試行する。再試行の開始期限は120秒、
 最後の試行を含め最大約122秒で失敗する。失敗時はCoreを起動せず、containerの状態を確認する。
@@ -67,7 +107,7 @@ Ollamaの起動順との競合を確認してからrestart policyを変更する
 
 ## rollback
 
-今回起動したCoreプロセスを停止し、先にllamaコンテナを停止する。
+今回起動したCoreプロセスを停止し、先にllamaとembeddingコンテナを停止する。
 repoルートで実行し、Composeには起動時と同じ検証済み絶対モデルpath・uid/gidを指定する。
 新しいシェルでも`MODEL_PATH`を起動時と同じ絶対pathに設定する。個人固有の値は公開しない。
 停止コマンドの成功とcontainer状態がexitedであることを確認できた場合だけOllamaを再開する。
@@ -77,8 +117,11 @@ repoルートで実行し、Composeには起動時と同じ検証済み絶対モ
 (
   set -euo pipefail
   export CORE_LLAMACPP_MODEL="${MODEL_PATH:?Set MODEL_PATH to the verified absolute GGUF path}"
+  export CORE_LLAMACPP_EMBEDDING_MODEL="${EMBEDDING_MODEL_PATH:?Set EMBEDDING_MODEL_PATH to the verified bge-m3 GGUF path}"
   export CORE_LLAMACPP_UID=$(id -u) CORE_LLAMACPP_GID=$(id -g)
-  if docker compose -f compose.llamacpp.yml stop llama &&
+  if docker compose -f compose.llamacpp.yml stop llama embedding &&
+     embedding_state=$(docker inspect --format '{{.State.Status}}' digital-souls-core-llamacpp-bge-m3) &&
+     [[ "$embedding_state" == exited ]] &&
      state=$(docker inspect --format '{{.State.Status}}' digital-souls-core-llamacpp) &&
      [[ "$state" == exited ]]; then
     sudo systemctl start digital-souls-ollama.service

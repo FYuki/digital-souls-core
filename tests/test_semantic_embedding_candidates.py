@@ -72,7 +72,7 @@ def test_sweep_reuses_production_pool_band_limit_and_threshold(threshold: float)
     )
     assert rank_at_threshold(records, vectors, SPACE, threshold) == expected
     assert len(expected) <= 5
-    assert RetrievalPolicy().relevance_threshold == 0.54
+    assert RetrievalPolicy().relevance_threshold == 0.52
 
 
 @pytest.mark.parametrize("values", [(), (float("nan"),), (float("inf"),)])
@@ -123,12 +123,12 @@ def test_sweep_boundary_quality_and_no_match_are_scored_without_relaxation() -> 
     )
     rows = sweep_case(g, observation, records, vectors, SPACE)
     assert len(rows) == 41
-    assert next(r for r in rows if r["threshold"] == 0.54)["quality_passed"]
+    assert next(r for r in rows if r["threshold"] == 0.52)["quality_passed"]
     assert not next(r for r in rows if r["threshold"] == 0.56)["quality_passed"]
     assert not next(r for r in rows if r["threshold"] == 0.56)["top_one_passed"]
     no_match = next(g for g in data.expectations.cases if g.no_match)
     rows = sweep_case(no_match, observation, records, vectors, SPACE)
-    assert not next(r for r in rows if r["threshold"] == 0.54)["no_match_passed"]
+    assert not next(r for r in rows if r["threshold"] == 0.52)["no_match_passed"]
     assert next(r for r in rows if r["threshold"] == 0.56)["no_match_passed"]
     with pytest.raises(ValueError, match="Incomplete sweep"):
         summarize_sweep(data, rows)

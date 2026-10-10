@@ -188,11 +188,11 @@ def test_threshold_uses_near_topic_distractors_and_both_sides() -> None:
         assert all(domain in r.normalized_text for r in c.episodes)
         assert gold.id.startswith("tuning-threshold-near-")
         score = independent_relevance(c.query_vector, c.episodes[0].vector)
-        assert 0.539 <= score <= 0.5411
-        assert (score >= 0.54) != gold.no_match
+        assert 0.519 <= score <= 0.5211
+        assert (score >= 0.52) != gold.no_match
         near_scores.append(score)
     assert len(near_scores) == 12
-    assert sum(s >= 0.54 for s in near_scores) == 6
+    assert sum(s >= 0.52 for s in near_scores) == 6
 
 
 @pytest.mark.parametrize(
@@ -220,7 +220,7 @@ def test_ranking_cases_have_one_answer_and_seven_distractors(category: str, coun
         # distractors remain below threshold; real models embed all eight texts.
         for r in c.episodes:
             score = independent_relevance(c.query_vector, r.vector)
-            assert (score >= 0.54) == (r.id == "target")
+            assert (score >= 0.52) == (r.id == "target")
 
 
 def test_unmutated_tuning_vectors_match_production_ranking_and_fixed_gold() -> None:

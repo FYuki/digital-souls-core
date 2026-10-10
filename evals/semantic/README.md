@@ -85,7 +85,15 @@
 
 ### 偽embeddingと品質評価
 
-queryと全normalized_text（Fact各版を含む）には共通4次元の有限・非ゼロvectorがあります。同一本文は全ケースで同じvectorです。queryと候補をunit vectorにし、二乗L2距離から `relevance = 1/(1+sqrt(distance))` を計算します。本番の候補20・閾値0.54・同等帯0.002・最大5を使います。Factのvectorは本文対応の完全性用で、Factを独立候補にしません。
+queryと全normalized_text（Fact各版を含む）には共通4次元の有限・非ゼロvectorがあります。同一本文は全ケースで同じvectorです。queryと候補をunit vectorにし、二乗L2距離から `relevance = 1/(1+sqrt(distance))` を計算します。本番の候補20・閾値0.52・同等帯0.002・最大5を使います。Factのvectorは本文対応の完全性用で、Factを独立候補にしません。
+
+[ADR 0024](../../docs/adr/0024-multilingual-memory-embedding.md) のユーザー承認済み Q3 例外として、
+`below-threshold` の `below-threshold-record` の偽vectorだけを
+`[0.63, 0.7765951326141569, 0.0, 0.0]`（relevance約0.53757）から
+`[0.5565557545480253, 0.8308102623821387, 0.0, 0.0]`（relevance 0.515）へ変更しました。
+閾値0.52の直下で「該当なし」を検証する意図を保つためです。本文・gold・他の61ケース・
+この記録以外のvectorは変更していません。この本文は他ケースと共有されていません。
+実モデル評価は偽vectorを使わず、bge-m3 Q8_0（CLS、1024次元、接頭辞なし）を使います。
 
 偽vectorはCIで道具を検証するためのものです。**モデルの品質証拠ではありません**。実モデル評価は手動・cacheなし3回、各回各分類90%以上、必須ゲート全件合格で判定します。平均で相殺せず、結果に合わせて期待値・閾値を緩めません。
 

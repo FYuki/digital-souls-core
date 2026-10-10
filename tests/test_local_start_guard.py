@@ -11,19 +11,27 @@ pytestmark = pytest.mark.it1
 
 
 @pytest.mark.parametrize(
-    "uid,load,state,digest,allowed",
+    "uid,load,state,digest,embedding_digest,allowed",
     [
-        ("1001", "loaded", "inactive", "valid", True),
-        ("0", "loaded", "inactive", "valid", False),
-        ("1001", "loaded", "active", "valid", False),
-        ("1001", "loaded", "activating", "valid", False),
-        ("1001", "loaded", "failed", "valid", False),
-        ("1001", "not-found", "inactive", "valid", False),
-        ("1001", "loaded", "inactive", "wrong", False),
+        ("1001", "loaded", "inactive", "valid", "valid", True),
+        ("0", "loaded", "inactive", "valid", "valid", False),
+        ("1001", "loaded", "active", "valid", "valid", False),
+        ("1001", "loaded", "activating", "valid", "valid", False),
+        ("1001", "loaded", "failed", "valid", "valid", False),
+        ("1001", "not-found", "inactive", "valid", "valid", False),
+        ("1001", "loaded", "inactive", "wrong", "valid", False),
+        ("1001", "loaded", "inactive", "valid", "wrong", False),
+        ("1001", "loaded", "inactive", "valid", "missing", False),
     ],
 )
 def test_local_start_requires_known_stopped_ollama_and_exact_model(
-    tmp_path: Path, uid: str, load: str, state: str, digest: str, allowed: bool
+    tmp_path: Path,
+    uid: str,
+    load: str,
+    state: str,
+    digest: str,
+    embedding_digest: str,
+    allowed: bool,
 ) -> None:
     # Execute the actual shell guard with inert external commands. No Docker or sudo runs.
     shim = """#!/usr/bin/env python3
@@ -38,7 +46,11 @@ elif name == "systemctl":
     print(os.environ[key])
 elif name == "sha256sum":
     expected = "1278394b693672ac2799eadc9a83fd98259a6a88a40acfb1dcaa6c6fc895a606"
-    digest = expected if os.environ["TEST_DIGEST"] == "valid" else "wrong"
+    key = "TEST_DIGEST"
+    if sys.argv[-1].endswith("embedding.gguf"):
+        expected = "aa473d51f451a22f0fcf39ba3330c14bed38a385712b1113440f69df4047a173"
+        key = "TEST_EMBEDDING_DIGEST"
+    digest = expected if os.environ[key] == "valid" else "wrong"
     print(digest + "  synthetic.gguf")
 elif name == "docker":
     with open(os.environ["TEST_CALLS"], "a") as handle:
@@ -54,12 +66,16 @@ else:
     env = os.environ | {
         "PATH": str(tmp_path) + os.pathsep + os.environ["PATH"],
         "CORE_LLAMACPP_MODEL": str(tmp_path / "synthetic.gguf"),
+        "CORE_LLAMACPP_EMBEDDING_MODEL": str(tmp_path / "embedding.gguf"),
+        "TEST_EMBEDDING_DIGEST": embedding_digest,
         "TEST_UID": uid,
         "TEST_LOAD": load,
         "TEST_STATE": state,
         "TEST_DIGEST": digest,
         "TEST_CALLS": str(calls),
     }
+    if embedding_digest == "missing":
+        env.pop("CORE_LLAMACPP_EMBEDDING_MODEL")
     result = subprocess.run(
         ["bash", str(ROOT / "tools/start-llamacpp.sh")],
         env=env,
