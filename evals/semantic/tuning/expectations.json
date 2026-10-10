@@ -2,7 +2,7 @@
   "schema_version": 2,
   "cases": [
     {
-      "id": "tuning-synonym-01",
+      "id": "tuning-synonym-daily-01",
       "category": "synonym",
       "relevant_ids": [
         "target"
@@ -22,7 +22,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "遊星歯車"
+            "Ｌ字型"
           ]
         ],
         "forbidden_facts": [],
@@ -30,7 +30,7 @@
       }
     },
     {
-      "id": "tuning-synonym-02",
+      "id": "tuning-synonym-daily-02",
       "category": "synonym",
       "relevant_ids": [
         "target"
@@ -50,7 +50,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "セラミック繊維"
+            "革製ケース"
           ]
         ],
         "forbidden_facts": [],
@@ -58,7 +58,7 @@
       }
     },
     {
-      "id": "tuning-synonym-03",
+      "id": "tuning-synonym-daily-03",
       "category": "synonym",
       "relevant_ids": [
         "target"
@@ -78,7 +78,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "真空管"
+            "楕円形"
           ]
         ],
         "forbidden_facts": [],
@@ -86,7 +86,7 @@
       }
     },
     {
-      "id": "tuning-synonym-04",
+      "id": "tuning-synonym-daily-04",
       "category": "synonym",
       "relevant_ids": [
         "target"
@@ -106,7 +106,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "気泡管"
+            "駅前のサロン"
           ]
         ],
         "forbidden_facts": [],
@@ -114,7 +114,7 @@
       }
     },
     {
-      "id": "tuning-synonym-05",
+      "id": "tuning-synonym-daily-05",
       "category": "synonym",
       "relevant_ids": [
         "target"
@@ -134,7 +134,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "シリカゲル"
+            "観音開き"
           ]
         ],
         "forbidden_facts": [],
@@ -142,7 +142,7 @@
       }
     },
     {
-      "id": "tuning-synonym-06",
+      "id": "tuning-synonym-daily-06",
       "category": "synonym",
       "relevant_ids": [
         "target"
@@ -162,7 +162,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "空気圧"
+            "太陽光"
           ]
         ],
         "forbidden_facts": [],
@@ -282,7 +282,7 @@
       }
     },
     {
-      "id": "tuning-paraphrase-01",
+      "id": "tuning-paraphrase-daily-01",
       "category": "paraphrase",
       "relevant_ids": [
         "target"
@@ -302,7 +302,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "清掃"
+            "デンタルフロス"
           ]
         ],
         "forbidden_facts": [],
@@ -310,7 +310,7 @@
       }
     },
     {
-      "id": "tuning-paraphrase-02",
+      "id": "tuning-paraphrase-daily-02",
       "category": "paraphrase",
       "relevant_ids": [
         "target"
@@ -330,7 +330,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "標準分銅"
+            "首掛けストラップ"
           ]
         ],
         "forbidden_facts": [],
@@ -338,7 +338,7 @@
       }
     },
     {
-      "id": "tuning-paraphrase-03",
+      "id": "tuning-paraphrase-daily-03",
       "category": "paraphrase",
       "relevant_ids": [
         "target"
@@ -358,7 +358,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "ラチェット"
+            "前の晩から水に浸"
           ]
         ],
         "forbidden_facts": [],
@@ -366,7 +366,7 @@
       }
     },
     {
-      "id": "tuning-paraphrase-04",
+      "id": "tuning-paraphrase-daily-04",
       "category": "paraphrase",
       "relevant_ids": [
         "target"
@@ -386,7 +386,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "在室表示"
+            "ビデオ通話"
           ]
         ],
         "forbidden_facts": [],
@@ -394,7 +394,7 @@
       }
     },
     {
-      "id": "tuning-paraphrase-05",
+      "id": "tuning-paraphrase-daily-05",
       "category": "paraphrase",
       "relevant_ids": [
         "target"
@@ -414,7 +414,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "三次元スキャン"
+            "画面を暗く"
           ]
         ],
         "forbidden_facts": [],
@@ -422,7 +422,7 @@
       }
     },
     {
-      "id": "tuning-paraphrase-06",
+      "id": "tuning-paraphrase-daily-06",
       "category": "paraphrase",
       "relevant_ids": [
         "target"
@@ -442,7 +442,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "音圧"
+            "耳栓"
           ]
         ],
         "forbidden_facts": [],
@@ -562,7 +562,7 @@
       }
     },
     {
-      "id": "tuning-cross-en-query-01",
+      "id": "tuning-cross-en-query-daily-01",
       "category": "cross_language",
       "relevant_ids": [
         "target"
@@ -582,8 +582,8 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "石英",
-            "quartz"
+            "えび",
+            "shrimp"
           ]
         ],
         "forbidden_facts": [],
@@ -591,7 +591,7 @@
       }
     },
     {
-      "id": "tuning-cross-en-query-02",
+      "id": "tuning-cross-en-query-daily-02",
       "category": "cross_language",
       "relevant_ids": [
         "target"
@@ -611,8 +611,8 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "黒鉛",
-            "graphite"
+            "アイマスク",
+            "eye mask"
           ]
         ],
         "forbidden_facts": [],
@@ -620,7 +620,7 @@
       }
     },
     {
-      "id": "tuning-cross-en-query-03",
+      "id": "tuning-cross-en-query-daily-03",
       "category": "cross_language",
       "relevant_ids": [
         "target"
@@ -640,8 +640,8 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "古い",
-            "oldest"
+            "帆布",
+            "canvas"
           ]
         ],
         "forbidden_facts": [],
@@ -649,7 +649,7 @@
       }
     },
     {
-      "id": "tuning-cross-en-query-04",
+      "id": "tuning-cross-en-query-daily-04",
       "category": "cross_language",
       "relevant_ids": [
         "target"
@@ -669,8 +669,8 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "玄武岩",
-            "basalt"
+            "海綿",
+            "sea sponge"
           ]
         ],
         "forbidden_facts": [],
@@ -678,7 +678,7 @@
       }
     },
     {
-      "id": "tuning-cross-en-query-05",
+      "id": "tuning-cross-en-query-daily-05",
       "category": "cross_language",
       "relevant_ids": [
         "target"
@@ -698,8 +698,8 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "四十",
-            "forty"
+            "韓国語",
+            "Korean"
           ]
         ],
         "forbidden_facts": [],
@@ -707,7 +707,7 @@
       }
     },
     {
-      "id": "tuning-cross-en-query-06",
+      "id": "tuning-cross-en-query-daily-06",
       "category": "cross_language",
       "relevant_ids": [
         "target"
@@ -727,8 +727,8 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "磁力",
-            "magnet"
+            "水曜日",
+            "Wednesday"
           ]
         ],
         "forbidden_facts": [],
@@ -910,7 +910,7 @@
       }
     },
     {
-      "id": "tuning-cross-ja-query-01",
+      "id": "tuning-cross-ja-query-daily-01",
       "category": "cross_language",
       "relevant_ids": [
         "target"
@@ -930,8 +930,8 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "振り子",
-            "pendulum"
+            "チェス",
+            "chess"
           ]
         ],
         "forbidden_facts": [],
@@ -939,7 +939,7 @@
       }
     },
     {
-      "id": "tuning-cross-ja-query-02",
+      "id": "tuning-cross-ja-query-daily-02",
       "category": "cross_language",
       "relevant_ids": [
         "target"
@@ -959,8 +959,8 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "レーダー",
-            "radar"
+            "中庭",
+            "courtyard"
           ]
         ],
         "forbidden_facts": [],
@@ -968,7 +968,7 @@
       }
     },
     {
-      "id": "tuning-cross-ja-query-03",
+      "id": "tuning-cross-ja-query-daily-03",
       "category": "cross_language",
       "relevant_ids": [
         "target"
@@ -988,8 +988,8 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "三角",
-            "triangular"
+            "充電台",
+            "dock"
           ]
         ],
         "forbidden_facts": [],
@@ -997,7 +997,7 @@
       }
     },
     {
-      "id": "tuning-cross-ja-query-04",
+      "id": "tuning-cross-ja-query-daily-04",
       "category": "cross_language",
       "relevant_ids": [
         "target"
@@ -1017,8 +1017,8 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "手回し",
-            "hand crank"
+            "通路側",
+            "aisle"
           ]
         ],
         "forbidden_facts": [],
@@ -1026,7 +1026,7 @@
       }
     },
     {
-      "id": "tuning-cross-ja-query-05",
+      "id": "tuning-cross-ja-query-daily-05",
       "category": "cross_language",
       "relevant_ids": [
         "target"
@@ -1046,8 +1046,8 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "セラミック",
-            "ceramic"
+            "隣人",
+            "neighbor"
           ]
         ],
         "forbidden_facts": [],
@@ -1055,7 +1055,7 @@
       }
     },
     {
-      "id": "tuning-cross-ja-query-06",
+      "id": "tuning-cross-ja-query-daily-06",
       "category": "cross_language",
       "relevant_ids": [
         "target"
@@ -1075,8 +1075,8 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "網",
-            "mesh cage"
+            "首",
+            "neck"
           ]
         ],
         "forbidden_facts": [],
@@ -1258,7 +1258,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-01",
+      "id": "tuning-unrelated-near-daily-01",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1281,7 +1281,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-02",
+      "id": "tuning-unrelated-near-daily-02",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1304,7 +1304,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-03",
+      "id": "tuning-unrelated-near-daily-03",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1327,7 +1327,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-04",
+      "id": "tuning-unrelated-near-daily-04",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1350,7 +1350,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-05",
+      "id": "tuning-unrelated-near-daily-05",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1373,7 +1373,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-06",
+      "id": "tuning-unrelated-near-tech-01",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1396,7 +1396,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-07",
+      "id": "tuning-unrelated-near-tech-02",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1419,7 +1419,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-08",
+      "id": "tuning-unrelated-near-tech-03",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1442,7 +1442,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-09",
+      "id": "tuning-unrelated-near-tech-04",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1465,7 +1465,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-10",
+      "id": "tuning-unrelated-near-tech-05",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1488,7 +1488,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-11",
+      "id": "tuning-unrelated-far-daily-01",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1511,7 +1511,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-12",
+      "id": "tuning-unrelated-far-daily-02",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1534,7 +1534,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-13",
+      "id": "tuning-unrelated-far-daily-03",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1557,7 +1557,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-14",
+      "id": "tuning-unrelated-far-daily-04",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1580,7 +1580,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-15",
+      "id": "tuning-unrelated-far-daily-05",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1603,7 +1603,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-16",
+      "id": "tuning-unrelated-far-daily-06",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1626,7 +1626,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-17",
+      "id": "tuning-unrelated-far-daily-07",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1649,7 +1649,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-18",
+      "id": "tuning-unrelated-far-daily-08",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1672,7 +1672,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-19",
+      "id": "tuning-unrelated-far-tech-01",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1695,7 +1695,7 @@
       }
     },
     {
-      "id": "tuning-unrelated-20",
+      "id": "tuning-unrelated-far-tech-02",
       "category": "unrelated",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1718,7 +1718,53 @@
       }
     },
     {
-      "id": "tuning-threshold-01",
+      "id": "tuning-unrelated-far-tech-03",
+      "category": "unrelated",
+      "relevant_ids": [],
+      "forbidden_ids": [
+        "nearby",
+        "adjacent"
+      ],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "tuning-unrelated-far-tech-04",
+      "category": "unrelated",
+      "relevant_ids": [],
+      "forbidden_ids": [
+        "nearby",
+        "adjacent"
+      ],
+      "no_match": true,
+      "expected_order": null,
+      "required_fact_ids": [],
+      "forbidden_fact_ids": [],
+      "dispatch": {
+        "valid": true,
+        "memory_ids": []
+      },
+      "answer": {
+        "behavior": "no_memory",
+        "required_facts": [],
+        "forbidden_facts": [],
+        "discarded": false
+      }
+    },
+    {
+      "id": "tuning-threshold-near-daily-01",
       "category": "threshold",
       "relevant_ids": [
         "nearby"
@@ -1740,7 +1786,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "平行ピン"
+            "ファスナー"
           ]
         ],
         "forbidden_facts": [],
@@ -1748,7 +1794,7 @@
       }
     },
     {
-      "id": "tuning-threshold-02",
+      "id": "tuning-threshold-near-daily-02",
       "category": "threshold",
       "relevant_ids": [
         "nearby"
@@ -1770,7 +1816,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "球形"
+            "デンタルフロス"
           ]
         ],
         "forbidden_facts": [],
@@ -1778,7 +1824,7 @@
       }
     },
     {
-      "id": "tuning-threshold-03",
+      "id": "tuning-threshold-near-daily-03",
       "category": "threshold",
       "relevant_ids": [
         "nearby"
@@ -1800,7 +1846,7 @@
         "behavior": "grounded",
         "required_facts": [
           [
-            "アルミ製ラック"
+            "日曜日"
           ]
         ],
         "forbidden_facts": [],
@@ -1808,7 +1854,7 @@
       }
     },
     {
-      "id": "tuning-threshold-04",
+      "id": "tuning-threshold-near-tech-04",
       "category": "threshold",
       "relevant_ids": [
         "nearby"
@@ -1838,7 +1884,7 @@
       }
     },
     {
-      "id": "tuning-threshold-05",
+      "id": "tuning-threshold-near-tech-05",
       "category": "threshold",
       "relevant_ids": [
         "nearby"
@@ -1868,7 +1914,7 @@
       }
     },
     {
-      "id": "tuning-threshold-06",
+      "id": "tuning-threshold-near-tech-06",
       "category": "threshold",
       "relevant_ids": [
         "nearby"
@@ -1898,7 +1944,7 @@
       }
     },
     {
-      "id": "tuning-threshold-07",
+      "id": "tuning-threshold-near-daily-07",
       "category": "threshold",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1921,7 +1967,7 @@
       }
     },
     {
-      "id": "tuning-threshold-08",
+      "id": "tuning-threshold-near-daily-08",
       "category": "threshold",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1944,7 +1990,7 @@
       }
     },
     {
-      "id": "tuning-threshold-09",
+      "id": "tuning-threshold-near-daily-09",
       "category": "threshold",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1967,7 +2013,7 @@
       }
     },
     {
-      "id": "tuning-threshold-10",
+      "id": "tuning-threshold-near-tech-10",
       "category": "threshold",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -1990,7 +2036,7 @@
       }
     },
     {
-      "id": "tuning-threshold-11",
+      "id": "tuning-threshold-near-tech-11",
       "category": "threshold",
       "relevant_ids": [],
       "forbidden_ids": [
@@ -2013,7 +2059,7 @@
       }
     },
     {
-      "id": "tuning-threshold-12",
+      "id": "tuning-threshold-near-tech-12",
       "category": "threshold",
       "relevant_ids": [],
       "forbidden_ids": [

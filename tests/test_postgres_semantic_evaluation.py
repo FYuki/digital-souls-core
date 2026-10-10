@@ -146,7 +146,7 @@ async def test_changing_embedding_space_fails_closed() -> None:
             await observe(runtime)
 
 
-def test_required_tuning_cli_eighty_seven_cases_three_uncached_runs(tmp_path: Path) -> None:
+def test_required_tuning_cli_eighty_nine_cases_three_uncached_runs(tmp_path: Path) -> None:
     from digital_souls_core.semantic_evaluation_cases import load_evaluation_cases
     from digital_souls_core.semantic_retrieval_evaluation import case_version
 
@@ -154,7 +154,7 @@ def test_required_tuning_cli_eighty_seven_cases_three_uncached_runs(tmp_path: Pa
     cases_path, gold_path = directory / "cases.json", directory / "expectations.json"
     data = load_evaluation_cases(cases_path, gold_path)
     output = tmp_path / "tuning-report.json"
-    # The 261 extra schemas use their own disposable server: catalog/WAL growth
+    # The 267 extra schemas use their own disposable server: catalog/WAL growth
     # must not consume the storage suite's bounded 512 MiB PostgreSQL container.
     process = subprocess.run(
         [
@@ -187,12 +187,12 @@ def test_required_tuning_cli_eighty_seven_cases_three_uncached_runs(tmp_path: Pa
     assert report.case_version != case_version(
         DATA, ROOT / "evals/semantic/cases.json", ROOT / "evals/semantic/expectations.json"
     )
-    assert all(len(run.cases) == 87 and run.gates_passed for run in report.runs)
+    assert all(len(run.cases) == 89 and run.gates_passed for run in report.runs)
     assert all(summary.rate == 1.0 for run in report.runs for summary in run.categories.values())
     assert all(row.passed for run in report.runs for row in run.cases)
     # epoch-change has no eligible records after revocation; every other case
     # embeds fresh inputs once per run, including the same logical record IDs.
-    assert report.embedding_call_count == 3 * 86
+    assert report.embedding_call_count == 3 * 88
     for c in data.cases.cases:
         assert c.query not in serialized
         assert all(r.normalized_text not in serialized for r in c.episodes)
