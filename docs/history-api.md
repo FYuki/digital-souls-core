@@ -40,6 +40,14 @@ completion本文の例（合成データ）:
 
 `messages`には新しいuserまたはtoolのみを1件以上渡します。件数上限はありません。
 過去ログを再送しません。保存済み履歴と新規入力の合計にも件数上限はありません。
+入力`content`は文字列、または`[{"type":"text","text":"..."}]`の配列です。
+入口で各textを`\n`で連結し、1要素ならそのtextそのものになります。
+要素は`type`・`text`だけを許可し、typeは`text`のみ、textは厳密な文字列です。
+text以外のtype、未知キー（cache_control等）、空配列、非object要素、非文字列text、
+配列以外の非文字列contentは400です。未知部分を黙って捨てません。
+privacyスキャン・保存・推論送信・既存1 MiBバイト検査は正規化した文字列へ適用します。
+復元と応答のtext contentも文字列で、assistant tool callのnullは従来どおりです。
+保存済み履歴やprovider応答の解析で配列を受理する変更ではありません。
 tools/tool_choice/temperature/max_tokens/max_completion_tokensの条件は既存APIと同じです。
 request_idは1〜64文字の英数字・`_`・`-`、期待revisionは0以上の整数です。
 成功は`conversation_id`、`request_id`、確定`revision`、公開assistant `message`、
@@ -47,7 +55,9 @@ request_idは1〜64文字の英数字・`_`・`-`、期待revisionは0以上の�
 
 tool_callsを受け取ったら外部Agentが実行し、次のrequest IDで対応する全tool resultを渡します。
 Coreは実行しません。不正な往復は400です。入力・設定が同じrequest IDの再送は同じreceiptを返し、
-再推論しません。異なる入力のID再利用、期待revisionのずれは409です。
+再推論しません。fingerprintはcontent正規化後に計算するため、同じtextを文字列と
+配列で再送しても同一入力です（例：`"one\ntwo"`と2要素のtext配列）。stream等の他項目は
+従来どおりfingerprintに含みます。異なる入力のID再利用、期待revisionのずれは409です。
 同時要求は推論コストが重複し得ます。409後は復元して次の入力を判断してください。
 
 ## streamと失敗
