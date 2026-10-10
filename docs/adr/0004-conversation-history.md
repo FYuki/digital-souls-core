@@ -4,6 +4,8 @@ Status: Proposed
 
 一部を[ADR 0021](0021-postgresql-only-storage.md)のPostgreSQL一本化で置き換えます（SQLite adapter、既定保存先（`history.sqlite3`）、ファイル権限、journal/secure_deleteの設定。保存・復元・削除・scope・revision・policyの契約は維持）。
 
+一部をEpic #134 / [Issue #135](https://github.com/FYuki/digital-souls-core/issues/135)の件数上限撤廃で置き換えます（2026-10-10 ユーザー決定。推論入力256 messageの件数上限を撤廃。履歴1 MiBのバイト上限は維持）。
+
 日付: 2026-10-03
 
 ## 背景

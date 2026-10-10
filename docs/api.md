@@ -43,10 +43,11 @@ inference profile、provider/modelは別の識別子です。返却JSONの`model
 
 ## 対応する小範囲
 
-- textのみの`messages`（system/user/assistant/tool、1〜256件）。callerのsystemは
+- textのみの`messages`（system/user/assistant/tool、1件以上・件数上限なし）。callerのsystemは
   人格systemの後に置きます。人格はLLMへの指示であり、セキュリティ境界ではありません。
 - function型`tools`（name/description/parameters）、`tool_choice`のauto/none/required/名前指定。
-  tool名は重複不可。tool callのID、名前、arguments文字列とtool結果は改変しません。
+  toolsは指定時1個以上・個数上限なしで、tool名は重複不可。
+  tool callのID、名前、arguments文字列とtool結果は改変しません。
   argumentsをJSONとして解釈・実行しません。履歴中のcall IDは一意で、全結果が必要です。
 - `stream`、`temperature`（0〜2）、`max_completion_tokens`（1〜32768）。
   旧`max_tokens`も同じ内部`max_completion_tokens`へ正規化します。両方指定は400です。
