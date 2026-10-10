@@ -2,6 +2,8 @@
 
 合成のみ。実会話・私的ログ・認証情報は含めません。決定は [ADR 0023](../../docs/adr/0023-semantic-evaluation-contract.md)、本番契約は [ADR 0022](../../docs/adr/0022-memory-retrieval-from-records.md)です。
 
+[調整専用の独立した合成ケースとローカル補助データ](tuning/README.md)は、合否判定用の62ケースと分けて使います。
+
 ## 分類と件数
 
 | category | 件数 |
