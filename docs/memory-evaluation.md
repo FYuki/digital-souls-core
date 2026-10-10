@@ -21,7 +21,9 @@ goldの分類・正解ID・禁止ID・期待順序・回答事実をモデルの
 本番 `MemoryRetrieval` / `MemoryContext` を通し、回答は `Inference.prepare` / `Inference.check` とProvider portを使います。
 逐語データや正本IDをモデル向けcontextへ注入する別経路は追加しません。
 
-本番設定は候補20、最大5、relevance閾値0.54、同等帯0.002です。
+本番設定は候補20、最大5、relevance閾値0.52、同等帯0.002です。
+採用モデルは [ADR 0024](adr/0024-multilingual-memory-embedding.md) の bge-m3 Q8_0（alias `bge-m3`、CLS、1024次元、接頭辞なし）です。
+従来の nomic のFAILは上記証跡に保持し、この設定での実モデル再評価は #132 で行います。
 unit vectorの二乗L2距離から `1/(1+sqrt(distance))` を求めます。
 同等帯は `last_user_mentioned_at DESC NULLS LAST → created_at DESC → id ASC` で並べます。
 Factは独立候補ではなく、有効なFactをEpisodeへ添付します。
@@ -93,7 +95,7 @@ external_send_allowed=true、timeoutを設定します。chatのProfileにmodel_
 起動前にGPUのVRAM・他の推論処理を確認し、余裕がなければ起動しません。
 既存コンテナの起動手順・主要設定は [llama.cpp運用](llamacpp-operations.md) を参照します。
 health・`/v1/models` alias・GGUF digest・image digest・build・portを確認します。
-embeddingにはmean等のpoolingが必要です。ubatchは最長入力のtoken数以上とし、
+bge-m3 のpoolingは `cls`、ctx/batch/ubatchは2048、parallelは1です。ubatchは最長入力のtoken数以上とし、
 long_textの失敗があれば設定値と失敗を記録します。運用設定を変えた場合は理由を記録し3回をやり直します。
 モデルの追加DL、他サービスの停止・変更、Ollamaの起動はこの評価手順に含めません。
 評価後は失敗時も起動した評価コンテナを停止し、inspectのexitedを記録します。

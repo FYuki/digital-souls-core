@@ -62,7 +62,10 @@ bge-m3 の掃引では次のとおりです（unrelated は話題が遠い型12�
 - 0.52 は bge-m3 の relevance 空間での値です。embedding モデルを変える場合は閾値も再調整します。
 - [ADR 0010](0010-in-process-memory-search.md)・[ADR 0018](0018-memory-retrieval-context.md)・[ADR 0022](0022-memory-retrieval-from-records.md)・
   [ADR 0023](0023-semantic-evaluation-contract.md)の閾値0.54の記述は、本文を書き換えず、冒頭の置換注記でこの ADR を参照します。
-- 本番で embedding のベクトルは永続化していません（[ADR 0011](0011-local-memory-embedding.md)・ADR 0022）。モデルの切替でデータの移行は不要です。実装時にこの前提を確認します。
+- 本番で embedding のベクトルは永続化していません（[ADR 0011](0011-local-memory-embedding.md)・ADR 0022）。モデルの切替でデータの移行は不要です。2026-10-10 に実装・schemaを照合して確認済みです。
+  `MemoryRetrieval.search` はローカル変数 `vectors` を `rank_records` へ渡し、storeへの書込はありません。
+  `MemoryRecordStore` の保存portと `postgres_record_schema.COLUMNS`、版6の `postgres_schema` に
+  embedding/vector列・永続indexはなく、model/digestは検索guardだけの識別です。
 
 ## 影響
 
@@ -70,7 +73,13 @@ bge-m3 の掃引では次のとおりです（unrelated は話題が遠い型12�
   従来の nomic 用 embedding コンテナは手動作成のため、切替の手順も文書にします。
 - `LocalEmbeddingProfile` の model・digest・dimensions（1024）の設定例と評価用 profile を更新します。adapter のコードは変えません。
 - SPEC・[記憶API](../memory.md)・[意味検索評価手順](../memory-evaluation.md)の閾値を0.52に合わせます。閾値の既定値をUTで確認します。
-- 偽 embedding の fixture は閾値の前後を測るため、閾値の変更に合わせて偽ベクトルの扱いを決めます（実装時に記録）。
+- ユーザー承認済み Q3 例外として、62ケースの `below-threshold` / `below-threshold-record` の偽vectorだけを
+  `[0.63, 0.7765951326141569, 0.0, 0.0]`（relevance約0.53757）から
+  `[0.5565557545480253, 0.8308102623821387, 0.0, 0.0]`（relevance 0.515）へ変更しました。
+  閾値0.52の直下で該当なしを検証する意図を保つためです。本文・gold・他の61ケース・
+  この記録以外のvectorは不変で、この本文は他ケースと共有されていません。実モデル評価は偽vectorを使いません。
+- 調整用89件も本文・goldを維持し、境界付近44記録の偽vectorだけを0.52前後へ追従しました。
+  答えあり0.5201〜0.521、該当なし0.519〜0.5199、別候補0.51、unrelated-nearは0.51 / 0.50です。
 - VRAM は embedding サーバーの読込みで約0.6 GB 増えます（nomic v1.5 は約0.55 GB）。
 
 ## 残る課題と後続
