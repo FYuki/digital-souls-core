@@ -14,6 +14,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from .memory_ranking import MemoryEmbedding
+from .privacy_scan import scan
 from .semantic_embedding_candidates import (
     PrefixEmbedding,
     TimedEmbedding,
@@ -92,6 +93,15 @@ async def evaluate_supplements(directory: Path, embedding: PrefixEmbedding) -> d
         or len(mkqa) < 2
     ):
         raise ValueError("Incomplete supplements")
+    # Apply the same raw-input scanner preflight to every candidate. Do not
+    # bypass LocalEmbedding's fail-closed contract for quote-leading questions.
+    # The original files remain intact; excluded pairs are explicitly NOT RUN.
+    original_pairs = len(mkqa)
+    blocked = [row for row in mkqa if (finding := scan((row.ja, row.en))).secret or finding.failed]
+    blocked_ids = {row.source_id for row in blocked}
+    mkqa = [row for row in mkqa if row.source_id not in blocked_ids]
+    if len(mkqa) < 2:
+        raise ValueError("Insufficient scanner-authorized bilingual pairs")
     timed = TimedEmbedding(embedding.delegate)
     asymmetric = PrefixEmbedding(timed, embedding.query_prefix, embedding.document_prefix)
     positive: list[float] = []
@@ -121,7 +131,9 @@ async def evaluate_supplements(directory: Path, embedding: PrefixEmbedding) -> d
             "auc": separation_auc(tuple(pairs), tuple(non_pairs)),
         }
     return {
-        "status": "COMPLETED; descriptive only",
+        "status": "COMPLETED with NOT RUN pairs; descriptive only"
+        if blocked
+        else "COMPLETED; descriptive only",
         "sources": {
             "nomiracl_revision": manifest["nomiracl"]["revision"],
             "mkqa_revision": manifest["mkqa"]["revision"],
@@ -133,7 +145,10 @@ async def evaluate_supplements(directory: Path, embedding: PrefixEmbedding) -> d
                 for p in (nomiracl_path, mkqa_path)
             },
             "nomiracl_queries": len(nomiracl),
-            "mkqa_pairs": len(mkqa),
+            "mkqa_original_pairs": original_pairs,
+            "mkqa_measured_pairs": len(mkqa),
+            "mkqa_not_run_pairs": len(blocked),
+            "mkqa_not_run_reason": "raw-input scanner secret/failed; same preflight for all candidates",
         },
         "nomiracl": {
             "query_max_characters": 128,

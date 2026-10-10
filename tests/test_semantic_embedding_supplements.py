@@ -56,6 +56,29 @@ async def test_descriptive_analysis_clips_inputs_and_never_exports_bodies(tmp_pa
     assert len(fake.calls[0][0]) == 128 + len("query: ")
     assert len(fake.calls[0][1]) == 200 + len("passage: ")
     assert all(t.startswith("query: ") for call in fake.calls[1:] for t in call)
+    # A quote-leading non-JSON question must not be sent, across prefix choices.
+    mkqa.append(
+        dict(
+            schema_version=1,
+            dataset="mkqa-ja-en",
+            source_id="blocked",
+            ja='"synthetic malformed JSON',
+            en="Synthetic blocked pair",
+        )
+    )
+    manifest["mkqa"]["counts"]["pairs"] = 3
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    (tmp_path / "mkqa-ja-en.jsonl").write_text("\n".join(json.dumps(r) for r in mkqa) + "\n")
+    for query_prefix, document_prefix in (("", ""), ("query: ", "passage: ")):
+        second_fake = FakeEmbedding()
+        filtered = await evaluate_supplements(
+            tmp_path, PrefixEmbedding(second_fake, query_prefix, document_prefix)
+        )
+        assert filtered["sources"]["mkqa_original_pairs"] == 3
+        assert filtered["sources"]["mkqa_measured_pairs"] == 2
+        assert filtered["sources"]["mkqa_not_run_pairs"] == 1
+        assert "NOT RUN" in filtered["status"]
+        assert all("Synthetic blocked pair" not in t for call in second_fake.calls for t in call)
     output = json.dumps(result)
     assert query not in output and body not in output
     assert all(str(r["ja"]) not in output and str(r["en"]) not in output for r in mkqa)
