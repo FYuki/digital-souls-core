@@ -38,7 +38,7 @@ Aを採用する。製品利用ではキャラクター設定、privacy、履歴
 
 共通の人格を使うことは、別Bindingの履歴・記憶を共有する許可を意味しない。
 既存のBinding分離、localhost制限、保存のopt-in、stateless APIの挙動を維持する。
-形成jobの起動を外部Agentが担う既存の責務も変更しない。
+記憶の形成jobの起動をPrivateAgentが担う既存の責務（[ADR 0017](0017-memory-formation-admission.md)）も変更しない。
 
 ## 影響
 
