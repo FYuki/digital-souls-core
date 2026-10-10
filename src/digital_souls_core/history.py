@@ -8,7 +8,7 @@ from typing import Annotated, Literal, Protocol
 from pydantic import Field, model_validator
 
 from .character import AccessScope
-from .contracts import Message, Name, NamedToolChoice, StrictModel, Tool
+from .contracts import InputMessage, Message, Name, NamedToolChoice, StrictModel, Tool
 
 type Clock = Callable[[], datetime]
 
@@ -26,7 +26,7 @@ def as_utc(value: datetime) -> datetime:
 class TurnInput(StrictModel):
     request_id: Name
     expected_revision: Annotated[int, Field(ge=0)]
-    messages: Annotated[list[Message], Field(min_length=1)]
+    messages: Annotated[list[InputMessage], Field(min_length=1)]
     memory_excluded_indices: list[Annotated[int, Field(ge=0)]] = Field(default_factory=list)
     stream: bool = False
     tools: Annotated[list[Tool], Field(min_length=1)] | None = None

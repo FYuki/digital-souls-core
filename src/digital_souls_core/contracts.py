@@ -2,7 +2,15 @@
 
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    create_model,
+    model_validator,
+)
 
 Name = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")]
 
@@ -40,6 +48,37 @@ class Message(StrictModel):
         return self
 
 
+class TextPart(StrictModel):
+    type: Literal["text"]
+    text: str
+
+
+_TEXT_PARTS: TypeAdapter[list[TextPart]] = TypeAdapter(
+    Annotated[list[TextPart], Field(min_length=1)]
+)
+
+
+def normalize_input_message(value: Any) -> Any:
+    """Normalize only completion inputs; stored/provider Message stays text-only."""
+    if isinstance(value, dict) and isinstance(value.get("content"), list):
+        parts = _TEXT_PARTS.validate_python(value["content"])
+        return {**value, "content": "\n".join(part.text for part in parts)}
+    return value
+
+
+# Describe the accepted wire shape without widening the runtime Message contract.
+_INPUT_MESSAGE_SCHEMA = create_model(
+    "CompletionMessageInput",
+    __base__=Message,
+    content=(str | Annotated[list[TextPart], Field(min_length=1)] | None, None),
+)
+
+type InputMessage = Annotated[
+    Message,
+    BeforeValidator(normalize_input_message, json_schema_input_type=_INPUT_MESSAGE_SCHEMA),
+]
+
+
 class FunctionDefinition(StrictModel):
     name: Name
     description: str | None = None
@@ -61,7 +100,7 @@ class NamedToolChoice(StrictModel):
 
 
 class CompletionInput(StrictModel):
-    messages: Annotated[list[Message], Field(min_length=1)]
+    messages: Annotated[list[InputMessage], Field(min_length=1)]
     stream: bool = False
     tools: Annotated[list[Tool], Field(min_length=1)] | None = None
     tool_choice: Literal["auto", "none", "required"] | NamedToolChoice | None = None
